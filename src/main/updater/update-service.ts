@@ -180,27 +180,44 @@ export function normalizeReleaseNotes(notes: string | ReleaseNoteEntry[] | null 
   return sections.length > 0 ? sections.join('\n\n') : undefined;
 }
 
+/** Marks a heading start so only headings get a blank line above them. */
+const HEADING_GAP = '\u0001';
+
 /**
  * GitHub delivers release notes as rendered HTML. The About section shows plain
  * text, so keep the structure (headings, list items, paragraphs) and drop tags.
+ * Source whitespace is not layout: GitHub turns every wrapped CHANGELOG line into
+ * `<br>`, so `<br>` and newlines become spaces and breaks come only from block tags.
+ * The "Downloads" table (scripts/release-notes.mjs) is for the GitHub page and is cut.
  */
 export function htmlToText(html: string): string {
   return html
-    .replace(/\r/g, '')
-    .replace(/<li[^>]*>/gi, '- ')
-    .replace(/<\/(h[1-6]|p|li|ul|ol|div|tr)>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<h[1-6][^>]*>\s*Downloads\s*<\/h[1-6]>[\s\S]*$/i, '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/<h[1-6][^>]*>/gi, `\n${HEADING_GAP}`)
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<\/?(p|div|tr|table|pre|blockquote)\b[^>]*>/gi, '\n')
+    .replace(/<\/t[dh]>/gi, ' ')
     .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (match, code: string) => codePoint(Number(code), match))
+    .replace(/&#x([0-9a-f]+);/gi, (match, code: string) => codePoint(parseInt(code, 16), match))
+    .replace(/&amp;/g, '&')
     .split('\n')
-    .map((line) => line.trimEnd())
+    .map((line) => line.trim())
     .join('\n')
+    .replace(/\n{2,}/g, '\n')
+    .replace(new RegExp(`\\n?${HEADING_GAP}`, 'g'), '\n\n')
     .trim();
+}
+
+function codePoint(code: number, fallback: string): string {
+  return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : fallback;
 }
 
 /** Runs one check shortly after startup so the window is visible before the network call. */

@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+- Update release notes read cleanly: no blank line after every item, wrapped sentences stay on one line, and the
+  GitHub download table is left out.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added

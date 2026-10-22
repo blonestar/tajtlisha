@@ -160,3 +160,5 @@ or update path.
 - 2026-10-22: U1 and U2 merged (Haiku workers), U3 from the Sol review. Checked in the built app with Playwright and
   capturePage at 100/125/150% on a 1100x700 window: splitters drag and persist, side column scrolls when short.
 - 2026-10-22: v0.3.0 released (resizable panels, UI zoom, plain-text release notes).
+- 2026-10-22: v0.2.x still shows raw HTML for the v0.3.0 notes (the cleanup ships in 0.3.0 itself). Tightened the
+  0.3.0 conversion on develop: one line per item, `<br>` soft wraps joined, Downloads section dropped.

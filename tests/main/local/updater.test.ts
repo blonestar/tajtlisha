@@ -5,6 +5,7 @@ import type { UpdateState } from '../../../src/shared/types/updates';
 import {
   createUpdateService,
   isUpdateSupported,
+  htmlToText,
   normalizeReleaseNotes,
   scheduleStartupCheck,
   type UpdaterLike
@@ -268,6 +269,32 @@ describe('scheduleStartupCheck', () => {
   it('turns GitHub HTML release notes into plain text', () => {
     expect(
       normalizeReleaseNotes('<h3>Fixed</h3>\n<ul>\n<li>The ffmpeg check &amp; Settings</li>\n<li>Publish step</li>\n</ul>')
-    ).toBe('Fixed\n\n- The ffmpeg check & Settings\n\n- Publish step');
+    ).toBe('Fixed\n- The ffmpeg check & Settings\n- Publish step');
+  });
+
+  it('joins wrapped lines, keeps sections apart and drops the GitHub download guide', () => {
+    const html = [
+      '<h3>Added</h3>',
+      '<ul>',
+      '<li>Zoom in Settings &gt; General.</li>',
+      '<li>Drag the line between the video and<br>',
+      'the style panel.</li>',
+      '</ul>',
+      '<h3>Fixed</h3>',
+      '<ul>',
+      '<li>Notes as text.</li>',
+      '</ul>',
+      '<h2>Downloads</h2>',
+      '<table><tr><td>Tajtlisha.AppImage</td><td>Linux</td></tr></table>',
+      '<p>ffmpeg is included.</p>'
+    ].join('\n');
+
+    expect(normalizeReleaseNotes(html)).toBe(
+      'Added\n- Zoom in Settings > General.\n- Drag the line between the video and the style panel.\n\nFixed\n- Notes as text.'
+    );
+  });
+
+  it('decodes entities once and leaves invalid numeric entities alone', () => {
+    expect(htmlToText('<p>&amp;lt;tag&amp;gt; &#39;x&#x27; &#99999999;</p>')).toBe("&lt;tag&gt; 'x' &#99999999;");
   });
 });
