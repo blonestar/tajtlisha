@@ -71,7 +71,7 @@ or update path.
 
 | # | Task | Branch | Status |
 | --- | --- | --- | --- |
-| F1 | Optional transcript summary: own Settings tab (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | in review |
+| F1 | Optional transcript summary: own Settings tab (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | merged |
 
 ## Backlog for v0.2.1
 
