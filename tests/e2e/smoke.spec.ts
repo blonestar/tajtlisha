@@ -173,10 +173,23 @@ test('seeks an opened video and toggles playback with a click on the frame', asy
     expect(seek.seekableEnd).toBeGreaterThan(9);
     expect(seek.currentTime).toBeCloseTo(6, 1);
 
+    // Play, pause, play again: the second play continues from the paused position.
+    const isPaused = () => video.evaluate((element: HTMLVideoElement) => element.paused);
+    const currentTime = () => video.evaluate((element: HTMLVideoElement) => element.currentTime);
     await video.click({ force: true });
-    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
+    await expect.poll(isPaused).toBe(false);
+    await page.waitForTimeout(1000);
     await video.click({ force: true });
-    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
+    await expect.poll(isPaused).toBe(true);
+    const pausedAt = await currentTime();
+    expect(pausedAt).toBeGreaterThan(6.5);
+
+    await video.click({ force: true });
+    await expect.poll(isPaused).toBe(false);
+    await page.waitForTimeout(300);
+    expect(await currentTime()).toBeGreaterThanOrEqual(pausedAt);
+    await video.click({ force: true });
+    await expect.poll(isPaused).toBe(true);
   } finally {
     await app.close();
     rmSync(tempFolder, { force: true, recursive: true });
