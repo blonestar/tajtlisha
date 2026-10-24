@@ -77,13 +77,15 @@ export const captionsStrings = {
       translating: 'Translating',
       polishing: 'Polishing text',
       rendering_video: 'Rendering video',
-      writing_srt: 'Writing SRT'
+      writing_srt: 'Writing SRT',
+      summarizing: 'Summarizing'
     },
     jobs: {
       transcribe: 'Transcription',
       translate: 'Translation',
       export: 'Export',
-      preview: 'Preview'
+      preview: 'Preview',
+      summarize: 'Summary'
     },
     job: {
       working: 'Working…',
@@ -111,6 +113,9 @@ export const captionsStrings = {
       translate: 'Translate',
       translateCount: 'Translate {{count}} rows',
       translateAgain: 'Translate again',
+      summarize: 'Summarize',
+      summarizeAgain: 'Summarize again',
+      showSummary: 'Show summary',
       timingApproximate: 'Timing is approximate',
       timingApproximateHint: 'Timing comes from speech detection, not from word timestamps.',
       reason: {
@@ -122,8 +127,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} cannot translate',
         noCaptions: 'Transcribe the clip first',
         allTranslated: 'Every row is translated and up to date',
-        busy: 'Wait for the current job to finish'
+        busy: 'Wait for the current job to finish',
+        noTranscript: 'No caption text inside the trim range',
+        cannotSummarize: '{{provider}} cannot summarize'
       }
+    },
+    summary: {
+      title: 'Video summary',
+      description: 'Based on the captions inside the trim range. Edit the text, then copy it.',
+      textLabel: 'Summary text',
+      characterCount: '{{count}} characters',
+      revisionChanged: 'Captions changed after this summary',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Copying failed. Select the text and copy it by hand.',
+      close: 'Close',
+      nothingToSummarize: 'There is no caption text inside the trim range to summarize.'
     },
     export: {
       title: 'Export subtitles',
@@ -256,13 +275,15 @@ export const captionsStrings = {
       translating: 'Prevođenje',
       polishing: 'Dorada teksta',
       rendering_video: 'Renderovanje videa',
-      writing_srt: 'Pisanje SRT-a'
+      writing_srt: 'Pisanje SRT-a',
+      summarizing: 'Sažimanje'
     },
     jobs: {
       transcribe: 'Transkripcija',
       translate: 'Prevod',
       export: 'Izvoz',
-      preview: 'Pregled'
+      preview: 'Pregled',
+      summarize: 'Sažetak'
     },
     job: {
       working: 'U toku…',
@@ -290,6 +311,9 @@ export const captionsStrings = {
       translate: 'Prevedi',
       translateCount: 'Prevedi redove: {{count}}',
       translateAgain: 'Prevedi ponovo',
+      summarize: 'Sažmi',
+      summarizeAgain: 'Sažmi ponovo',
+      showSummary: 'Prikaži sažetak',
       timingApproximate: 'Vremena su približna',
       timingApproximateHint: 'Vremena dolaze iz detekcije govora, a ne iz vremena reči.',
       reason: {
@@ -301,8 +325,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} ne može da prevodi',
         noCaptions: 'Prvo transkribuj isečak',
         allTranslated: 'Svi redovi su prevedeni i ažurni',
-        busy: 'Sačekaj da se završi trenutni posao'
+        busy: 'Sačekaj da se završi trenutni posao',
+        noTranscript: 'Nema teksta titlova u opsegu isečka',
+        cannotSummarize: '{{provider}} ne može da sažima'
       }
+    },
+    summary: {
+      title: 'Sažetak videa',
+      description: 'Zasnovano na titlovima unutar isečka. Izmeni tekst, pa ga kopiraj.',
+      textLabel: 'Tekst sažetka',
+      characterCount: '{{count}} karaktera',
+      revisionChanged: 'Titlovi su menjani posle ovog sažetka',
+      copy: 'Kopiraj',
+      copied: 'Kopirano',
+      copyFailed: 'Kopiranje nije uspelo. Označi tekst i kopiraj ga ručno.',
+      close: 'Zatvori',
+      nothingToSummarize: 'U opsegu isečka nema teksta titlova za sažimanje.'
     },
     export: {
       title: 'Izvoz titlova',
@@ -435,13 +473,15 @@ export const captionsStrings = {
       translating: 'Превођење',
       polishing: 'Дорада текста',
       rendering_video: 'Рендеровање видеа',
-      writing_srt: 'Писање SRT-а'
+      writing_srt: 'Писање SRT-а',
+      summarizing: 'Сажимање'
     },
     jobs: {
       transcribe: 'Транскрипција',
       translate: 'Превод',
       export: 'Извоз',
-      preview: 'Преглед'
+      preview: 'Преглед',
+      summarize: 'Сажетак'
     },
     job: {
       working: 'У току…',
@@ -469,6 +509,9 @@ export const captionsStrings = {
       translate: 'Преведи',
       translateCount: 'Преведи редове: {{count}}',
       translateAgain: 'Преведи поново',
+      summarize: 'Сажми',
+      summarizeAgain: 'Сажми поново',
+      showSummary: 'Прикажи сажетак',
       timingApproximate: 'Времена су приближна',
       timingApproximateHint: 'Времена долазе из детекције говора, а не из времена речи.',
       reason: {
@@ -480,8 +523,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} не може да преводи',
         noCaptions: 'Прво транскрибуј исечак',
         allTranslated: 'Сви редови су преведени и ажурни',
-        busy: 'Сачекај да се заврши тренутни посао'
+        busy: 'Сачекај да се заврши тренутни посао',
+        noTranscript: 'Нема текста титлова у опсегу исечка',
+        cannotSummarize: '{{provider}} не може да сажима'
       }
+    },
+    summary: {
+      title: 'Сажетак видеа',
+      description: 'Засновано на титловима унутар исечка. Измени текст, па га копирај.',
+      textLabel: 'Текст сажетка',
+      characterCount: '{{count}} карактера',
+      revisionChanged: 'Титлови су мењани после овог сажетка',
+      copy: 'Копирај',
+      copied: 'Копирано',
+      copyFailed: 'Копирање није успело. Означи текст и копирај га ручно.',
+      close: 'Затвори',
+      nothingToSummarize: 'У опсегу исечка нема текста титлова за сажимање.'
     },
     export: {
       title: 'Извоз титлова',

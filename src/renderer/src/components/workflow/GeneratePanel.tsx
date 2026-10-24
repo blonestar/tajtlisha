@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right.js';
 import CircleCheck from 'lucide-react/dist/esm/icons/circle-check.js';
 import AudioLines from 'lucide-react/dist/esm/icons/audio-lines.js';
+import ScrollText from 'lucide-react/dist/esm/icons/scroll-text.js';
+import Eye from 'lucide-react/dist/esm/icons/eye.js';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.js';
 import TriangleAlert from 'lucide-react/dist/esm/icons/triangle-alert.js';
 import { PROJECT_LANGUAGES } from '../../../../shared/types/project';import './workflow.css';
@@ -14,6 +16,7 @@ export type GenerateProviderInfo = {
   connected: boolean;
   canTranscribe: boolean;
   canTranslate: boolean;
+  canSummarize: boolean;
 };
 
 export type GeneratePanelProps = {
@@ -26,10 +29,17 @@ export type GeneratePanelProps = {
   rowsNeedingTranslation: number;
   timingSource?: 'word' | 'segment' | 'speech_detection';
   busy: boolean;
+  /** Summary is opt-in in Settings. The actions are hidden unless this is true. */
+  summaryEnabled?: boolean;
+  /** Caption rows inside the trim range that have text. Summary needs at least one. */
+  summarizableRows?: number;
+  hasSummary?: boolean;
   onSourceLanguageChange(code: string | 'auto'): void;
   onTargetLanguageChange(code: string): void;
   onTranscribe(): void;
   onTranslate(): void;
+  onSummarize?(): void;
+  onShowSummary?(): void;
   onOpenSettings(): void;
 };
 
@@ -64,6 +74,19 @@ function translateBlock(props: GeneratePanelProps): Reason | null {
   return null;
 }
 
+function summarizeBlock(props: GeneratePanelProps): Reason | null {
+  if (props.busy) return { key: 'captions.generate.reason.busy' };
+  if ((props.summarizableRows ?? 0) === 0) return { key: 'captions.generate.reason.noTranscript' };
+  if (!props.provider) return { key: 'captions.generate.reason.noProvider' };
+  if (!props.provider.connected) {
+    return { key: 'captions.generate.reason.notConnected', values: { provider: props.provider.displayName } };
+  }
+  if (!props.provider.canSummarize) {
+    return { key: 'captions.generate.reason.cannotSummarize', values: { provider: props.provider.displayName } };
+  }
+  return null;
+}
+
 /**
  * Compact toolbar for the AI steps. Every disabled action names the reason
  * next to it, so the user never has to guess why a button does nothing.
@@ -77,15 +100,20 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
     captionCount,
     rowsNeedingTranslation,
     timingSource,
+    summaryEnabled = false,
+    hasSummary = false,
     onSourceLanguageChange,
     onTargetLanguageChange,
     onTranscribe,
     onTranslate,
+    onSummarize,
+    onShowSummary,
     onOpenSettings
   } = props;
 
   const transcribeReason = transcribeBlock(props);
   const translateReason = translateBlock(props);
+  const summarizeReason = summarizeBlock(props);
   const translateLabel =
     rowsNeedingTranslation > 0
       ? t('captions.generate.translateCount', { count: rowsNeedingTranslation })
@@ -199,6 +227,30 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
             <span className="generate-reason">{t(translateReason.key, translateReason.values)}</span>
           )}
         </div>
+        {summaryEnabled && (
+          <div className="generate-action">
+            <div className="generate-button-row">
+              <button
+                type="button"
+                className="btn"
+                disabled={summarizeReason !== null}
+                onClick={onSummarize}
+              >
+                <ScrollText aria-hidden="true" size={14} />
+                {hasSummary ? t('captions.generate.summarizeAgain') : t('captions.generate.summarize')}
+              </button>
+              {hasSummary && (
+                <button type="button" className="btn btn-ghost" onClick={onShowSummary}>
+                  <Eye aria-hidden="true" size={14} />
+                  {t('captions.generate.showSummary')}
+                </button>
+              )}
+            </div>
+            {summarizeReason && (
+              <span className="generate-reason">{t(summarizeReason.key, summarizeReason.values)}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

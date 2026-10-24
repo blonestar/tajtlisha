@@ -11,6 +11,7 @@ import type {
 import type { AppSettings } from '../../../../shared/types/settings';
 import { CaptionSettings } from './CaptionSettings';
 import { ProviderPanel } from './ProviderPanel';
+import { SummarySettings } from './SummarySettings';
 
 type AiSectionProps = {
   settings: AppSettings;
@@ -84,6 +85,9 @@ export function AiSection({
 
       <h3 className="settings-subheading">{t('settings.captions.heading')}</h3>
       <CaptionSettings settings={settings} onSettingsChange={onSettingsChange} />
+
+      <h3 className="settings-subheading">{t('settings.summary.heading')}</h3>
+      <SummarySettings settings={settings} onSettingsChange={onSettingsChange} />
     </>
   );
 }

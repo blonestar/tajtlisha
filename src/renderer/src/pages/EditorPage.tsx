@@ -19,7 +19,13 @@ import { useEditorLayout } from '../hooks/useEditorLayout';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { usePlayhead } from '../hooks/usePlayhead';
 import type { Workspace } from '../hooks/useWorkspace';
-import { captionIssuesFor, captionLineLimit, staleCaptionIds, UNKNOWN_LANGUAGE } from '../hooks/workspaceModel';
+import {
+  captionIssuesFor,
+  captionLineLimit,
+  staleCaptionIds,
+  summaryTranscript,
+  UNKNOWN_LANGUAGE
+} from '../hooks/workspaceModel';
 import { findActiveCaption, isBlockingCaptionIssue, rowsNeedingTranslation } from '../state/selectors';
 import { MIN_INSERT_ROOM_MS } from '../state/project-reducer';
 import type { ProjectStore } from '../state/useProjectStore';
@@ -221,6 +227,11 @@ export function EditorPage({
             onTargetLanguageChange={(code) => dispatch({ type: 'languages/set', targetLanguage: code })}
             onTranscribe={workspace.requestTranscribe}
             onTranslate={workspace.translate}
+            summaryEnabled={settings.summary.enabled}
+            summarizableRows={summaryTranscript(project).length}
+            hasSummary={workspace.summary !== null}
+            onSummarize={workspace.summarize}
+            onShowSummary={workspace.openSummary}
             onOpenSettings={onOpenSettings}
           />
         </div>
