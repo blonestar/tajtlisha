@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-25
+
 ### Fixed
 - Update release notes read cleanly: no blank line after every item, wrapped sentences stay on one line, and the
   GitHub download table is left out.
@@ -83,7 +85,9 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.2.1...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.3.1...develop
+[0.3.1]: https://github.com/blonestar/tajtlisha/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/blonestar/tajtlisha/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/blonestar/tajtlisha/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/blonestar/tajtlisha/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/blonestar/tajtlisha/releases/tag/v0.1.0
