@@ -35,8 +35,13 @@ function setup(options: SetupOptions = {}) {
   });
 
   let finish: (value: Summary) => void = () => undefined;
+  let fail: (error: Error) => void = () => undefined;
   const summarize = vi.fn(
-    (_request: SummarizeTranscriptRequest) => new Promise<Summary>((resolve) => (finish = resolve))
+    (_request: SummarizeTranscriptRequest) =>
+      new Promise<Summary>((resolve, reject) => {
+        finish = resolve;
+        fail = reject;
+      })
   );
   const api = { ...fake.api, workflow: { transcribe: vi.fn(), translate: vi.fn(), summarize } } as unknown as TajtlishaApi;
   vi.stubGlobal('tajtlisha', api);
@@ -64,6 +69,7 @@ function setup(options: SetupOptions = {}) {
     hook,
     summarize,
     finish: (value: Summary) => finish(value),
+    fail: (error: Error) => fail(error),
     /** Starts the summary and waits until the request has reached the API. */
     async start() {
       await waitFor(() => expect(hook.result.current.store.ready).toBe(true));
@@ -176,6 +182,7 @@ describe('useWorkspace.summarize', () => {
     const { workspace, store } = env.hook.result.current;
     expect(workspace.summary).toEqual({
       projectId: store.state.project.id,
+      inputPath: store.state.project.source?.inputPath ?? null,
       revision: store.state.project.revision,
       text: 'Tweet text'
     });
@@ -232,6 +239,49 @@ describe('useWorkspace.summarize', () => {
 
     expect(env.hook.result.current.workspace.summary).toBeNull();
     expect(env.hook.result.current.workspace.summaryOpen).toBe(false);
+  });
+
+  it('clears an existing result when another video is opened in the same project', async () => {
+    const env = setup();
+    await env.start();
+    await act(async () => {
+      env.finish({ text: 'Tweet text' });
+    });
+    const { store } = env.hook.result.current;
+    const source = store.state.project.source;
+    expect(source).not.toBeNull();
+    expect(env.hook.result.current.workspace.summary).not.toBeNull();
+
+    act(() =>
+      env.hook.result.current.store.dispatch({
+        type: 'source/set',
+        source: { ...source!, inputPath: '/videos/another-clip.mp4' }
+      })
+    );
+
+    expect(env.hook.result.current.store.state.project.id).toBe(store.state.project.id);
+    expect(env.hook.result.current.workspace.summary).toBeNull();
+    expect(env.hook.result.current.workspace.summaryOpen).toBe(false);
+  });
+
+  it('clears the job bar error of a failed attempt when the next attempt succeeds', async () => {
+    const env = setup();
+    await env.start();
+    await act(async () => {
+      env.fail(new Error('[PROVIDER_REQUEST_FAILED] OpenAI request failed (HTTP 500).'));
+    });
+    expect(env.hook.result.current.workspace.jobResult?.status).toBe('error');
+
+    act(() => {
+      void env.hook.result.current.workspace.summarize();
+    });
+    await waitFor(() => expect(env.summarize).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      env.finish({ text: 'Tweet text' });
+    });
+
+    expect(env.hook.result.current.workspace.summary?.text).toBe('Tweet text');
+    expect(env.hook.result.current.workspace.jobResult).toBeNull();
   });
 
   it('explains instead of calling the provider when no caption in the trim has text', async () => {

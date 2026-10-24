@@ -97,6 +97,23 @@ describe('SummarySettings', () => {
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
   });
 
+  it('never writes when a cleared default prompt is blurred and Settings then closes', () => {
+    const onSettingsChange = vi.fn();
+    const view = renderWithI18n(
+      <SummarySettings
+        settings={withSummary({ enabled: true, systemPrompt: DEFAULT_SUMMARY_PROMPT })}
+        onSettingsChange={onSettingsChange}
+      />
+    );
+    const prompt = screen.getByLabelText('System prompt');
+
+    fireEvent.change(prompt, { target: { value: '' } });
+    fireEvent.blur(prompt);
+    view.unmount();
+
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
   it('does not write settings on blur when the prompt is unchanged', () => {
     const { onSettingsChange } = renderSummary(withSummary({ enabled: true, systemPrompt: 'Same' }));
 

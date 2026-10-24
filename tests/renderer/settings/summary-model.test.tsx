@@ -108,6 +108,45 @@ describe('Summary tab model row', () => {
     });
   });
 
+  it('saves a typed model when Settings closes with Esc (no blur)', () => {
+    const onSettingsChange = vi.fn();
+    const view = renderWithI18n(
+      <SummarySettings
+        settings={settingsWith({ enabled: true })}
+        providers={mockProviderStatuses}
+        onSettingsChange={onSettingsChange}
+        onListModels={listModelsSpy()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Summary model'), { target: { value: 'gpt-5-mini' } });
+    view.unmount();
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      summary: expect.objectContaining({ modelByProvider: { openai: 'gpt-5-mini' } })
+    });
+  });
+
+  it('does not save the model twice when a blur already saved it', () => {
+    const onSettingsChange = vi.fn();
+    const view = renderWithI18n(
+      <SummarySettings
+        settings={settingsWith({ enabled: true })}
+        providers={mockProviderStatuses}
+        onSettingsChange={onSettingsChange}
+        onListModels={listModelsSpy()}
+      />
+    );
+    const input = screen.getByLabelText('Summary model');
+
+    fireEvent.change(input, { target: { value: 'gpt-5-mini' } });
+    fireEvent.blur(input);
+    view.unmount();
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+  });
+
   it('commits on Enter', () => {
     const { onSettingsChange } = renderSummaryTab({ settings: settingsWith({ enabled: true }) });
     const input = screen.getByLabelText('Summary model');

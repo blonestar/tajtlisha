@@ -123,13 +123,26 @@ function SummaryModelRow({ provider, settings, onSettingsChange, onListModels }:
     };
   }, [usable, providerId, onListModels]);
 
-  function commit(): void {
-    const next = draft.trim();
-    setDraft(next);
-    if (!providerId || next === storedModel) return;
+  const committed = useRef(storedModel);
+  useEffect(() => {
+    committed.current = storedModel;
+  }, [storedModel]);
 
+  function save(value: string): void {
+    const next = value.trim();
+    if (!providerId || next === committed.current) return;
+
+    committed.current = next;
     const summary = settings.summary;
     onSettingsChange?.({ summary: { ...summary, modelByProvider: { ...summary.modelByProvider, [providerId]: next } } });
+  }
+
+  // Esc closes Settings without a blur; save what was typed.
+  useCommitOnUnmount(draft, save);
+
+  function commit(): void {
+    setDraft(draft.trim());
+    save(draft);
   }
 
   const hint = !provider?.connected
@@ -188,31 +201,23 @@ function SummaryPromptRow({ systemPrompt, onCommit }: SummaryPromptRowProps): Re
   const isDefault = stored === DEFAULT_SUMMARY_PROMPT;
 
   // Esc closes Settings without a blur, so a draft that was never committed is committed on unmount.
-  // `committed` stops a second write after a blur already saved it (for example when the switch turns the feature off).
+  // `committed` holds the last saved value as shown (blank = default), so a blur that already
+  // saved it, or a blank draft that now shows the default, never causes a second write.
   const committed = useRef(stored);
-  const latest = useRef({ draft, onCommit });
-  useLayoutEffect(() => {
-    latest.current = { draft, onCommit };
-  });
-  useEffect(
-    () => () => {
-      const { draft: pending, onCommit: commit } = latest.current;
-      if (pending !== committed.current) commit(pending.trim() === '' ? '' : pending);
-    },
-    []
-  );
-
   useEffect(() => {
     committed.current = stored;
   }, [stored]);
+  useCommitOnUnmount(draft, (pending) => {
+    if (shownPrompt(pending) !== committed.current) onCommit(pending.trim() === '' ? '' : pending);
+  });
 
   function commitDraft(): void {
-    if (draft === stored || draft === committed.current) return;
-
     const next = draft.trim() === '' ? '' : draft;
-    committed.current = draft;
-    onCommit(next);
     setDraft(shownPrompt(next));
+    if (shownPrompt(next) === committed.current) return;
+
+    committed.current = shownPrompt(next);
+    onCommit(next);
   }
 
   function resetPrompt(): void {
@@ -243,4 +248,16 @@ function SummaryPromptRow({ systemPrompt, onCommit }: SummaryPromptRowProps): Re
       </div>
     </SettingsRow>
   );
+}
+
+/**
+ * Calls `flush` with the latest draft when the component unmounts. The callback
+ * is read at unmount time, so it sees the latest props.
+ */
+function useCommitOnUnmount(draft: string, flush: (draft: string) => void): void {
+  const latest = useRef({ draft, flush });
+  useLayoutEffect(() => {
+    latest.current = { draft, flush };
+  });
+  useEffect(() => () => latest.current.flush(latest.current.draft), []);
 }

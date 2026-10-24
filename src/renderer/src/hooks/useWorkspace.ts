@@ -98,12 +98,15 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   const proxyAttemptRef = useRef<string | null>(null);
 
   const projectId = state.project.id;
-  // A summary belongs to the project it was made for. The effect clears it once the project changes.
-  const summary = summaryState && summaryState.projectId === projectId ? summaryState : null;
+  const sourcePath = state.project.source?.inputPath ?? null;
+  // A summary belongs to the project and video it was made for. Opening another video keeps the
+  // project id, so the source path is checked too. The effect clears it once either changes.
+  const summary =
+    summaryState && summaryState.projectId === projectId && summaryState.inputPath === sourcePath ? summaryState : null;
   useEffect(() => {
     setSummaryState(null);
     setSummaryOpen(false);
-  }, [projectId]);
+  }, [projectId, sourcePath]);
 
   const activeId = settings.aiConnector.activeProviderId;
   const activeStatus = providers.find((provider) => provider.id === activeId) ?? null;
@@ -343,7 +346,14 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
       return;
     }
 
-    setSummaryState({ projectId: context.projectId, revision: context.revision, text: outcome.value.text });
+    // A failed earlier attempt must not reappear in the job bar once this one succeeded.
+    setJobResult(null);
+    setSummaryState({
+      projectId: context.projectId,
+      inputPath: context.inputPath,
+      revision: context.revision,
+      text: outcome.value.text
+    });
     setSummaryOpen(true);
   }, [api, job, t]);
 

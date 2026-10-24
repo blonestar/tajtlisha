@@ -71,7 +71,7 @@ or update path.
 
 | # | Task | Branch | Status |
 | --- | --- | --- | --- |
-| F1 | Optional transcript summary: settings (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | in progress |
+| F1 | Optional transcript summary: own Settings tab (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | in review |
 
 ## Backlog for v0.2.1
 
@@ -169,3 +169,8 @@ or update path.
 - 2026-10-22: v0.2.x still shows raw HTML for the v0.3.0 notes (the cleanup ships in 0.3.0 itself). Tightened the
   0.3.0 conversion on develop: one line per item, `<br>` soft wraps joined, Downloads section dropped.
 - 2026-10-25: v0.3.1 released (clean plain-text release notes).
+- 2026-10-25: F1 video summary built by two Haiku workers (main, renderer) on shared contracts. Owner tested it live
+  and asked for an own Settings tab where the switch only hides the editor button. Orchestrator fixes: dialogs
+  stacked under the sticky caption header (z-index), REASONING_UNSUPPORTED message when a model rejects the
+  thinking effort, prompt/model drafts saved when Settings closes with Esc. Sol review: no P0/P1; four P2/P3 fixed
+  (summary of the previous video kept, blank-prompt double write, model draft lost on Esc, stale error after retry).

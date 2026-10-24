@@ -15,7 +15,7 @@ function props(overrides: Partial<SummaryDialogProps> = {}): SummaryDialogProps 
   return {
     open: true,
     onOpenChange: vi.fn(),
-    summary: { projectId: 'project-1', revision: 3, text: TEXT },
+    summary: { projectId: 'project-1', inputPath: '/videos/clip.mp4', revision: 3, text: TEXT },
     currentRevision: 3,
     busy: false,
     onSummarizeAgain: vi.fn(),
@@ -43,7 +43,7 @@ describe('SummaryDialog', () => {
   });
 
   it('keeps edits local and updates the count while typing', () => {
-    const summary = { projectId: 'project-1', revision: 3, text: TEXT };
+    const summary = { projectId: 'project-1', inputPath: '/videos/clip.mp4', revision: 3, text: TEXT };
     renderWithI18n(<SummaryDialog {...props({ summary })} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Summary text' }), { target: { value: 'Short' } });
@@ -121,13 +121,13 @@ describe('SummaryDialog', () => {
   });
 
   it('replaces the text when a new summary arrives, dropping the old local edits', () => {
-    const first = { projectId: 'project-1', revision: 3, text: TEXT };
+    const first = { projectId: 'project-1', inputPath: '/videos/clip.mp4', revision: 3, text: TEXT };
     const { rerender } = renderWithI18n(<SummaryDialog {...props({ summary: first })} />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Summary text' }), { target: { value: 'My edit' } });
 
     rerender(
       <I18nextProvider i18n={createI18n('en')}>
-        <SummaryDialog {...props({ summary: { projectId: 'project-1', revision: 3, text: 'Second run' } })} />
+        <SummaryDialog {...props({ summary: { projectId: 'project-1', inputPath: '/videos/clip.mp4', revision: 3, text: 'Second run' } })} />
       </I18nextProvider>
     );
 

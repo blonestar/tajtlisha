@@ -10,6 +10,8 @@ import './workflow.css';
 /** One finished summary run. `revision` is the project revision the run read. */
 export type SummaryResult = {
   projectId: string;
+  /** Source video the transcript belonged to; opening another video discards the summary. */
+  inputPath: string | null;
   revision: number;
   text: string;
 };
