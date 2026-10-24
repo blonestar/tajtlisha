@@ -11,7 +11,8 @@ const connectedProvider = {
   displayName: 'OpenAI',
   connected: true,
   canTranscribe: true,
-  canTranslate: true
+  canTranslate: true,
+  canSummarize: true
 };
 
 function props(overrides: Partial<GeneratePanelProps> = {}): GeneratePanelProps {
@@ -174,5 +175,74 @@ describe('GeneratePanel', () => {
 
     expect(onSourceLanguageChange).toHaveBeenCalledWith('de');
     expect(onTargetLanguageChange).toHaveBeenCalledWith('en');
+  });
+
+  describe('summary action', () => {
+    const summaryProps = (overrides: Partial<GeneratePanelProps> = {}) =>
+      props({ summaryEnabled: true, summarizableRows: 2, ...overrides });
+
+    it('is hidden while the video summary is off', () => {
+      renderWithI18n(<GeneratePanel {...props({ summaryEnabled: false, summarizableRows: 2 })} />);
+
+      expect(screen.queryByRole('button', { name: 'Summarize' })).not.toBeInTheDocument();
+    });
+
+    it('runs the summary when the provider can summarize', () => {
+      const onSummarize = vi.fn();
+      renderWithI18n(<GeneratePanel {...summaryProps({ onSummarize })} />);
+
+      const button = screen.getByRole('button', { name: 'Summarize' });
+      expect(button).toBeEnabled();
+
+      fireEvent.click(button);
+      expect(onSummarize).toHaveBeenCalledTimes(1);
+    });
+
+    it('relabels the action and offers Show summary once a summary exists', () => {
+      const onShowSummary = vi.fn();
+      renderWithI18n(<GeneratePanel {...summaryProps({ hasSummary: true, onShowSummary })} />);
+
+      expect(screen.getByRole('button', { name: 'Summarize again' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Show summary' }));
+      expect(onShowSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not offer Show summary before a summary exists', () => {
+      renderWithI18n(<GeneratePanel {...summaryProps()} />);
+
+      expect(screen.queryByRole('button', { name: 'Show summary' })).not.toBeInTheDocument();
+    });
+
+    it('explains when there is no caption text in the trim range', () => {
+      renderWithI18n(<GeneratePanel {...summaryProps({ summarizableRows: 0 })} />);
+
+      expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
+      expect(screen.getByText('No caption text inside the trim range')).toBeTruthy();
+    });
+
+    it('explains when the provider cannot summarize', () => {
+      renderWithI18n(
+        <GeneratePanel
+          {...summaryProps({ provider: { ...connectedProvider, displayName: 'OpenRouter', canSummarize: false } })}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
+      expect(screen.getByText('OpenRouter cannot summarize')).toBeTruthy();
+    });
+
+    it('names a provider that is not connected', () => {
+      renderWithI18n(<GeneratePanel {...summaryProps({ provider: { ...connectedProvider, connected: false } })} />);
+
+      expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
+      expect(screen.getAllByText('Connect OpenAI in Settings first').length).toBeGreaterThan(0);
+    });
+
+    it('is disabled while another job runs, with the busy reason', () => {
+      renderWithI18n(<GeneratePanel {...summaryProps({ busy: true })} />);
+
+      expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
+      expect(screen.getAllByText('Wait for the current job to finish').length).toBeGreaterThan(0);
+    });
   });
 });

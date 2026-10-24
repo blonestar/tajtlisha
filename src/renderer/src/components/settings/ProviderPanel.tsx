@@ -49,6 +49,8 @@ export function ProviderPanel({
   const [transcriptionModels, setTranscriptionModels] = useState<ProviderModelDescriptor[]>([]);
   const [textModels, setTextModels] = useState<ProviderModelDescriptor[]>([]);
   const [modelsState, setModelsState] = useState<ModelsState>('idle');
+  const [summaryModels, setSummaryModels] = useState<ProviderModelDescriptor[]>([]);
+  const [summaryModelDraft, setSummaryModelDraft] = useState(() => settings.summary.modelByProvider[provider.id] ?? '');
 
   const providerId = provider.id;
   const connected = provider.connected;
@@ -56,7 +58,9 @@ export function ProviderPanel({
   const keyInputId = `settings-ai-key-${providerId}`;
   const transcriptionId = settings.aiConnector.transcriptionModelByProvider[providerId] ?? '';
   const textId = settings.aiConnector.textModelByProvider[providerId] ?? '';
+  const summaryModelId = settings.summary.modelByProvider[providerId] ?? '';
   const selectedTranscription = transcriptionModels.find((model) => model.id === transcriptionId);
+  const showSummaryModel = connected && settings.summary.enabled && provider.capabilities.summary;
 
   useEffect(() => {
     if (!connected || !onListModels) {
@@ -88,6 +92,44 @@ export function ProviderPanel({
       active = false;
     };
   }, [providerId, connected, onListModels]);
+
+  // Suggestions only: when the list fails, the free-text field still works.
+  useEffect(() => {
+    if (!showSummaryModel || !onListModels) {
+      setSummaryModels([]);
+      return undefined;
+    }
+
+    let active = true;
+    onListModels(providerId, 'summary').then(
+      (next) => {
+        if (active) setSummaryModels(next);
+      },
+      () => {
+        if (active) setSummaryModels([]);
+      }
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [providerId, showSummaryModel, onListModels]);
+
+  useEffect(() => {
+    setSummaryModelDraft(summaryModelId);
+  }, [summaryModelId]);
+
+  // Blank means "same as the text model" and is stored as '', like the other model maps.
+  function commitSummaryModel(): void {
+    const next = summaryModelDraft.trim();
+    setSummaryModelDraft(next);
+    if (next === summaryModelId) return;
+
+    const summary = settings.summary;
+    onSettingsChange?.({
+      summary: { ...summary, modelByProvider: { ...summary.modelByProvider, [providerId]: next } }
+    });
+  }
 
   // "Default" is stored as ''. Settings patches merge maps deeply, so a deleted key would keep its old model.
   // Requests treat a blank id as absent (see optionalModelId in useWorkspace).
@@ -275,6 +317,37 @@ export function ProviderPanel({
               ))}
             </select>
           </SettingsRow>
+
+          {showSummaryModel ? (
+            <SettingsRow
+              label={t('settings.ai.summaryModel')}
+              htmlFor={`${keyInputId}-summary`}
+              hint={t('settings.ai.summaryModelHint')}
+            >
+              <input
+                id={`${keyInputId}-summary`}
+                className="input input-mono"
+                type="text"
+                list={`${keyInputId}-summary-models`}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={t('settings.ai.summaryModelPlaceholder')}
+                value={summaryModelDraft}
+                onChange={(event) => setSummaryModelDraft(event.currentTarget.value)}
+                onBlur={commitSummaryModel}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitSummaryModel();
+                }}
+              />
+              <datalist id={`${keyInputId}-summary-models`}>
+                {summaryModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.label}
+                  </option>
+                ))}
+              </datalist>
+            </SettingsRow>
+          ) : null}
         </>
       ) : (
         <p className="settings-card-note muted">{t('settings.ai.connectToChooseModels')}</p>

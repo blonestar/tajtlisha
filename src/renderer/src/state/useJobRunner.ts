@@ -4,7 +4,7 @@ import type { TajtlishaApi } from '../../../shared/types/ipc';
 import type { JobProgressEvent, JobStage } from '../../../shared/types/jobs';
 import type { ProjectDocument } from '../../../shared/types/project';
 
-export type JobKind = 'transcribe' | 'translate' | 'export' | 'preview';
+export type JobKind = 'transcribe' | 'translate' | 'summarize' | 'export' | 'preview';
 
 export type ActiveJob = {
   id: string;

@@ -9,7 +9,7 @@ import type { JobStage } from '../../../../shared/types/jobs';import './workflow
 
 
 export type JobBarJob = {
-  kind: 'transcribe' | 'translate' | 'export' | 'preview';
+  kind: 'transcribe' | 'translate' | 'summarize' | 'export' | 'preview';
   stage?: JobStage;
   /** 0..1 when known; undefined renders an indeterminate bar. */
   progress?: number;
@@ -17,7 +17,7 @@ export type JobBarJob = {
 };
 
 export type JobBarResult = {
-  kind: 'transcribe' | 'translate' | 'export' | 'preview';
+  kind: 'transcribe' | 'translate' | 'summarize' | 'export' | 'preview';
   status: 'done' | 'canceled' | 'error';
   message: string;
 };
