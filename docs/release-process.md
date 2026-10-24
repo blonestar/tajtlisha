@@ -13,6 +13,15 @@
 | `release/X.Y.Z` | Version bump and changelog for a release; merged into `master` and back into `develop`. |
 | `hotfix/X.Y.Z` | Urgent fix from `master`; merged into `master` and `develop`. |
 
+`master` is protected by the GitHub ruleset "Protect master": no direct pushes, no force pushes, no deletion.
+Changes reach `master` only through a pull request that passes the `test` and `test-windows` checks and is merged
+with a merge commit. Repository admins can bypass the checks only inside a pull request, never with a direct push.
+`release/*` and `hotfix/*` branches therefore go into `master` through a pull request.
+
+The ruleset "Protect develop" blocks force pushes and deletion of `develop`; normal pushes still work. The ruleset
+"Protect release tags" blocks deleting or moving any `v*` tag; creating a new tag still works. A broken release is
+fixed with a new patch version, not by re-tagging.
+
 Merge feature branches with `git merge --no-ff` so each feature stays visible in history.
 Work in separate worktrees (`git worktree add ../Tajtlisha-worktrees/<name> -b feat/<name> develop`) when
 several branches are active at once.
@@ -32,9 +41,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 2. Move `[Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`, update the compare links.
 3. `pnpm version X.Y.Z --no-git-tag-version` and commit `chore(release): vX.Y.Z`.
 4. `pnpm typecheck && pnpm test && pnpm build && pnpm test:e2e`.
-5. Merge into `master` (`--no-ff`), tag `vX.Y.Z`, merge `master` back into `develop`.
-6. Push `master`, `develop` and the tag. The release workflow builds both platforms and publishes the GitHub
-   Release (see [CI](#ci)). Installed builds pick it up through auto-update.
+5. Push `release/X.Y.Z` and open a pull request into `master`
+   (`gh pr create --base master --head release/X.Y.Z`). Merge it with a merge commit once `test` and `test-windows`
+   pass (`gh pr merge --merge`).
+6. `git switch master && git pull`, tag the merge commit `vX.Y.Z`, push the tag, then merge `master` back into
+   `develop` and push `develop`. The release workflow builds both platforms and publishes the GitHub Release
+   (see [CI](#ci)). Installed builds pick it up through auto-update.
 7. Smoke-test the published installers on real machines (see [Before a public release](#before-a-public-release)).
 
 ## Auto-update
