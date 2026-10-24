@@ -2,6 +2,12 @@ import { AppError } from '../../shared/errors';
 import { languageDisplayName } from './language';
 import type { ProviderPolishMode, ProviderTextItem } from './provider';
 
+export type SummarySegmentInput = {
+  startMs: number;
+  endMs: number;
+  text: string;
+};
+
 export type CaptionLimits = {
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
@@ -82,6 +88,30 @@ export function parseCaptionItems(raw: string, providerName: string): ProviderTe
   return items
     .filter((item): item is ProviderTextItem => typeof item?.id === 'string' && typeof item?.text === 'string')
     .map(({ id, text }) => ({ id, text }));
+}
+
+/**
+ * Plain-text transcript for the summary prompt: a language line, then one
+ * `[time] text` line per segment. Times are already clip-relative.
+ */
+export function buildSummaryTranscript(segments: SummarySegmentInput[], language: string): string {
+  const languageLine =
+    language === 'und' ? 'Transcript language: unknown' : `Transcript language: ${languageDisplayName(language)}`;
+  const lines = segments.map(
+    (segment) => `[${formatClockTime(segment.startMs)}] ${segment.text.replace(/\s*[\r\n]+\s*/g, ' ').trim()}`
+  );
+
+  return [languageLine, '', ...lines].join('\n');
+}
+
+/** `m:ss`, or `h:mm:ss` from one hour on. Whole seconds, rounded down. */
+function formatClockTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 }
 
 function layoutInstruction({ maxCharsPerLine, maxLinesPerCaption }: CaptionLimits): string {
