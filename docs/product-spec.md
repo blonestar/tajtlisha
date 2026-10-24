@@ -203,6 +203,11 @@ Obavezno:
 - kracenje predugih caption-a bez promene znacenja,
 - conservative mode za cuvanje originalnog smisla.
 
+Opciono (ukljucuje se u podesavanjima):
+
+- sazetak transkripta na zahtev, sa sopstvenim sistemskim promptom, modelom i thinking effort-om (na primer
+  poenta klipa za tweet). Rezultat se kopira, ne menja titlove.
+
 Nije MVP:
 
 - automatski voiceover,

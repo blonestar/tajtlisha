@@ -67,6 +67,12 @@ or update path.
 | U2 | Whole-UI zoom 80-150% (Ctrl + / - / 0, Settings > General), `uiZoomPercent` setting, preload `webFrame` zoom | `feat/ui-zoom` | merged |
 | U3 | Sol review fixes: settings response ordering, layout at 150% zoom on the minimum window, splitter focus vs playback keys | `fix/panes-zoom-review` | merged |
 
+## Features after v0.3.1
+
+| # | Task | Branch | Status |
+| --- | --- | --- | --- |
+| F1 | Optional transcript summary: settings (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | in progress |
+
 ## Backlog for v0.2.1
 
 - Exact-frame preview and preview-proxy recovery must be invalidated by content/source generation, not only path.
