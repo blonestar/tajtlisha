@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../../shared/summary';
 import { REASONING_EFFORTS } from '../../../../shared/types/ai';
@@ -85,15 +85,36 @@ function SummaryPromptRow({ systemPrompt, onCommit }: SummaryPromptRowProps): Re
 
   const isDefault = stored === DEFAULT_SUMMARY_PROMPT;
 
+  // Esc closes Settings without a blur, so a draft that was never committed is committed on unmount.
+  // `committed` stops a second write after a blur already saved it (for example when the switch turns the feature off).
+  const committed = useRef(stored);
+  const latest = useRef({ draft, onCommit });
+  useLayoutEffect(() => {
+    latest.current = { draft, onCommit };
+  });
+  useEffect(
+    () => () => {
+      const { draft: pending, onCommit: commit } = latest.current;
+      if (pending !== committed.current) commit(pending.trim() === '' ? '' : pending);
+    },
+    []
+  );
+
+  useEffect(() => {
+    committed.current = stored;
+  }, [stored]);
+
   function commitDraft(): void {
-    if (draft === stored) return;
+    if (draft === stored || draft === committed.current) return;
 
     const next = draft.trim() === '' ? '' : draft;
+    committed.current = draft;
     onCommit(next);
     setDraft(shownPrompt(next));
   }
 
   function resetPrompt(): void {
+    committed.current = DEFAULT_SUMMARY_PROMPT;
     setDraft(DEFAULT_SUMMARY_PROMPT);
     onCommit(DEFAULT_SUMMARY_PROMPT);
   }

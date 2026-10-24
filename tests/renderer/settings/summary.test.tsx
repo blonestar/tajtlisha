@@ -68,6 +68,35 @@ describe('SummarySettings', () => {
     });
   });
 
+  it('commits an unsaved draft when Settings closes without a blur (Esc)', () => {
+    const onSettingsChange = vi.fn();
+    const view = renderWithI18n(
+      <SummarySettings settings={withSummary({ enabled: true, systemPrompt: 'Old' })} onSettingsChange={onSettingsChange} />
+    );
+
+    fireEvent.change(screen.getByLabelText('System prompt'), { target: { value: 'Typed before Esc' } });
+    view.unmount();
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      summary: expect.objectContaining({ systemPrompt: 'Typed before Esc', enabled: true })
+    });
+  });
+
+  it('does not write the prompt again on unmount after a blur saved it', () => {
+    const onSettingsChange = vi.fn();
+    const view = renderWithI18n(
+      <SummarySettings settings={withSummary({ enabled: true, systemPrompt: 'Old' })} onSettingsChange={onSettingsChange} />
+    );
+    const prompt = screen.getByLabelText('System prompt');
+
+    fireEvent.change(prompt, { target: { value: 'Saved on blur' } });
+    fireEvent.blur(prompt);
+    view.unmount();
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+  });
+
   it('does not write settings on blur when the prompt is unchanged', () => {
     const { onSettingsChange } = renderSummary(withSummary({ enabled: true, systemPrompt: 'Same' }));
 
