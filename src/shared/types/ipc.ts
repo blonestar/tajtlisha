@@ -12,6 +12,8 @@ import type {
   JobProgressEvent,
   ProjectExportRequest,
   ProjectExportResult,
+  SummarizeTranscriptRequest,
+  SummarizeTranscriptResult,
   TranscribeClipRequest,
   TranscribeClipResult,
   TranslateCaptionsRequest,
@@ -47,6 +49,7 @@ export const IPC_CHANNELS = {
 
   workflowTranscribe: 'workflow:transcribe',
   workflowTranslate: 'workflow:translate',
+  workflowSummarize: 'workflow:summarize',
 
   jobsCancel: 'jobs:cancel',
   /** main -> renderer event, payload JobProgressEvent */
@@ -128,6 +131,8 @@ export type TajtlishaApi = {
   workflow: {
     transcribe(request: TranscribeClipRequest): Promise<TranscribeClipResult>;
     translate(request: TranslateCaptionsRequest): Promise<TranslateCaptionsResult>;
+    /** Summarizes the transcript with the settings prompt. Cancellable via jobs.cancel(jobId). */
+    summarize(request: SummarizeTranscriptRequest): Promise<SummarizeTranscriptResult>;
   };
   jobs: {
     cancel(jobId: string): Promise<void>;

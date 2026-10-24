@@ -31,7 +31,8 @@ export const openRouterProviderDefinition: ProviderDefinition = {
     wordTimestamps: false,
     translation: true,
     subtitlePolish: true,
-    textToSpeech: false
+    textToSpeech: false,
+    summary: true
   },
   modelDescriptors: [
     { id: OPENROUTER_DEFAULT_TRANSCRIPTION_MODEL, label: 'OpenAI Whisper Large v3', capability: 'transcription', timestamps: 'none' }

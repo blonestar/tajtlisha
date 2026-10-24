@@ -10,7 +10,17 @@ export type AiProviderCapabilities = {
   translation: boolean;
   subtitlePolish: boolean;
   textToSpeech: boolean;
+  /** Free-form summary of a whole transcript, driven by a user system prompt. */
+  summary: boolean;
 };
+
+/**
+ * Thinking effort sent to reasoning models. Which values a model accepts is
+ * model-specific; an unsupported value is rejected by the provider API.
+ */
+export const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export type ProviderSummary = {
   id: AiProviderId;

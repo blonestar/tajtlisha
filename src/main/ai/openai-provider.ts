@@ -37,7 +37,8 @@ export const openAiProviderDefinition: ProviderDefinition = {
     wordTimestamps: true,
     translation: true,
     subtitlePolish: true,
-    textToSpeech: false
+    textToSpeech: false,
+    summary: true
   },
   modelDescriptors: [
     { id: 'whisper-1', label: 'Whisper (whisper-1)', capability: 'transcription', timestamps: 'word' },

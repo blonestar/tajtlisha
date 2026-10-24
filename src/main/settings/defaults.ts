@@ -1,4 +1,5 @@
 import type { AppSettings } from '../../shared/types/settings';
+import { DEFAULT_SUMMARY_PROMPT } from '../../shared/summary';
 import { DEFAULT_UI_ZOOM_PERCENT } from '../../shared/ui-zoom';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -26,5 +27,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     socialCaptionPolish: false,
     maxCharsPerLine: 42,
     maxLinesPerCaption: 2
+  },
+  summary: {
+    enabled: false,
+    systemPrompt: DEFAULT_SUMMARY_PROMPT,
+    modelByProvider: {},
+    reasoningEffort: 'default'
   }
 };

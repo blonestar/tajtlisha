@@ -231,7 +231,8 @@ describe('AI provider registry', () => {
         wordTimestamps: false,
         translation: true,
         subtitlePolish: false,
-        textToSpeech: false
+        textToSpeech: false,
+        summary: false
       } satisfies AiProviderCapabilities,
       listModels: async () => [],
       testConnection: async () => ({ ok: true, providerId: 'openrouter', checkedAt: '' }),
