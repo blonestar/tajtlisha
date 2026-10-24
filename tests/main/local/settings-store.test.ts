@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { SecretFieldError, SettingsStore } from '../../../src/main/settings';
+import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../src/shared/summary';
 
 describe('SettingsStore', () => {
   it('merges partial settings onto defaults and persists them', async () => {
@@ -123,5 +124,114 @@ describe('SettingsStore', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  describe('summary settings', () => {
+    async function withSettingsFile<T>(fileContent: unknown, run: (store: SettingsStore) => Promise<T>): Promise<T> {
+      const dir = await mkdtemp(join(tmpdir(), 'tajtlisha-settings-'));
+      const filePath = join(dir, 'settings.json');
+      try {
+        if (fileContent !== undefined) {
+          await writeFile(filePath, JSON.stringify(fileContent), 'utf8');
+        }
+        return await run(new SettingsStore({ filePath }));
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
+
+    it('gives a file without a summary section the default summary settings', async () => {
+      await withSettingsFile({ uiLanguage: 'en' }, async (store) => {
+        const settings = await store.get();
+
+        expect(settings.summary).toEqual({
+          enabled: false,
+          systemPrompt: DEFAULT_SUMMARY_PROMPT,
+          modelByProvider: {},
+          reasoningEffort: 'default'
+        });
+      });
+    });
+
+    it('persists summary patches without treating them as secrets', async () => {
+      await withSettingsFile(undefined, async (store) => {
+        const updated = await store.update({
+          summary: { enabled: true, reasoningEffort: 'high', modelByProvider: { openai: 'gpt-4.1' } } as never
+        });
+
+        expect(updated.summary).toEqual({
+          enabled: true,
+          systemPrompt: DEFAULT_SUMMARY_PROMPT,
+          modelByProvider: { openai: 'gpt-4.1' },
+          reasoningEffort: 'high'
+        });
+        expect((await store.get()).summary.reasoningEffort).toBe('high');
+      });
+    });
+
+    it('treats enabled as on only when it is the boolean true', async () => {
+      for (const enabled of ['true', 1, 'yes', null]) {
+        await withSettingsFile({ summary: { enabled } }, async (store) => {
+          expect((await store.get()).summary.enabled).toBe(false);
+        });
+      }
+      await withSettingsFile({ summary: { enabled: true } }, async (store) => {
+        expect((await store.get()).summary.enabled).toBe(true);
+      });
+    });
+
+    it('replaces a blank or non-string system prompt with the default', async () => {
+      for (const systemPrompt of ['', '   \n\t', 42, null, ['prompt']]) {
+        await withSettingsFile({ summary: { systemPrompt } }, async (store) => {
+          expect((await store.get()).summary.systemPrompt).toBe(DEFAULT_SUMMARY_PROMPT);
+        });
+      }
+    });
+
+    it('keeps a custom system prompt and slices one longer than the limit', async () => {
+      await withSettingsFile({ summary: { systemPrompt: 'Make a tweet.' } }, async (store) => {
+        expect((await store.get()).summary.systemPrompt).toBe('Make a tweet.');
+      });
+
+      await withSettingsFile({ summary: { systemPrompt: 'a'.repeat(MAX_SUMMARY_PROMPT_CHARS + 500) } }, async (store) => {
+        expect((await store.get()).summary.systemPrompt).toHaveLength(MAX_SUMMARY_PROMPT_CHARS);
+      });
+    });
+
+    it('falls back to default reasoning effort for an unknown value and keeps every known one', async () => {
+      await withSettingsFile({ summary: { reasoningEffort: 'ultra' } }, async (store) => {
+        expect((await store.get()).summary.reasoningEffort).toBe('default');
+      });
+
+      for (const reasoningEffort of ['default', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']) {
+        await withSettingsFile({ summary: { reasoningEffort } }, async (store) => {
+          expect((await store.get()).summary.reasoningEffort).toBe(reasoningEffort);
+        });
+      }
+    });
+
+    it('keeps only string model ids per provider', async () => {
+      await withSettingsFile(
+        { summary: { modelByProvider: { openai: 'gpt-4.1', openrouter: 7, extra: { nested: true }, blank: '' } } },
+        async (store) => {
+          expect((await store.get()).summary.modelByProvider).toEqual({ openai: 'gpt-4.1', blank: '' });
+        }
+      );
+
+      await withSettingsFile({ summary: { modelByProvider: 'gpt-4.1' } }, async (store) => {
+        expect((await store.get()).summary.modelByProvider).toEqual({});
+      });
+    });
+
+    it('uses the default summary settings when the summary value is not an object', async () => {
+      await withSettingsFile({ summary: null }, async (store) => {
+        expect((await store.get()).summary).toEqual({
+          enabled: false,
+          systemPrompt: DEFAULT_SUMMARY_PROMPT,
+          modelByProvider: {},
+          reasoningEffort: 'default'
+        });
+      });
+    });
   });
 });
