@@ -199,11 +199,13 @@
   }
 }
 
-/* Export dialog */
+/* Modal dialogs (export, confirm, summary). The z-index keeps them above sticky table
+ * headers (z-index 1) and the settings overlay (z-index 50). */
 .dialog-overlay {
   background: rgba(8, 10, 12, 0.6);
   inset: 0;
   position: fixed;
+  z-index: 60;
 }
 
 .dialog-content {
@@ -220,6 +222,7 @@
   width: 480px;
   display: flex;
   flex-direction: column;
+  z-index: 61;
 }
 
 .export-dialog .dialog-title {

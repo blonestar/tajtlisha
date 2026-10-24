@@ -24,18 +24,18 @@ describe('SummarySettings', () => {
   it('turns the feature on with a patch that carries the whole summary object', () => {
     const { onSettingsChange } = renderSummary(withSummary({ enabled: false }));
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Enable video summary' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Show Summarize in the editor' }));
 
     expect(onSettingsChange).toHaveBeenCalledWith({
       summary: { ...mockSettings.summary, enabled: true }
     });
   });
 
-  it('hides the prompt and effort fields while the feature is off', () => {
-    renderSummary(withSummary({ enabled: false }));
+  it('keeps the prompt and effort editable while the editor button is hidden', () => {
+    renderSummary(withSummary({ enabled: false, systemPrompt: 'Prompt while off' }));
 
-    expect(screen.queryByLabelText('System prompt')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Thinking effort')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('System prompt')).toHaveValue('Prompt while off');
+    expect(screen.getByLabelText('Thinking effort')).toBeEnabled();
   });
 
   it('shows the prompt, its counter and the effort select when enabled', () => {

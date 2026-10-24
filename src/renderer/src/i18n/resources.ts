@@ -26,6 +26,7 @@ const baseResources = {
         nav: {
           general: 'General',
           ai: 'AI',
+          summary: 'Summary',
           export: 'Export',
           about: 'About'
         },
@@ -97,9 +98,11 @@ const baseResources = {
           }
         },
         summary: {
-          heading: 'Video summary',
-          enable: 'Enable video summary',
-          enableHint: 'Adds a Summarize button to the editor. The transcript is sent to the AI provider only when you press it.',
+          enable: 'Show Summarize in the editor',
+          enableHint: 'Shows or hides the Summarize button in the editor. The transcript is sent to the AI provider only when you press it.',
+          modelProvider: 'Uses the active AI provider: {{provider}}.',
+          modelUnavailable: 'Connect the active AI provider in the AI section to choose a model.',
+          modelUnsupported: '{{provider}} cannot summarize text.',
           prompt: 'System prompt',
           promptHint: 'Tells the model what to take from the transcript. Changes are saved when you leave the field.',
           promptCounter: '{{count}} / {{max}} characters',
@@ -202,6 +205,7 @@ const baseResources = {
         nav: {
           general: 'Opšte',
           ai: 'AI',
+          summary: 'Sažetak',
           export: 'Izvoz',
           about: 'O programu'
         },
@@ -273,9 +277,11 @@ const baseResources = {
           }
         },
         summary: {
-          heading: 'Sažetak videa',
-          enable: 'Uključi sažetak videa',
-          enableHint: 'Dodaje dugme Sažmi u editor. Transkript se šalje AI provajderu tek kada ga pritisneš.',
+          enable: 'Prikaži Sažmi u editoru',
+          enableHint: 'Prikazuje ili skriva dugme Sažmi u editoru. Transkript se šalje AI provajderu tek kada ga pritisneš.',
+          modelProvider: 'Koristi aktivni AI provajder: {{provider}}.',
+          modelUnavailable: 'Poveži aktivni AI provajder u odeljku AI da bi izabrao model.',
+          modelUnsupported: '{{provider}} ne može da sažima tekst.',
           prompt: 'Sistemska uputstva',
           promptHint: 'Govori modelu šta da izdvoji iz transkripta. Izmene se čuvaju kada napustiš polje.',
           promptCounter: '{{count}} / {{max}} karaktera',
@@ -379,6 +385,7 @@ const baseResources = {
         nav: {
           general: 'Опште',
           ai: 'AI',
+          summary: 'Сажетак',
           export: 'Извоз',
           about: 'О програму'
         },
@@ -450,9 +457,11 @@ const baseResources = {
           }
         },
         summary: {
-          heading: 'Сажетак видеа',
-          enable: 'Укључи сажетак видеа',
-          enableHint: 'Додаје дугме Сажми у едитор. Транскрипт се шаље AI провајдеру тек када га притиснеш.',
+          enable: 'Прикажи Сажми у едитору',
+          enableHint: 'Приказује или скрива дугме Сажми у едитору. Транскрипт се шаље AI провајдеру тек када га притиснеш.',
+          modelProvider: 'Користи активни AI провајдер: {{provider}}.',
+          modelUnavailable: 'Повежи активни AI провајдер у одељку AI да би изабрао модел.',
+          modelUnsupported: '{{provider}} не може да сажима текст.',
           prompt: 'Системска упутства',
           promptHint: 'Говори моделу шта да издвоји из транскрипта. Измене се чувају када напустиш поље.',
           promptCounter: '{{count}} / {{max}} карактера',

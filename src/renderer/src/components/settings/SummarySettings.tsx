@@ -2,13 +2,21 @@ import type { ReactElement } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../../shared/summary';
-import { REASONING_EFFORTS } from '../../../../shared/types/ai';
+import {
+  REASONING_EFFORTS,
+  type AiProviderCapabilities,
+  type AiProviderId,
+  type ProviderModelDescriptor,
+  type ProviderStatus
+} from '../../../../shared/types/ai';
 import type { AppSettings, SummarySettings as SummarySettingsValue } from '../../../../shared/types/settings';
 import { SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
 type SummarySettingsProps = {
   settings: AppSettings;
+  providers?: ProviderStatus[];
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
+  onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
 };
 
 type EffortChoice = SummarySettingsValue['reasoningEffort'];
@@ -19,12 +27,14 @@ function shownPrompt(stored: string): string {
 }
 
 /**
- * Settings for the optional transcript summary. Everything below the switch is
- * hidden while the feature is off, so the Editor's Summarize action has one switch to follow.
+ * The Summary settings tab. The switch only shows or hides the Summarize button
+ * in the editor; the prompt, model and effort stay editable either way.
  */
-export function SummarySettings({ settings, onSettingsChange }: SummarySettingsProps): ReactElement {
+export function SummarySettings({ settings, providers = [], onSettingsChange, onListModels }: SummarySettingsProps): ReactElement {
   const { t } = useTranslation();
   const summary = settings.summary;
+  const activeId = settings.aiConnector.activeProviderId;
+  const activeProvider = providers.find((provider) => provider.id === activeId);
 
   function updateSummary(patch: Partial<SummarySettingsValue>): void {
     onSettingsChange?.({ summary: { ...summary, ...patch } });
@@ -40,28 +50,120 @@ export function SummarySettings({ settings, onSettingsChange }: SummarySettingsP
         />
       </SettingsRow>
 
-      {summary.enabled ? (
-        <>
-          <SummaryPromptRow systemPrompt={summary.systemPrompt} onCommit={(systemPrompt) => updateSummary({ systemPrompt })} />
+      <SummaryPromptRow systemPrompt={summary.systemPrompt} onCommit={(systemPrompt) => updateSummary({ systemPrompt })} />
 
-          <SettingsRow label={t('settings.summary.effort')} htmlFor="settings-summary-effort" hint={t('settings.summary.effortHint')}>
-            <select
-              id="settings-summary-effort"
-              className="select"
-              value={summary.reasoningEffort}
-              onChange={(event) => updateSummary({ reasoningEffort: event.currentTarget.value as EffortChoice })}
-            >
-              <option value="default">{t('settings.summary.effortDefault')}</option>
-              {REASONING_EFFORTS.map((effort) => (
-                <option key={effort} value={effort}>
-                  {t(`settings.summary.effortLevels.${effort}`)}
-                </option>
-              ))}
-            </select>
-          </SettingsRow>
-        </>
-      ) : null}
+      <SummaryModelRow
+        key={activeProvider?.id ?? 'none'}
+        provider={activeProvider}
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+        onListModels={onListModels}
+      />
+
+      <SettingsRow label={t('settings.summary.effort')} htmlFor="settings-summary-effort" hint={t('settings.summary.effortHint')}>
+        <select
+          id="settings-summary-effort"
+          className="select"
+          value={summary.reasoningEffort}
+          onChange={(event) => updateSummary({ reasoningEffort: event.currentTarget.value as EffortChoice })}
+        >
+          <option value="default">{t('settings.summary.effortDefault')}</option>
+          {REASONING_EFFORTS.map((effort) => (
+            <option key={effort} value={effort}>
+              {t(`settings.summary.effortLevels.${effort}`)}
+            </option>
+          ))}
+        </select>
+      </SettingsRow>
     </>
+  );
+}
+
+type SummaryModelRowProps = {
+  provider?: ProviderStatus;
+  settings: AppSettings;
+  onSettingsChange?: (patch: Partial<AppSettings>) => void;
+  onListModels?: SummarySettingsProps['onListModels'];
+};
+
+/**
+ * Summary model of the active provider. Free text with suggestions, because model
+ * lists change often. Blank means "same as the text model" and is stored as ''.
+ */
+function SummaryModelRow({ provider, settings, onSettingsChange, onListModels }: SummaryModelRowProps): ReactElement {
+  const { t } = useTranslation();
+  const providerId = provider?.id;
+  const usable = Boolean(provider?.connected && provider.capabilities.summary);
+  const storedModel = (providerId && settings.summary.modelByProvider[providerId]) || '';
+  const [draft, setDraft] = useState(storedModel);
+  const [models, setModels] = useState<ProviderModelDescriptor[]>([]);
+
+  useEffect(() => {
+    setDraft(storedModel);
+  }, [storedModel]);
+
+  // Suggestions only: when the list fails, the free-text field still works.
+  useEffect(() => {
+    if (!usable || !providerId || !onListModels) {
+      setModels([]);
+      return undefined;
+    }
+
+    let active = true;
+    onListModels(providerId, 'summary').then(
+      (next) => {
+        if (active) setModels(next);
+      },
+      () => {
+        if (active) setModels([]);
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [usable, providerId, onListModels]);
+
+  function commit(): void {
+    const next = draft.trim();
+    setDraft(next);
+    if (!providerId || next === storedModel) return;
+
+    const summary = settings.summary;
+    onSettingsChange?.({ summary: { ...summary, modelByProvider: { ...summary.modelByProvider, [providerId]: next } } });
+  }
+
+  const hint = !provider?.connected
+    ? t('settings.summary.modelUnavailable')
+    : !provider.capabilities.summary
+      ? t('settings.summary.modelUnsupported', { provider: provider.displayName })
+      : `${t('settings.summary.modelProvider', { provider: provider.displayName })} ${t('settings.ai.summaryModelHint')}`;
+
+  return (
+    <SettingsRow label={t('settings.ai.summaryModel')} htmlFor="settings-summary-model" hint={hint}>
+      <input
+        id="settings-summary-model"
+        className="input input-mono"
+        type="text"
+        list="settings-summary-models"
+        autoComplete="off"
+        spellCheck={false}
+        disabled={!usable}
+        placeholder={t('settings.ai.summaryModelPlaceholder')}
+        value={draft}
+        onChange={(event) => setDraft(event.currentTarget.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit();
+        }}
+      />
+      <datalist id="settings-summary-models">
+        {models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.label}
+          </option>
+        ))}
+      </datalist>
+    </SettingsRow>
   );
 }
 

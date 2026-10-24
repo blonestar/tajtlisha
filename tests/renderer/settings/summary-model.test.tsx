@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiProviderCapabilities, ProviderModelDescriptor, ProviderStatus } from '../../../src/shared/types/ai';
 import type { AppSettings } from '../../../src/shared/types/settings';
 import { AiSection } from '../../../src/renderer/src/components/settings/AiSection';
+import { SummarySettings } from '../../../src/renderer/src/components/settings/SummarySettings';
 import { mockProviderStatuses, mockSettings } from './mockSettings';
 import { renderWithI18n } from '../renderWithI18n';
 
@@ -35,7 +36,7 @@ function capableProvider(overrides: Partial<ProviderStatus['capabilities']> = {}
   return [{ ...mockProviderStatuses[0], capabilities: { ...mockProviderStatuses[0].capabilities, ...overrides } }];
 }
 
-function renderAi(options: {
+function renderSummaryTab(options: {
   settings: AppSettings;
   providers?: ProviderStatus[];
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
@@ -44,7 +45,7 @@ function renderAi(options: {
   const onSettingsChange = options.onSettingsChange ?? vi.fn();
   const onListModels = options.onListModels ?? listModelsSpy();
   renderWithI18n(
-    <AiSection
+    <SummarySettings
       settings={options.settings}
       providers={options.providers ?? mockProviderStatuses}
       onSettingsChange={onSettingsChange}
@@ -54,37 +55,43 @@ function renderAi(options: {
   return { onSettingsChange, onListModels };
 }
 
-describe('ProviderPanel summary model row', () => {
-  it('is hidden while the video summary is off', () => {
-    renderAi({ settings: settingsWith({ enabled: false }) });
+describe('Summary tab model row', () => {
+  it('is not part of the AI section any more', () => {
+    renderWithI18n(
+      <AiSection settings={settingsWith({ enabled: true })} providers={mockProviderStatuses} onListModels={listModelsSpy()} />
+    );
 
     expect(screen.queryByLabelText('Summary model')).not.toBeInTheDocument();
   });
 
-  it('is shown when the summary is on, the provider is connected and it can summarize', () => {
-    renderAi({ settings: settingsWith({ enabled: true }) });
+  it('edits the active provider model even while the editor button is hidden', () => {
+    renderSummaryTab({ settings: settingsWith({ enabled: false }) });
 
     const input = screen.getByLabelText('Summary model');
+    expect(input).toBeEnabled();
     expect(input).toHaveAttribute('placeholder', 'Same as text model');
+    expect(screen.getByText(/Uses the active AI provider: OpenAI\./)).toBeInTheDocument();
   });
 
-  it('is hidden when the provider is not connected', () => {
-    renderAi({
+  it('is disabled with a hint when the active provider is not connected', () => {
+    renderSummaryTab({
       settings: settingsWith({ enabled: true }),
       providers: [{ ...mockProviderStatuses[0], connected: false, maskedCredential: undefined }]
     });
 
-    expect(screen.queryByLabelText('Summary model')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Summary model')).toBeDisabled();
+    expect(screen.getByText('Connect the active AI provider in the AI section to choose a model.')).toBeInTheDocument();
   });
 
-  it('is hidden when the provider cannot summarize', () => {
-    renderAi({ settings: settingsWith({ enabled: true }), providers: capableProvider({ summary: false }) });
+  it('is disabled with a hint when the provider cannot summarize', () => {
+    renderSummaryTab({ settings: settingsWith({ enabled: true }), providers: capableProvider({ summary: false }) });
 
-    expect(screen.queryByLabelText('Summary model')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Summary model')).toBeDisabled();
+    expect(screen.getByText('OpenAI cannot summarize text.')).toBeInTheDocument();
   });
 
   it('keeps typed text local and commits the model on blur', () => {
-    const { onSettingsChange } = renderAi({ settings: settingsWith({ enabled: true }) });
+    const { onSettingsChange } = renderSummaryTab({ settings: settingsWith({ enabled: true }) });
     const input = screen.getByLabelText('Summary model');
 
     fireEvent.change(input, { target: { value: 'gpt-5' } });
@@ -102,7 +109,7 @@ describe('ProviderPanel summary model row', () => {
   });
 
   it('commits on Enter', () => {
-    const { onSettingsChange } = renderAi({ settings: settingsWith({ enabled: true }) });
+    const { onSettingsChange } = renderSummaryTab({ settings: settingsWith({ enabled: true }) });
     const input = screen.getByLabelText('Summary model');
 
     fireEvent.change(input, { target: { value: 'gpt-5-mini' } });
@@ -114,7 +121,7 @@ describe('ProviderPanel summary model row', () => {
   });
 
   it('stores a cleared model as an empty string, which means the text model', () => {
-    const { onSettingsChange } = renderAi({
+    const { onSettingsChange } = renderSummaryTab({
       settings: settingsWith({ enabled: true, modelByProvider: { openai: 'gpt-5-mini' } })
     });
     const input = screen.getByLabelText('Summary model');
@@ -128,7 +135,7 @@ describe('ProviderPanel summary model row', () => {
   });
 
   it('does not write settings when the value did not change', () => {
-    const { onSettingsChange } = renderAi({
+    const { onSettingsChange } = renderSummaryTab({
       settings: settingsWith({ enabled: true, modelByProvider: { openai: 'gpt-5-mini' } })
     });
 
@@ -137,14 +144,12 @@ describe('ProviderPanel summary model row', () => {
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
-  it('offers the provider summary models as suggestions and keeps the other lists loading', async () => {
-    const { onListModels } = renderAi({ settings: settingsWith({ enabled: true }) });
+  it('offers the provider summary models as suggestions', async () => {
+    const { onListModels } = renderSummaryTab({ settings: settingsWith({ enabled: true }) });
 
     await waitFor(() => {
       expect(onListModels).toHaveBeenCalledWith('openai', 'summary');
     });
-    expect(onListModels).toHaveBeenCalledWith('openai', 'transcription');
-    expect(onListModels).toHaveBeenCalledWith('openai', 'translation');
 
     const input = screen.getByLabelText('Summary model');
     const listId = input.getAttribute('list');
@@ -156,7 +161,7 @@ describe('ProviderPanel summary model row', () => {
   });
 
   it('stays usable when the summary model list fails', async () => {
-    const { onSettingsChange } = renderAi({
+    const { onSettingsChange } = renderSummaryTab({
       settings: settingsWith({ enabled: true }),
       onListModels: listModelsSpy(new Error('offline'))
     });
