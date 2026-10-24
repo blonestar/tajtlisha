@@ -123,3 +123,63 @@ test('plays an ffmpeg preview proxy through the local media protocol', async () 
     rmSync(userDataDir, { force: true, recursive: true });
   }
 });
+
+test('seeks an opened video and toggles playback with a click on the frame', async () => {
+  const mainEntry = resolve(process.cwd(), 'out/main/index.js');
+  test.skip(!existsSync(mainEntry), 'Run pnpm build before pnpm test:e2e.');
+
+  const tempFolder = mkdtempSync(join(tmpdir(), 'tajtlisha-e2e-seek-'));
+  const inputPath = join(tempFolder, 'clip.mp4');
+  execFileSync('ffmpeg', [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc2=size=320x568:rate=30',
+    '-t',
+    '10',
+    '-c:v',
+    'libx264',
+    '-pix_fmt',
+    'yuv420p',
+    inputPath
+  ]);
+
+  const userDataDir = mkdtempSync(join(tmpdir(), 'tajtlisha-e2e-profile-'));
+  const app = await electron.launch({ args: [mainEntry], env: { ...process.env, TAJTLISHA_USER_DATA_DIR: userDataDir } });
+  try {
+    const page = await app.firstWindow();
+    await app.evaluate(({ dialog }, sourcePath) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [sourcePath] });
+    }, inputPath);
+    await page.locator('.empty-card').getByRole('button', { name: OPEN_VIDEO_NAME }).click({ force: true });
+
+    const video = page.locator('video');
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.readyState), { timeout: 20000 }).toBeGreaterThan(0);
+
+    // The media protocol must answer range requests, or Chromium cannot seek.
+    const seek = await video.evaluate(async (element: HTMLVideoElement) => {
+      const seekableEnd = element.seekable.length > 0 ? element.seekable.end(0) : 0;
+      element.currentTime = 6;
+      await new Promise((done) => {
+        element.addEventListener('seeked', done, { once: true });
+        globalThis.setTimeout(done, 5000);
+      });
+      return { seekableEnd, currentTime: element.currentTime };
+    });
+    expect(seek.seekableEnd).toBeGreaterThan(9);
+    expect(seek.currentTime).toBeCloseTo(6, 1);
+
+    await video.click({ force: true });
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(false);
+    await video.click({ force: true });
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.paused)).toBe(true);
+  } finally {
+    await app.close();
+    rmSync(tempFolder, { force: true, recursive: true });
+    rmSync(userDataDir, { force: true, recursive: true });
+  }
+});
