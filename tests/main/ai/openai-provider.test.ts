@@ -322,3 +322,150 @@ describe('caption item parsing', () => {
     expect(() => parseCaptionItems('not json', 'OpenAI')).toThrow(AppError);
   });
 });
+
+describe('OpenAI summary', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** Body of the most recent fetch call. */
+  function requestBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+    return JSON.parse(String(calls[calls.length - 1][1].body)) as Record<string, unknown>;
+  }
+
+  it('sends the system prompt as instructions and the transcript as plain input, with no text format', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ output_text: 'Short post.' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const text = await (await connectedProvider()).summarizeText({
+      systemPrompt: 'Summarize for a tweet.',
+      transcript: '[0:01] Hello'
+    });
+
+    expect((fetchMock.mock.calls[0] as [string, RequestInit])[0]).toBe('https://api.openai.com/v1/responses');
+    expect(requestBody(fetchMock)).toEqual({
+      model: 'gpt-4.1-mini',
+      store: false,
+      instructions: 'Summarize for a tweet.',
+      input: '[0:01] Hello'
+    });
+    expect(text).toBe('Short post.');
+  });
+
+  it('uses the requested model and sends reasoning only when an effort is given', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ output_text: 'Post.' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = await connectedProvider();
+
+    await provider.summarizeText({ systemPrompt: 'p', transcript: 't', modelId: 'gpt-4.1', reasoningEffort: 'high' });
+    expect(requestBody(fetchMock)).toMatchObject({ model: 'gpt-4.1', reasoning: { effort: 'high' } });
+
+    await provider.summarizeText({ systemPrompt: 'p', transcript: 't', reasoningEffort: 'none' });
+    expect(requestBody(fetchMock)).toMatchObject({ reasoning: { effort: 'none' } });
+
+    await provider.summarizeText({ systemPrompt: 'p', transcript: 't' });
+    expect(requestBody(fetchMock)).not.toHaveProperty('reasoning');
+  });
+
+  it('reads the message text that follows a reasoning item and ignores reasoning text parts', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          output: [
+            { type: 'reasoning', id: 'rs_1', summary: [] },
+            { type: 'reasoning', content: [{ type: 'reasoning_text', text: 'thinking' }] },
+            { type: 'message', content: [{ type: 'output_text', text: '  Post text  ' }] }
+          ]
+        })
+      )
+    );
+
+    await expect((await connectedProvider()).summarizeText({ systemPrompt: 'p', transcript: 't' })).resolves.toBe('Post text');
+  });
+
+  it('fails with PROVIDER_REQUEST_FAILED when the message text is blank', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          output: [
+            { type: 'reasoning', summary: [] },
+            { type: 'message', content: [{ type: 'output_text', text: '   ' }] }
+          ]
+        })
+      )
+    );
+
+    await expect((await connectedProvider()).summarizeText({ systemPrompt: 'p', transcript: 't' })).rejects.toMatchObject({
+      code: 'PROVIDER_REQUEST_FAILED',
+      message: '[PROVIDER_REQUEST_FAILED] OpenAI returned an empty summary.'
+    });
+  });
+
+  it('fails with the same error when the response has only a reasoning item', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ output: [{ type: 'reasoning', summary: [] }] })));
+
+    await expect((await connectedProvider()).summarizeText({ systemPrompt: 'p', transcript: 't' })).rejects.toThrow(
+      'OpenAI returned an empty summary.'
+    );
+  });
+
+  it('lists live chat models for summary, drops non-text models, and sorts the ids', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        data: [
+          { id: 'gpt-4o' },
+          { id: 'whisper-1' },
+          { id: 'gpt-4o-transcribe' },
+          { id: 'text-embedding-3-small' },
+          { id: 'o3-mini' },
+          { id: 'gpt-4o-audio-preview' },
+          { id: 'gpt-4o-realtime-preview' },
+          { id: 'dall-e-3' },
+          { id: 'tts-1' },
+          { id: 'omni-moderation-latest' },
+          { id: 'gpt-3.5-turbo-instruct' },
+          { id: 'gpt-4.1-mini' },
+          { id: 42 }
+        ]
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const models = await (await connectedProvider()).listModels('summary');
+
+    expect((fetchMock.mock.calls[0] as [string, RequestInit])[0]).toBe('https://api.openai.com/v1/models');
+    expect(models).toEqual([
+      { id: 'gpt-4.1-mini', label: 'gpt-4.1-mini', capability: 'summary' },
+      { id: 'gpt-4o', label: 'gpt-4o', capability: 'summary' },
+      { id: 'o3-mini', label: 'o3-mini', capability: 'summary' }
+    ]);
+  });
+
+  it('falls back to the static summary models when the live list fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    await expect((await connectedProvider()).listModels('summary')).resolves.toEqual([
+      { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini', capability: 'summary', available: true },
+      { id: 'gpt-4.1', label: 'GPT-4.1', capability: 'summary', available: true }
+    ]);
+  });
+
+  it('falls back to the static summary models on an HTTP error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: { message: 'server error' } }, 500)));
+
+    const models = await (await connectedProvider()).listModels('summary');
+    expect(models.map((model) => model.id)).toEqual(['gpt-4.1-mini', 'gpt-4.1']);
+  });
+
+  it('returns the static summary models without a network call when no key is stored', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new OpenAiProvider({ credentialStore: new MemoryCredentialStore() });
+
+    await expect(provider.listModels('summary')).resolves.toHaveLength(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

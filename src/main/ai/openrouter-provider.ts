@@ -8,6 +8,7 @@ import {
   type AiProviderContext,
   type ProviderDefinition,
   type ProviderPolishRequest,
+  type ProviderSummarizeRequest,
   type ProviderTextItem,
   type ProviderTranscribeRequest,
   type ProviderTranscribeResult,
@@ -70,7 +71,7 @@ export class OpenRouterProvider extends BaseAiProvider {
     if (capability === 'transcription') {
       return super.listModels(capability);
     }
-    if (capability !== 'translation' && capability !== 'subtitlePolish') {
+    if (capability !== 'translation' && capability !== 'subtitlePolish' && capability !== 'summary') {
       return [];
     }
 
@@ -111,6 +112,30 @@ export class OpenRouterProvider extends BaseAiProvider {
       language: request.language ?? 'und',
       text: payload.text?.trim() ?? ''
     };
+  }
+
+  override async summarizeText(request: ProviderSummarizeRequest): Promise<string> {
+    const payload = (await this.fetchJson(`${OPENROUTER_API}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-title': 'Tajtlisha' },
+      body: JSON.stringify({
+        model: request.modelId ?? OPENROUTER_DEFAULT_TEXT_MODEL,
+        messages: [
+          { role: 'system', content: request.systemPrompt },
+          { role: 'user', content: request.transcript }
+        ],
+        ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort } } : {})
+      }),
+      signal: request.signal
+    })) as OpenRouterChatPayload;
+
+    const content = payload.choices?.[0]?.message?.content;
+    const text = typeof content === 'string' ? content.trim() : '';
+    if (!text) {
+      throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenRouter returned an empty summary.');
+    }
+
+    return text;
   }
 
   override async translateTexts(request: ProviderTranslateRequest): Promise<ProviderTextItem[]> {

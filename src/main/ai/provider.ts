@@ -4,6 +4,7 @@ import type {
   AuthMode,
   ProviderModelDescriptor,
   ProviderSummary,
+  ReasoningEffort,
   TestConnectionResult
 } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
@@ -69,12 +70,24 @@ export type ProviderPolishRequest = ProviderTextBaseRequest & {
   mode: ProviderPolishMode;
 };
 
+export type ProviderSummarizeRequest = {
+  systemPrompt: string;
+  /** Transcript built by buildSummaryTranscript. */
+  transcript: string;
+  /** Provider model id; undefined = provider default text model. */
+  modelId?: string;
+  /** Undefined = send no reasoning parameter. */
+  reasoningEffort?: ReasoningEffort;
+  signal?: AbortSignal;
+};
+
 export interface AiProvider extends ProviderSummary {
   listModels(capability: keyof AiProviderCapabilities): Promise<ProviderModelDescriptor[]>;
   testConnection(): Promise<TestConnectionResult>;
   transcribe(request: ProviderTranscribeRequest): Promise<ProviderTranscribeResult>;
   translateTexts(request: ProviderTranslateRequest): Promise<ProviderTextItem[]>;
   polishTexts(request: ProviderPolishRequest): Promise<ProviderTextItem[]>;
+  summarizeText(request: ProviderSummarizeRequest): Promise<string>;
 }
 
 type FetchJsonOptions = {
@@ -150,6 +163,10 @@ export abstract class BaseAiProvider implements AiProvider {
 
   polishTexts(_request: ProviderPolishRequest): Promise<ProviderTextItem[]> {
     return Promise.reject(this.unsupported('subtitle polish'));
+  }
+
+  summarizeText(_request: ProviderSummarizeRequest): Promise<string> {
+    return Promise.reject(this.unsupported('summary'));
   }
 
   protected unsupported(operation: string): AppError {

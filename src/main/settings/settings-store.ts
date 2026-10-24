@@ -2,7 +2,9 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import type { AppSettings } from '../../shared/types/settings';
+import { REASONING_EFFORTS } from '../../shared/types/ai';
+import type { AppSettings, SummarySettings } from '../../shared/types/settings';
+import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../shared/summary';
 import { normalizeUiZoom } from '../../shared/ui-zoom';
 import { DEFAULT_APP_SETTINGS } from './defaults';
 import { rejectSecretFields } from './secret-fields';
@@ -113,8 +115,37 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     aiConnector: {
       ...settings.aiConnector,
       maxLinesPerCaption: settings.aiConnector.maxLinesPerCaption === 1 ? 1 : 2
-    }
+    },
+    summary: normalizeSummary(settings.summary)
   };
+}
+
+const REASONING_EFFORT_SETTINGS: ReadonlyArray<SummarySettings['reasoningEffort']> = ['default', ...REASONING_EFFORTS];
+
+/** Hand-edited values that are not usable fall back to the same defaults as a fresh file. */
+function normalizeSummary(value: unknown): SummarySettings {
+  const summary: JsonObject = isPlainObject(value) ? value : {};
+  return {
+    enabled: summary.enabled === true,
+    systemPrompt: normalizeSummaryPrompt(summary.systemPrompt),
+    modelByProvider: normalizeModelByProvider(summary.modelByProvider),
+    reasoningEffort: REASONING_EFFORT_SETTINGS.find((effort) => effort === summary.reasoningEffort) ?? 'default'
+  };
+}
+
+function normalizeSummaryPrompt(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return DEFAULT_SUMMARY_PROMPT;
+  }
+  return value.slice(0, MAX_SUMMARY_PROMPT_CHARS);
+}
+
+function normalizeModelByProvider(value: unknown): SummarySettings['modelByProvider'] {
+  if (!isPlainObject(value)) {
+    return {};
+  }
+  const models = Object.entries(value).filter(([, model]) => typeof model === 'string');
+  return Object.fromEntries(models) as SummarySettings['modelByProvider'];
 }
 
 function isPlainObject(value: unknown): value is JsonObject {
