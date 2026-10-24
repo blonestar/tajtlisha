@@ -18,6 +18,8 @@ export const APP_ERROR_CODES = [
   'PROVIDER_RATE_LIMITED',
   'AUDIO_TOO_LARGE',
   'TRANSLATION_INCOMPLETE',
+  /** The chosen model rejected the summary thinking (reasoning) effort. */
+  'REASONING_UNSUPPORTED',
   'OUTPUT_EXISTS',
   'OUTPUT_IS_SOURCE',
   'OUTPUT_FOLDER_INVALID',

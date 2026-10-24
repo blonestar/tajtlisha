@@ -194,6 +194,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'The AI provider is rate limiting requests. Wait a minute and try again.',
       AUDIO_TOO_LARGE: 'The audio is too large for one request. Trim the clip to a shorter range.',
       TRANSLATION_INCOMPLETE: 'The AI provider returned an incomplete translation. Try again.',
+      REASONING_UNSUPPORTED:
+        'This model does not support the chosen thinking effort. In Settings > Summary choose Default, or pick a reasoning model.',
       OUTPUT_EXISTS: 'A file with this name already exists in the output folder.',
       OUTPUT_IS_SOURCE: 'The output would overwrite the original video. Choose a different name or folder.',
       OUTPUT_FOLDER_INVALID: 'The output folder cannot be used. Choose another folder.',
@@ -392,6 +394,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'AI provajder privremeno ograničava zahteve. Sačekaj minut i pokušaj ponovo.',
       AUDIO_TOO_LARGE: 'Zvuk je prevelik za jedan zahtev. Skrati opseg isecanja.',
       TRANSLATION_INCOMPLETE: 'AI provajder je vratio nepotpun prevod. Pokušaj ponovo.',
+      REASONING_UNSUPPORTED:
+        'Ovaj model ne podržava izabrani intenzitet razmišljanja. U Podešavanja > Sažetak izaberi Podrazumevano ili model za razmišljanje.',
       OUTPUT_EXISTS: 'Fajl sa ovim imenom već postoji u izabranom folderu.',
       OUTPUT_IS_SOURCE: 'Izlaz bi prepisao originalni video. Izaberi drugo ime ili folder.',
       OUTPUT_FOLDER_INVALID: 'Izabrani folder ne može da se koristi. Izaberi drugi folder.',
@@ -590,6 +594,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'AI провајдер привремено ограничава захтеве. Сачекај минут и покушај поново.',
       AUDIO_TOO_LARGE: 'Звук је превелик за један захтев. Скрати опсег исецања.',
       TRANSLATION_INCOMPLETE: 'AI провајдер је вратио непотпун превод. Покушај поново.',
+      REASONING_UNSUPPORTED:
+        'Овај модел не подржава изабрани интензитет размишљања. У Подешавања > Сажетак изабери Подразумевано или модел за размишљање.',
       OUTPUT_EXISTS: 'Фајл са овим именом већ постоји у изабраном фолдеру.',
       OUTPUT_IS_SOURCE: 'Излаз би преписао оригинални видео. Изабери друго име или фолдер.',
       OUTPUT_FOLDER_INVALID: 'Изабрани фолдер не може да се користи. Изабери други фолдер.',

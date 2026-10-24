@@ -549,6 +549,32 @@ describe('SubtitleWorkflowService.summarize', () => {
     expect(registry.summarizeText).toHaveBeenCalledTimes(1);
   });
 
+  it('names a rejected reasoning effort with REASONING_UNSUPPORTED and keeps the API detail', async () => {
+    const detail = "OpenAI request failed (HTTP 400): Unsupported parameter: 'reasoning.effort' is not supported with this model.";
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => {
+        throw new AppError('PROVIDER_REQUEST_FAILED', detail);
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest({ reasoningEffort: 'low' }))).rejects.toMatchObject({
+      code: 'REASONING_UNSUPPORTED',
+      detail
+    });
+  });
+
+  it('keeps other provider failures as they are, also without an effort', async () => {
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => {
+        throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI request failed (HTTP 400): reasoning is not available.');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest())).rejects.toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
+  });
+
   it('fails with PROVIDER_REQUEST_FAILED when the provider returns only whitespace', async () => {
     const registry = fakeRegistry({ summarizeText: vi.fn(async () => ' \n ') } as never);
     const { service } = createService({ registry });

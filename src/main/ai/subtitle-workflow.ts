@@ -165,15 +165,29 @@ export class SubtitleWorkflowService {
     }
 
     context.onProgress?.({ stage: 'summarizing' });
-    const text = (
-      await this.registry.summarizeText(request.providerId, {
-        systemPrompt: request.systemPrompt,
-        transcript: buildSummaryTranscript(segments, request.language),
-        modelId: request.modelId,
-        reasoningEffort: request.reasoningEffort,
-        signal: context.signal
-      })
-    ).trim();
+    let text: string;
+    try {
+      text = (
+        await this.registry.summarizeText(request.providerId, {
+          systemPrompt: request.systemPrompt,
+          transcript: buildSummaryTranscript(segments, request.language),
+          modelId: request.modelId,
+          reasoningEffort: request.reasoningEffort,
+          signal: context.signal
+        })
+      ).trim();
+    } catch (error) {
+      // Models without reasoning reject the effort parameter; name that instead of a generic failure.
+      if (
+        request.reasoningEffort &&
+        error instanceof AppError &&
+        error.code === 'PROVIDER_REQUEST_FAILED' &&
+        /reasoning|effort/i.test(error.detail ?? '')
+      ) {
+        throw new AppError('REASONING_UNSUPPORTED', error.detail);
+      }
+      throw error;
+    }
 
     if (!text) {
       throw new AppError('PROVIDER_REQUEST_FAILED', 'The AI provider returned an empty summary.');
