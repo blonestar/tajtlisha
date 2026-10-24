@@ -1,4 +1,4 @@
-import type { AiProviderId } from './ai';
+import type { AiProviderId, ReasoningEffort } from './ai';
 import type { CaptionRow, TrimRange } from './project';
 import type { SubtitleStyle } from './style';
 
@@ -19,6 +19,7 @@ export type JobStage =
   | 'transcribing'
   | 'translating'
   | 'polishing'
+  | 'summarizing'
   | 'rendering_video'
   | 'writing_srt';
 
@@ -69,6 +70,30 @@ export type TranslateCaptionsRequest = {
 export type TranslateCaptionsResult = {
   /** Exactly one entry per requested caption id, same order. Never silently falls back to source text. */
   translations: Array<{ id: string; text: string }>;
+};
+
+/**
+ * Summarizes the transcript with the user's system prompt. Times are relative
+ * to the trimmed clip (00:00 = trim start), so the model sees the final timeline.
+ */
+export type SummarizeTranscriptRequest = {
+  jobId: string;
+  providerId: AiProviderId;
+  /** Undefined = provider default text model. */
+  modelId?: string;
+  /** Undefined = send no reasoning parameter. */
+  reasoningEffort?: ReasoningEffort;
+  /** Non-empty, at most MAX_SUMMARY_PROMPT_CHARS. */
+  systemPrompt: string;
+  /** Spoken language code of the transcript ('und' when unknown). */
+  language: string;
+  /** Non-empty captions in timeline order; blank texts are dropped by main. */
+  segments: Array<{ startMs: number; endMs: number; text: string }>;
+};
+
+export type SummarizeTranscriptResult = {
+  /** Model output, trimmed. Never empty. */
+  text: string;
 };
 
 export type ExportOutputs = {

@@ -1,4 +1,4 @@
-import type { AiProviderId, AuthMode } from './ai';
+import type { AiProviderId, AuthMode, ReasoningEffort } from './ai';
 import type { ExportOverwritePolicy } from './export';
 
 export type UiLanguage = 'system' | 'en' | 'sr-Latn' | 'sr-Cyrl';
@@ -24,6 +24,21 @@ export type AiConnectorSettings = {
   maxLinesPerCaption: 1 | 2;
 };
 
+/**
+ * Optional on-demand summary of the transcript (for example the point of a
+ * clip for a social post). Off by default; the Editor shows the action only
+ * when enabled.
+ */
+export type SummarySettings = {
+  enabled: boolean;
+  /** System prompt the model receives. Blank is normalized back to DEFAULT_SUMMARY_PROMPT. */
+  systemPrompt: string;
+  /** '' or missing = use the provider's text model (textModelByProvider), then the provider default. */
+  modelByProvider: Partial<Record<AiProviderId, string>>;
+  /** 'default' sends no reasoning parameter, so non-reasoning models keep working. */
+  reasoningEffort: 'default' | ReasoningEffort;
+};
+
 export type AppSettings = {
   uiLanguage: UiLanguage;
   defaultOutputFolder?: string;
@@ -35,4 +50,5 @@ export type AppSettings = {
   uiZoomPercent: number;
   exportDefaults: ExportSettings;
   aiConnector: AiConnectorSettings;
+  summary: SummarySettings;
 };

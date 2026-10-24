@@ -20,7 +20,8 @@ const CAPABILITIES: ReadonlyArray<keyof AiProviderCapabilities> = [
   'wordTimestamps',
   'translation',
   'subtitlePolish',
-  'textToSpeech'
+  'textToSpeech',
+  'summary'
 ];
 
 export function registerAiIpc({ ipc, registry }: AiIpcDeps): void {

@@ -1,6 +1,7 @@
 import Bot from 'lucide-react/dist/esm/icons/bot.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
 import Info from 'lucide-react/dist/esm/icons/info.js';
+import ScrollText from 'lucide-react/dist/esm/icons/scroll-text.js';
 import Settings from 'lucide-react/dist/esm/icons/settings.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
 import type { ReactElement } from 'react';
@@ -12,6 +13,7 @@ import { AboutSection } from '../components/settings/AboutSection';
 import { AiSection } from '../components/settings/AiSection';
 import { ExportSection } from '../components/settings/ExportSection';
 import { GeneralSection } from '../components/settings/GeneralSection';
+import { SummarySettings } from '../components/settings/SummarySettings';
 import '../components/settings/settings.css';
 
 type SettingsPageProps = {
@@ -28,11 +30,12 @@ type SettingsPageProps = {
   onClose?: () => void;
 };
 
-type SettingsSectionId = 'general' | 'ai' | 'export' | 'about';
+type SettingsSectionId = 'general' | 'ai' | 'summary' | 'export' | 'about';
 
 const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
   { id: 'general', icon: Settings },
   { id: 'ai', icon: Bot },
+  { id: 'summary', icon: ScrollText },
   { id: 'export', icon: FolderOpen },
   { id: 'about', icon: Info }
 ];
@@ -94,6 +97,14 @@ export function SettingsPage({
                 onConnectProvider={onConnectProvider}
                 onDisconnectProvider={onDisconnectProvider}
                 onTestProvider={onTestProvider}
+                onListModels={onListModels}
+              />
+            ) : null}
+            {section === 'summary' ? (
+              <SummarySettings
+                settings={settings}
+                providers={providers}
+                onSettingsChange={onSettingsChange}
                 onListModels={onListModels}
               />
             ) : null}

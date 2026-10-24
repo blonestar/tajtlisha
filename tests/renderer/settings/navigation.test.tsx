@@ -36,6 +36,20 @@ describe('SettingsPage navigation', () => {
     expect(screen.getByRole('switch', { name: 'Auto-detect spoken language' })).toBeChecked();
   });
 
+  it('has its own Summary section, separate from AI', () => {
+    renderWithI18n(<SettingsPage settings={mockSettings} providers={mockProviderStatuses} onLanguageChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    expect(screen.queryByRole('switch', { name: 'Show Summarize in the editor' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summary' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Show Summarize in the editor' })).toBeInTheDocument();
+    expect(screen.getByLabelText('System prompt')).toBeInTheDocument();
+    expect(screen.getByLabelText('Summary model')).toBeInTheDocument();
+    expect(screen.getByLabelText('Thinking effort')).toBeInTheDocument();
+  });
+
   it('loads the About section and shows the app version', async () => {
     installFakeApi({
       app: { getInfo: async () => ({ version: '0.2.0', platform: 'linux', isPackaged: true }), setZoomFactor: () => undefined },

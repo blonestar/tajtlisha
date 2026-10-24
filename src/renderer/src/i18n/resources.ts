@@ -26,6 +26,7 @@ const baseResources = {
         nav: {
           general: 'General',
           ai: 'AI',
+          summary: 'Summary',
           export: 'Export',
           about: 'About'
         },
@@ -66,6 +67,9 @@ const baseResources = {
           whisperRetired: '{{model}} has word timing, but OpenAI retires it on 2027-02-26.',
           textModel: 'Translation model',
           textHint: 'Used for translation and polish.',
+          summaryModel: 'Summary model',
+          summaryModelHint: 'Free text, so newer model IDs work too. Suggestions come from the provider.',
+          summaryModelPlaceholder: 'Same as text model',
           modelDefault: 'Provider default',
           modelsLoading: 'Loading models…',
           modelsError: 'Models could not be loaded. Check the connection and try again.',
@@ -91,6 +95,29 @@ const baseResources = {
             none: 'Translations are used exactly as the provider returns them.',
             light: 'Light cleanup of the translated text. The meaning is kept.',
             social: 'Shorter, more natural wording for social media captions.'
+          }
+        },
+        summary: {
+          enable: 'Show Summarize in the editor',
+          enableHint: 'Shows or hides the Summarize button in the editor. The transcript is sent to the AI provider only when you press it.',
+          modelProvider: 'Uses the active AI provider: {{provider}}.',
+          modelUnavailable: 'Connect the active AI provider in the AI section to choose a model.',
+          modelUnsupported: '{{provider}} cannot summarize text.',
+          prompt: 'System prompt',
+          promptHint: 'Tells the model what to take from the transcript. Changes are saved when you leave the field.',
+          promptCounter: '{{count}} / {{max}} characters',
+          resetPrompt: 'Reset to default',
+          effort: 'Thinking effort',
+          effortHint: 'Only reasoning models use it. Providers reject levels a model does not support, so keep Default for other models.',
+          effortDefault: 'Default (not sent)',
+          effortLevels: {
+            none: 'None',
+            minimal: 'Minimal',
+            low: 'Low',
+            medium: 'Medium',
+            high: 'High',
+            xhigh: 'Extra high',
+            max: 'Maximum'
           }
         },
         export: {
@@ -178,6 +205,7 @@ const baseResources = {
         nav: {
           general: 'Opšte',
           ai: 'AI',
+          summary: 'Sažetak',
           export: 'Izvoz',
           about: 'O programu'
         },
@@ -218,6 +246,9 @@ const baseResources = {
           whisperRetired: '{{model}} ima vreme po rečima, ali OpenAI ga ukida 2027-02-26.',
           textModel: 'Model za prevod',
           textHint: 'Koristi se za prevod i doradu.',
+          summaryModel: 'Model za sažetak',
+          summaryModelHint: 'Slobodan unos, pa rade i noviji ID-jevi modela. Predloge daje provajder.',
+          summaryModelPlaceholder: 'Isti kao model za tekst',
           modelDefault: 'Podrazumevani za provajdera',
           modelsLoading: 'Učitavam modele…',
           modelsError: 'Modeli nisu učitani. Proverite vezu i pokušajte ponovo.',
@@ -243,6 +274,30 @@ const baseResources = {
             none: 'Prevodi se koriste onako kako ih provajder vrati.',
             light: 'Lagana dorada prevedenog teksta. Značenje se zadržava.',
             social: 'Kraći i prirodniji tekst za titlove na društvenim mrežama.'
+          }
+        },
+        summary: {
+          enable: 'Prikaži Sažmi u editoru',
+          enableHint: 'Prikazuje ili skriva dugme Sažmi u editoru. Transkript se šalje AI provajderu tek kada ga pritisneš.',
+          modelProvider: 'Koristi aktivni AI provajder: {{provider}}.',
+          modelUnavailable: 'Poveži aktivni AI provajder u odeljku AI da bi izabrao model.',
+          modelUnsupported: '{{provider}} ne može da sažima tekst.',
+          prompt: 'Sistemska uputstva',
+          promptHint: 'Govori modelu šta da izdvoji iz transkripta. Izmene se čuvaju kada napustiš polje.',
+          promptCounter: '{{count}} / {{max}} karaktera',
+          resetPrompt: 'Vrati podrazumevana',
+          effort: 'Intenzitet razmišljanja',
+          effortHint:
+            'Koriste ga samo modeli za razmišljanje. Provajderi odbijaju nivoe koje model ne podržava, zato za ostale modele ostavi Podrazumevano.',
+          effortDefault: 'Podrazumevano (ne šalje se)',
+          effortLevels: {
+            none: 'Bez razmišljanja',
+            minimal: 'Minimalno',
+            low: 'Nisko',
+            medium: 'Srednje',
+            high: 'Visoko',
+            xhigh: 'Vrlo visoko',
+            max: 'Maksimalno'
           }
         },
         export: {
@@ -330,6 +385,7 @@ const baseResources = {
         nav: {
           general: 'Опште',
           ai: 'AI',
+          summary: 'Сажетак',
           export: 'Извоз',
           about: 'О програму'
         },
@@ -370,6 +426,9 @@ const baseResources = {
           whisperRetired: '{{model}} има време по речима, али OpenAI га укида 2027-02-26.',
           textModel: 'Модел за превод',
           textHint: 'Користи се за превод и дораду.',
+          summaryModel: 'Модел за сажетак',
+          summaryModelHint: 'Слободан унос, па раде и новији ИД-јеви модела. Предлоге даје провајдер.',
+          summaryModelPlaceholder: 'Исти као модел за текст',
           modelDefault: 'Подразумевани за провајдера',
           modelsLoading: 'Учитавам моделе…',
           modelsError: 'Модели нису учитани. Проверите везу и покушајте поново.',
@@ -395,6 +454,30 @@ const baseResources = {
             none: 'Преводи се користе онако како их провајдер врати.',
             light: 'Лагана дорада преведеног текста. Значење се задржава.',
             social: 'Краћи и природнији текст за титлове на друштвеним мрежама.'
+          }
+        },
+        summary: {
+          enable: 'Прикажи Сажми у едитору',
+          enableHint: 'Приказује или скрива дугме Сажми у едитору. Транскрипт се шаље AI провајдеру тек када га притиснеш.',
+          modelProvider: 'Користи активни AI провајдер: {{provider}}.',
+          modelUnavailable: 'Повежи активни AI провајдер у одељку AI да би изабрао модел.',
+          modelUnsupported: '{{provider}} не може да сажима текст.',
+          prompt: 'Системска упутства',
+          promptHint: 'Говори моделу шта да издвоји из транскрипта. Измене се чувају када напустиш поље.',
+          promptCounter: '{{count}} / {{max}} карактера',
+          resetPrompt: 'Врати подразумевана',
+          effort: 'Интензитет размишљања',
+          effortHint:
+            'Користе га само модели за размишљање. Провајдери одбијају нивое које модел не подржава, зато за остале моделе остави Подразумевано.',
+          effortDefault: 'Подразумевано (не шаље се)',
+          effortLevels: {
+            none: 'Без размишљања',
+            minimal: 'Минимално',
+            low: 'Ниско',
+            medium: 'Средње',
+            high: 'Високо',
+            xhigh: 'Врло високо',
+            max: 'Максимално'
           }
         },
         export: {

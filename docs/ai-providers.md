@@ -97,8 +97,22 @@ type AiProviderCapabilities = {
   translation: boolean;
   subtitlePolish: boolean;
   textToSpeech: boolean;
+  summary: boolean;
 };
 ```
+
+### Sazetak videa (summary)
+
+Opcioni, korisnicki ukljucen korak. Kada je `summary.enabled`, Editor prikazuje dugme Summarize. Main salje
+transkript (originalni tekst caption-a unutar trim-a, vremena relativna na pocetak trim-a, format `[m:ss] tekst`)
+aktivnom provideru sa sistemskim promptom iz podesavanja i vraca obican tekst.
+
+- Kanal: `workflow:summarize` (job, moze da se otkaze), stage `summarizing`.
+- Model: `summary.modelByProvider[provider]`, pa `textModelByProvider[provider]`, pa default providera.
+- Thinking effort: `summary.reasoningEffort`. `default` ne salje parametar (radi i sa modelima bez reasoning-a);
+  ostale vrednosti (`none` ... `max`) idu kao `reasoning.effort` (OpenAI Responses API i OpenRouter). Koje
+  vrednosti model prihvata zavisi od modela; nepodrzanu vrednost provider odbije i korisnik vidi poruku API-ja.
+- Rezultat se ne cuva u projektu; ostaje u Editoru dok se ne otvori drugi projekat.
 
 ## AI connector settings
 

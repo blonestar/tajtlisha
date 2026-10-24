@@ -275,6 +275,7 @@ export function ProviderPanel({
               ))}
             </select>
           </SettingsRow>
+
         </>
       ) : (
         <p className="settings-card-note muted">{t('settings.ai.connectToChooseModels')}</p>

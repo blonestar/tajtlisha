@@ -67,6 +67,12 @@ export const SETTINGS: AppSettings = {
     socialCaptionPolish: false,
     maxCharsPerLine: 42,
     maxLinesPerCaption: 2
+  },
+  summary: {
+    enabled: false,
+    systemPrompt: 'Summarize the clip.',
+    modelByProvider: {},
+    reasoningEffort: 'default'
   }
 };
 
@@ -82,6 +88,7 @@ export const OPENAI_STATUS: ProviderStatus = {
     wordTimestamps: true,
     translation: true,
     subtitlePolish: true,
-    textToSpeech: false
+    textToSpeech: false,
+    summary: true
   }
 };

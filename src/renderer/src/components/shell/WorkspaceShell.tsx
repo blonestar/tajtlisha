@@ -18,6 +18,7 @@ import { useJobRunner } from '../../state/useJobRunner';
 import { useProjectStore } from '../../state/useProjectStore';
 import { ExportDialog } from '../workflow/ExportDialog';
 import { JobBar } from '../workflow/JobBar';
+import { SummaryDialog } from '../workflow/SummaryDialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { EmptyState } from './EmptyState';
 import { SettingsSheet } from './SettingsSheet';
@@ -232,6 +233,17 @@ export function WorkspaceShell({ runtime }: WorkspaceShellProps): ReactElement {
         onExport={exportModel.start}
         onShowInFolder={exportModel.showInFolder}
       />
+
+      {workspace.summary ? (
+        <SummaryDialog
+          open={workspace.summaryOpen}
+          onOpenChange={workspace.setSummaryOpen}
+          summary={workspace.summary}
+          currentRevision={project.revision}
+          busy={busy}
+          onSummarizeAgain={workspace.summarize}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={workspace.confirm !== null}

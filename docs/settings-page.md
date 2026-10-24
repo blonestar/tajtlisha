@@ -116,6 +116,14 @@ Opcije:
 - keep original meaning,
 - preserve timing during translation.
 
+### Sazetak videa (zaseban tab "Summary")
+
+- prekidac koji prikazuje ili sakriva dugme Summarize u Editoru (podrazumevano iskljuceno); ostala polja ostaju
+  vidljiva i izmenljiva i kada je iskljucen,
+- sistemski prompt (do 8000 znakova, dugme za vracanje podrazumevanog; prazan prompt se vraca na podrazumevani),
+- thinking effort: Default (ne salje se) ili `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`,
+- model za aktivni provider (slobodan unos sa predlozima; prazno = isti kao model za tekst); cuva se po provideru.
+
 ### Credential prikaz
 
 AI connector ne sme da prikazuje tajne posle cuvanja.
