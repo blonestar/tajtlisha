@@ -10,6 +10,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Video summary (optional, Settings > Summary): a Summarize button in the editor sends the transcript to the active AI
   provider with your own system prompt, for example to get the point of a clip for a post. Choose the model per
   provider and the thinking effort; the result opens in a dialog where you can edit and copy it.
+
+## [0.4.0] - 2026-10-25
+
+### Added
 - Shift all captions: a bar above the caption table moves every caption earlier or later by a typed number of
   seconds (0.5 s by default). Durations and gaps stay the same, and one Undo reverts the shift.
 - Clicking into a caption's text or time field moves the video to that caption.
@@ -99,7 +103,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.3.1...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.4.0...develop
+[0.4.0]: https://github.com/blonestar/tajtlisha/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/blonestar/tajtlisha/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/blonestar/tajtlisha/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/blonestar/tajtlisha/compare/v0.2.0...v0.2.1
