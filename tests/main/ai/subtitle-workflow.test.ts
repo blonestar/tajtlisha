@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { AppError } from '../../../src/shared/errors';
-import type { TranscribeClipRequest, TranslateCaptionsRequest, JobStage } from '../../../src/shared/types/jobs';
+import type { TranscribeClipRequest, TranslateCaptionsRequest, JobStage, SummarizeTranscriptRequest } from '../../../src/shared/types/jobs';
 import type { AiProviderRegistry } from '../../../src/main/ai/provider-registry';
-import type { ProviderPolishRequest, ProviderTextItem, ProviderTranscribeRequest, ProviderTranscribeResult, ProviderTranslateRequest } from '../../../src/main/ai/provider';
+import type { ProviderPolishRequest, ProviderSummarizeRequest, ProviderTextItem, ProviderTranscribeRequest, ProviderTranscribeResult, ProviderTranslateRequest } from '../../../src/main/ai/provider';
 import { MAX_AUDIO_BYTES, SubtitleWorkflowService, TRANSLATION_BATCH_SIZE, type WorkflowProgress } from '../../../src/main/ai/subtitle-workflow';
 import type { MediaService, MediaRunOptions } from '../../../src/main/media/media-service';
 import type { AudioExtractRequest, AudioExtractResult } from '../../../src/shared/types/media';
@@ -15,7 +15,7 @@ const SILENCE_STDERR = `Duration: 00:00:04.00, start: 0
 [silencedetect @ 0x1] silence_start: 1
 [silencedetect @ 0x1] silence_end: 1.5 | silence_duration: 0.5`;
 
-type Registry = Pick<AiProviderRegistry, 'transcribe' | 'translateTexts' | 'polishTexts'>;
+type Registry = Pick<AiProviderRegistry, 'transcribe' | 'translateTexts' | 'polishTexts' | 'summarizeText'>;
 
 function createRequest(overrides: Partial<TranscribeClipRequest> = {}): TranscribeClipRequest {
   return {
@@ -52,6 +52,7 @@ function fakeRegistry(overrides: Partial<Registry> = {}): Registry & {
   transcribe: ReturnType<typeof vi.fn>;
   translateTexts: ReturnType<typeof vi.fn>;
   polishTexts: ReturnType<typeof vi.fn>;
+  summarizeText: ReturnType<typeof vi.fn>;
 } {
   return {
     transcribe: vi.fn(async (_providerId: string, _request: ProviderTranscribeRequest): Promise<ProviderTranscribeResult> => ({
@@ -62,6 +63,7 @@ function fakeRegistry(overrides: Partial<Registry> = {}): Registry & {
       request.items.map((item) => ({ id: item.id, text: item.text.toUpperCase() }))
     ),
     polishTexts: vi.fn(async (_providerId: string, request: ProviderPolishRequest) => request.items),
+    summarizeText: vi.fn(async (_providerId: string, _request: ProviderSummarizeRequest) => 'Summary.'),
     ...overrides
   } as never;
 }
@@ -458,5 +460,149 @@ describe('SubtitleWorkflowService.translate', () => {
       service.translate(translateRequest({ captions: numbered(45) }), { signal: controller.signal })
     ).rejects.toMatchObject({ code: 'JOB_CANCELED' });
     expect(registry.translateTexts).toHaveBeenCalledTimes(1);
+  });
+});
+
+function summarizeRequest(overrides: Partial<SummarizeTranscriptRequest> = {}): SummarizeTranscriptRequest {
+  return {
+    jobId: 'summary-1',
+    providerId: 'openai',
+    systemPrompt: 'Make a tweet.',
+    language: 'en',
+    segments: [{ startMs: 0, endMs: 1000, text: 'Hello.' }],
+    ...overrides
+  };
+}
+
+describe('SubtitleWorkflowService.summarize', () => {
+  it('drops blank segments and sends the clip-relative transcript with the system prompt', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.summarize(
+      summarizeRequest({
+        segments: [
+          { startMs: 0, endMs: 1000, text: 'Hello.' },
+          { startMs: 1000, endMs: 2000, text: '   ' },
+          { startMs: 2000, endMs: 3000, text: 'World.' }
+        ]
+      })
+    );
+
+    expect(registry.summarizeText).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({
+        systemPrompt: 'Make a tweet.',
+        transcript: 'Transcript language: English\n\n[0:00] Hello.\n[0:02] World.'
+      })
+    );
+  });
+
+  it('passes the model and reasoning effort to the registry', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.summarize(summarizeRequest({ modelId: 'gpt-4.1', reasoningEffort: 'medium' }));
+
+    expect(registry.summarizeText).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ modelId: 'gpt-4.1', reasoningEffort: 'medium' })
+    );
+  });
+
+  it('returns the trimmed provider text', async () => {
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => '  The point.\n')
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest())).resolves.toEqual({ text: 'The point.' });
+  });
+
+  it('fails with NO_SPEECH and makes no provider call when every segment is blank', async () => {
+    const events: WorkflowProgress[] = [];
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await expect(
+      service.summarize(summarizeRequest({ segments: [{ startMs: 0, endMs: 1000, text: ' \n ' }] }), {
+        onProgress: (event) => events.push(event)
+      })
+    ).rejects.toMatchObject({ code: 'NO_SPEECH' });
+    expect(registry.summarizeText).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('reports the summarizing stage before calling the provider', async () => {
+    const events: WorkflowProgress[] = [];
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => {
+        expect(events).toEqual([{ stage: 'summarizing' }]);
+        return 'Summary.';
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await service.summarize(summarizeRequest(), { onProgress: (event) => events.push(event) });
+
+    expect(stagesOf(events)).toEqual(['summarizing']);
+    expect(registry.summarizeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('names a rejected reasoning effort with REASONING_UNSUPPORTED and keeps the API detail', async () => {
+    const detail = "OpenAI request failed (HTTP 400): Unsupported parameter: 'reasoning.effort' is not supported with this model.";
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => {
+        throw new AppError('PROVIDER_REQUEST_FAILED', detail);
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest({ reasoningEffort: 'low' }))).rejects.toMatchObject({
+      code: 'REASONING_UNSUPPORTED',
+      detail
+    });
+  });
+
+  it('keeps other provider failures as they are, also without an effort', async () => {
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async () => {
+        throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI request failed (HTTP 400): reasoning is not available.');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest())).rejects.toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
+  });
+
+  it('fails with PROVIDER_REQUEST_FAILED when the provider returns only whitespace', async () => {
+    const registry = fakeRegistry({ summarizeText: vi.fn(async () => ' \n ') } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest())).rejects.toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
+  });
+
+  it('does not start when already canceled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest(), { signal: controller.signal })).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+    expect(registry.summarizeText).not.toHaveBeenCalled();
+  });
+
+  it('passes the abort signal to the provider and surfaces its cancellation', async () => {
+    const controller = new AbortController();
+    const registry = fakeRegistry({
+      summarizeText: vi.fn(async (_providerId: string, request: ProviderSummarizeRequest) => {
+        expect(request.signal).toBe(controller.signal);
+        controller.abort();
+        throw new AppError('JOB_CANCELED');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(service.summarize(summarizeRequest(), { signal: controller.signal })).rejects.toMatchObject({ code: 'JOB_CANCELED' });
   });
 });

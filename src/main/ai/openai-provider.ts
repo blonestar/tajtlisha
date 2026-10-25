@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
-import type { ProviderModelDescriptor } from '../../shared/types/ai';
+import type { AiProviderCapabilities, ProviderModelDescriptor } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
 import { validatePath } from '../media/contracts';
 import { transcriptionLanguageCode, languageCodeFromSpokenName } from './language';
@@ -9,6 +9,7 @@ import {
   type AiProviderContext,
   type ProviderDefinition,
   type ProviderPolishRequest,
+  type ProviderSummarizeRequest,
   type ProviderTextItem,
   type ProviderTranscribeRequest,
   type ProviderTranscribeResult,
@@ -37,7 +38,8 @@ export const openAiProviderDefinition: ProviderDefinition = {
     wordTimestamps: true,
     translation: true,
     subtitlePolish: true,
-    textToSpeech: false
+    textToSpeech: false,
+    summary: true
   },
   modelDescriptors: [
     { id: 'whisper-1', label: 'Whisper (whisper-1)', capability: 'transcription', timestamps: 'word' },
@@ -47,7 +49,9 @@ export const openAiProviderDefinition: ProviderDefinition = {
     { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini', capability: 'translation' },
     { id: 'gpt-4.1', label: 'GPT-4.1', capability: 'translation' },
     { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini', capability: 'subtitlePolish' },
-    { id: 'gpt-4.1', label: 'GPT-4.1', capability: 'subtitlePolish' }
+    { id: 'gpt-4.1', label: 'GPT-4.1', capability: 'subtitlePolish' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini', capability: 'summary' },
+    { id: 'gpt-4.1', label: 'GPT-4.1', capability: 'summary' }
   ]
 };
 
@@ -59,6 +63,14 @@ type OpenAiVerboseTranscription = {
   words?: Array<{ word?: string; start?: number; end?: number }>;
   segments?: Array<{ start?: number; end?: number; text?: string }>;
 };
+
+type OpenAiModelsPayload = {
+  data?: Array<{ id?: unknown }>;
+};
+
+/** Chat-capable model ids; audio, image, embedding, and similar models are left out. */
+const OPENAI_SUMMARY_MODEL_ID = /^(gpt-|chatgpt-|o\d)/;
+const OPENAI_NON_TEXT_MODEL_ID = /(audio|realtime|transcribe|tts|image|search|embedding|moderation|instruct|whisper|dall-e)/i;
 
 type OpenAiTextResponse = {
   output_text?: string;
@@ -97,6 +109,50 @@ export class OpenAiProvider extends BaseAiProvider {
     });
 
     return parseOpenAiTranscription(payload, { modelId, requestedLanguage: request.language });
+  }
+
+  /**
+   * Summary models are listed live so new releases appear without an app update.
+   * If the live call fails, the static descriptors are returned instead.
+   */
+  override async listModels(capability: keyof AiProviderCapabilities): Promise<ProviderModelDescriptor[]> {
+    if (capability !== 'summary') {
+      return super.listModels(capability);
+    }
+
+    try {
+      const payload = (await this.fetchJson(this.modelsUrl, { method: 'GET' })) as OpenAiModelsPayload;
+      return (payload.data ?? [])
+        .flatMap((model) => (typeof model.id === 'string' ? [model.id] : []))
+        .filter((id) => OPENAI_SUMMARY_MODEL_ID.test(id) && !OPENAI_NON_TEXT_MODEL_ID.test(id))
+        .sort((a, b) => a.localeCompare(b))
+        .map((id) => ({ id, label: id, capability: 'summary' }));
+    } catch (error) {
+      if (error instanceof AppError && error.code === 'JOB_CANCELED') throw error;
+      return super.listModels(capability);
+    }
+  }
+
+  override async summarizeText(request: ProviderSummarizeRequest): Promise<string> {
+    const response = (await this.fetchJson(`${OPENAI_API}/responses`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: request.modelId ?? OPENAI_DEFAULT_TEXT_MODEL,
+        store: false,
+        instructions: request.systemPrompt,
+        input: request.transcript,
+        ...(request.reasoningEffort ? { reasoning: { effort: request.reasoningEffort } } : {})
+      }),
+      signal: request.signal
+    })) as OpenAiTextResponse;
+
+    const text = readOutputText(response).trim();
+    if (!text) {
+      throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI returned an empty summary.');
+    }
+
+    return text;
   }
 
   override async translateTexts(request: ProviderTranslateRequest): Promise<ProviderTextItem[]> {
@@ -147,7 +203,12 @@ export class OpenAiProvider extends BaseAiProvider {
       signal: input.signal
     })) as OpenAiTextResponse;
 
-    return extractOutputText(response);
+    const text = readOutputText(response);
+    if (!text) {
+      throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI response did not contain output text.');
+    }
+
+    return text;
   }
 }
 
@@ -229,18 +290,19 @@ function mimeTypeForAudioFormat(format: ProviderTranscribeRequest['audioFormat']
   }
 }
 
-function extractOutputText(response: OpenAiTextResponse): string {
+/**
+ * Returns the first output_text part, or '' when there is none. Reasoning items
+ * come first in `output` on reasoning models; they carry no output_text part,
+ * so they are skipped.
+ */
+function readOutputText(response: OpenAiTextResponse): string {
   if (response.output_text) {
     return response.output_text;
   }
 
-  const text = response.output
-    ?.flatMap((item) => item.content ?? [])
-    .find((content) => content.type === 'output_text' && typeof content.text === 'string')?.text;
-
-  if (!text) {
-    throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI response did not contain output text.');
-  }
-
-  return text;
+  return (
+    response.output
+      ?.flatMap((item) => item.content ?? [])
+      .find((content) => content.type === 'output_text' && typeof content.text === 'string')?.text ?? ''
+  );
 }

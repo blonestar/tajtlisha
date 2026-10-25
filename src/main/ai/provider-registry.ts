@@ -14,6 +14,7 @@ import { OpenRouterProvider } from './openrouter-provider';
 import type {
   AiProvider,
   ProviderPolishRequest,
+  ProviderSummarizeRequest,
   ProviderTextItem,
   ProviderTranscribeRequest,
   ProviderTranscribeResult,
@@ -101,6 +102,10 @@ export class AiProviderRegistry {
 
   async polishTexts(providerId: AiProviderId, request: ProviderPolishRequest): Promise<ProviderTextItem[]> {
     return this.requireCapable(providerId, 'subtitlePolish').polishTexts(request);
+  }
+
+  async summarizeText(providerId: AiProviderId, request: ProviderSummarizeRequest): Promise<string> {
+    return this.requireCapable(providerId, 'summary').summarizeText(request);
   }
 
   private requireCapable(providerId: AiProviderId, capability: keyof AiProviderCapabilities): AiProvider {

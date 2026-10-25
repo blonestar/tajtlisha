@@ -67,6 +67,12 @@ or update path.
 | U2 | Whole-UI zoom 80-150% (Ctrl + / - / 0, Settings > General), `uiZoomPercent` setting, preload `webFrame` zoom | `feat/ui-zoom` | merged |
 | U3 | Sol review fixes: settings response ordering, layout at 150% zoom on the minimum window, splitter focus vs playback keys | `fix/panes-zoom-review` | merged |
 
+## Features after v0.3.1
+
+| # | Task | Branch | Status |
+| --- | --- | --- | --- |
+| F1 | Optional transcript summary: own Settings tab (switch, system prompt, model per provider, thinking effort), `workflow:summarize` job, OpenAI + OpenRouter, Editor button and dialog | `feat/video-summary` | merged |
+
 ## Backlog for v0.2.1
 
 - Exact-frame preview and preview-proxy recovery must be invalidated by content/source generation, not only path.
@@ -163,6 +169,11 @@ or update path.
 - 2026-10-22: v0.2.x still shows raw HTML for the v0.3.0 notes (the cleanup ships in 0.3.0 itself). Tightened the
   0.3.0 conversion on develop: one line per item, `<br>` soft wraps joined, Downloads section dropped.
 - 2026-10-25: v0.3.1 released (clean plain-text release notes).
+- 2026-10-25: F1 video summary built by two Haiku workers (main, renderer) on shared contracts. Owner tested it live
+  and asked for an own Settings tab where the switch only hides the editor button. Orchestrator fixes: dialogs
+  stacked under the sticky caption header (z-index), REASONING_UNSUPPORTED message when a model rejects the
+  thinking effort, prompt/model drafts saved when Settings closes with Esc. Sol review: no P0/P1; four P2/P3 fixed
+  (summary of the previous video kept, blank-prompt double write, model draft lost on Esc, stale error after retry).
 - 2026-10-25: Caption table follows the video: focusing a caption field seeks to it, a click on the video toggles
   playback, and a "shift all captions" bar moves every caption earlier or later (one undo step). 445 renderer tests.
 - 2026-10-25: v0.4.0 released (caption click seeks, click-to-play, shift all captions, seeking fixed).

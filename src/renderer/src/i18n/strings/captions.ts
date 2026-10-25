@@ -87,13 +87,15 @@ export const captionsStrings = {
       translating: 'Translating',
       polishing: 'Polishing text',
       rendering_video: 'Rendering video',
-      writing_srt: 'Writing SRT'
+      writing_srt: 'Writing SRT',
+      summarizing: 'Summarizing'
     },
     jobs: {
       transcribe: 'Transcription',
       translate: 'Translation',
       export: 'Export',
-      preview: 'Preview'
+      preview: 'Preview',
+      summarize: 'Summary'
     },
     job: {
       working: 'Working…',
@@ -121,6 +123,9 @@ export const captionsStrings = {
       translate: 'Translate',
       translateCount: 'Translate {{count}} rows',
       translateAgain: 'Translate again',
+      summarize: 'Summarize',
+      summarizeAgain: 'Summarize again',
+      showSummary: 'Show summary',
       timingApproximate: 'Timing is approximate',
       timingApproximateHint: 'Timing comes from speech detection, not from word timestamps.',
       reason: {
@@ -132,8 +137,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} cannot translate',
         noCaptions: 'Transcribe the clip first',
         allTranslated: 'Every row is translated and up to date',
-        busy: 'Wait for the current job to finish'
+        busy: 'Wait for the current job to finish',
+        noTranscript: 'No caption text inside the trim range',
+        cannotSummarize: '{{provider}} cannot summarize'
       }
+    },
+    summary: {
+      title: 'Video summary',
+      description: 'Based on the captions inside the trim range. Edit the text, then copy it.',
+      textLabel: 'Summary text',
+      characterCount: '{{count}} characters',
+      revisionChanged: 'Captions changed after this summary',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Copying failed. Select the text and copy it by hand.',
+      close: 'Close',
+      nothingToSummarize: 'There is no caption text inside the trim range to summarize.'
     },
     export: {
       title: 'Export subtitles',
@@ -185,6 +204,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'The AI provider is rate limiting requests. Wait a minute and try again.',
       AUDIO_TOO_LARGE: 'The audio is too large for one request. Trim the clip to a shorter range.',
       TRANSLATION_INCOMPLETE: 'The AI provider returned an incomplete translation. Try again.',
+      REASONING_UNSUPPORTED:
+        'This model does not support the chosen thinking effort. In Settings > Summary choose Default, or pick a reasoning model.',
       OUTPUT_EXISTS: 'A file with this name already exists in the output folder.',
       OUTPUT_IS_SOURCE: 'The output would overwrite the original video. Choose a different name or folder.',
       OUTPUT_FOLDER_INVALID: 'The output folder cannot be used. Choose another folder.',
@@ -276,13 +297,15 @@ export const captionsStrings = {
       translating: 'Prevođenje',
       polishing: 'Dorada teksta',
       rendering_video: 'Renderovanje videa',
-      writing_srt: 'Pisanje SRT-a'
+      writing_srt: 'Pisanje SRT-a',
+      summarizing: 'Sažimanje'
     },
     jobs: {
       transcribe: 'Transkripcija',
       translate: 'Prevod',
       export: 'Izvoz',
-      preview: 'Pregled'
+      preview: 'Pregled',
+      summarize: 'Sažetak'
     },
     job: {
       working: 'U toku…',
@@ -310,6 +333,9 @@ export const captionsStrings = {
       translate: 'Prevedi',
       translateCount: 'Prevedi redove: {{count}}',
       translateAgain: 'Prevedi ponovo',
+      summarize: 'Sažmi',
+      summarizeAgain: 'Sažmi ponovo',
+      showSummary: 'Prikaži sažetak',
       timingApproximate: 'Vremena su približna',
       timingApproximateHint: 'Vremena dolaze iz detekcije govora, a ne iz vremena reči.',
       reason: {
@@ -321,8 +347,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} ne može da prevodi',
         noCaptions: 'Prvo transkribuj isečak',
         allTranslated: 'Svi redovi su prevedeni i ažurni',
-        busy: 'Sačekaj da se završi trenutni posao'
+        busy: 'Sačekaj da se završi trenutni posao',
+        noTranscript: 'Nema teksta titlova u opsegu isečka',
+        cannotSummarize: '{{provider}} ne može da sažima'
       }
+    },
+    summary: {
+      title: 'Sažetak videa',
+      description: 'Zasnovano na titlovima unutar isečka. Izmeni tekst, pa ga kopiraj.',
+      textLabel: 'Tekst sažetka',
+      characterCount: '{{count}} karaktera',
+      revisionChanged: 'Titlovi su menjani posle ovog sažetka',
+      copy: 'Kopiraj',
+      copied: 'Kopirano',
+      copyFailed: 'Kopiranje nije uspelo. Označi tekst i kopiraj ga ručno.',
+      close: 'Zatvori',
+      nothingToSummarize: 'U opsegu isečka nema teksta titlova za sažimanje.'
     },
     export: {
       title: 'Izvoz titlova',
@@ -374,6 +414,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'AI provajder privremeno ograničava zahteve. Sačekaj minut i pokušaj ponovo.',
       AUDIO_TOO_LARGE: 'Zvuk je prevelik za jedan zahtev. Skrati opseg isecanja.',
       TRANSLATION_INCOMPLETE: 'AI provajder je vratio nepotpun prevod. Pokušaj ponovo.',
+      REASONING_UNSUPPORTED:
+        'Ovaj model ne podržava izabrani intenzitet razmišljanja. U Podešavanja > Sažetak izaberi Podrazumevano ili model za razmišljanje.',
       OUTPUT_EXISTS: 'Fajl sa ovim imenom već postoji u izabranom folderu.',
       OUTPUT_IS_SOURCE: 'Izlaz bi prepisao originalni video. Izaberi drugo ime ili folder.',
       OUTPUT_FOLDER_INVALID: 'Izabrani folder ne može da se koristi. Izaberi drugi folder.',
@@ -465,13 +507,15 @@ export const captionsStrings = {
       translating: 'Превођење',
       polishing: 'Дорада текста',
       rendering_video: 'Рендеровање видеа',
-      writing_srt: 'Писање SRT-а'
+      writing_srt: 'Писање SRT-а',
+      summarizing: 'Сажимање'
     },
     jobs: {
       transcribe: 'Транскрипција',
       translate: 'Превод',
       export: 'Извоз',
-      preview: 'Преглед'
+      preview: 'Преглед',
+      summarize: 'Сажетак'
     },
     job: {
       working: 'У току…',
@@ -499,6 +543,9 @@ export const captionsStrings = {
       translate: 'Преведи',
       translateCount: 'Преведи редове: {{count}}',
       translateAgain: 'Преведи поново',
+      summarize: 'Сажми',
+      summarizeAgain: 'Сажми поново',
+      showSummary: 'Прикажи сажетак',
       timingApproximate: 'Времена су приближна',
       timingApproximateHint: 'Времена долазе из детекције говора, а не из времена речи.',
       reason: {
@@ -510,8 +557,22 @@ export const captionsStrings = {
         cannotTranslate: '{{provider}} не може да преводи',
         noCaptions: 'Прво транскрибуј исечак',
         allTranslated: 'Сви редови су преведени и ажурни',
-        busy: 'Сачекај да се заврши тренутни посао'
+        busy: 'Сачекај да се заврши тренутни посао',
+        noTranscript: 'Нема текста титлова у опсегу исечка',
+        cannotSummarize: '{{provider}} не може да сажима'
       }
+    },
+    summary: {
+      title: 'Сажетак видеа',
+      description: 'Засновано на титловима унутар исечка. Измени текст, па га копирај.',
+      textLabel: 'Текст сажетка',
+      characterCount: '{{count}} карактера',
+      revisionChanged: 'Титлови су мењани после овог сажетка',
+      copy: 'Копирај',
+      copied: 'Копирано',
+      copyFailed: 'Копирање није успело. Означи текст и копирај га ручно.',
+      close: 'Затвори',
+      nothingToSummarize: 'У опсегу исечка нема текста титлова за сажимање.'
     },
     export: {
       title: 'Извоз титлова',
@@ -563,6 +624,8 @@ export const captionsStrings = {
       PROVIDER_RATE_LIMITED: 'AI провајдер привремено ограничава захтеве. Сачекај минут и покушај поново.',
       AUDIO_TOO_LARGE: 'Звук је превелик за један захтев. Скрати опсег исецања.',
       TRANSLATION_INCOMPLETE: 'AI провајдер је вратио непотпун превод. Покушај поново.',
+      REASONING_UNSUPPORTED:
+        'Овај модел не подржава изабрани интензитет размишљања. У Подешавања > Сажетак изабери Подразумевано или модел за размишљање.',
       OUTPUT_EXISTS: 'Фајл са овим именом већ постоји у изабраном фолдеру.',
       OUTPUT_IS_SOURCE: 'Излаз би преписао оригинални видео. Изабери друго име или фолдер.',
       OUTPUT_FOLDER_INVALID: 'Изабрани фолдер не може да се користи. Изабери други фолдер.',

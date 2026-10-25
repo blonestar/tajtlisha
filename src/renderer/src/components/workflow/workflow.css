@@ -68,6 +68,49 @@
   font-size: var(--text-xs);
   line-height: 1.35;
 }
+.generate-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Summary dialog: the result is an editable text block, wider than the export dialog's form. */
+.summary-dialog {
+  width: min(560px, calc(100vw - 48px));
+}
+.summary-dialog .dialog-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) 0;
+}
+.summary-description {
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-4);
+}
+.summary-body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.summary-text {
+  line-height: 1.5;
+  min-height: 9rem;
+  padding: var(--space-2);
+  resize: vertical;
+  width: 100%;
+}
+.summary-meta {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  justify-content: space-between;
+}
+.summary-note {
+  font-size: var(--text-xs);
+}
 
 /* Job bar */
 .job-bar {
@@ -156,11 +199,13 @@
   }
 }
 
-/* Export dialog */
+/* Modal dialogs (export, confirm, summary). The z-index keeps them above sticky table
+ * headers (z-index 1) and the settings overlay (z-index 50). */
 .dialog-overlay {
   background: rgba(8, 10, 12, 0.6);
   inset: 0;
   position: fixed;
+  z-index: 60;
 }
 
 .dialog-content {
@@ -177,6 +222,7 @@
   width: 480px;
   display: flex;
   flex-direction: column;
+  z-index: 61;
 }
 
 .export-dialog .dialog-title {

@@ -10,6 +10,7 @@ import { registerJobsIpc } from '../../../src/main/ipc/jobs.ipc';
 import { getFfmpegStatus } from '../../../src/main/ipc/media.ipc';
 import { registerProjectIpc } from '../../../src/main/ipc/project.ipc';
 import { registerWorkflowIpc } from '../../../src/main/ipc/workflow.ipc';
+import { registerAiIpc } from '../../../src/main/ipc/ai.ipc';
 import type { DesktopDialogs, DesktopShell, IpcEvent } from '../../../src/main/ipc/types';
 import { mainStringsFor } from '../../../src/main/i18n';
 import { FfmpegService } from '../../../src/main/ffmpeg';
@@ -268,6 +269,167 @@ describe('workflow handlers', () => {
       ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), trim: { startMs: 5000, endMs: 1000 } })
     ).rejects.toThrow('[UNKNOWN] trim must be a range with 0 <= startMs < endMs.');
     expect(transcribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('workflow:summarize', () => {
+  function setup() {
+    const ipc = fakeIpc();
+    const summarize = vi.fn(async (_request: unknown) => ({ text: 'Summary.' }));
+    registerWorkflowIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      workflow: { transcribe: vi.fn(), translate: vi.fn(), summarize } as never,
+      sources: new KnownSources()
+    });
+    return { ipc, summarize };
+  }
+
+  it('is registered and passes a valid text-only request through to the workflow', async () => {
+    const { ipc, summarize } = setup();
+
+    await expect(ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), summarizeRequest('sum-1'))).resolves.toEqual({
+      text: 'Summary.'
+    });
+    expect(summarize.mock.calls[0]?.[0]).toEqual({
+      jobId: 'sum-1',
+      providerId: 'openai',
+      modelId: undefined,
+      reasoningEffort: undefined,
+      systemPrompt: 'Make a tweet.',
+      language: 'en',
+      segments: [{ startMs: 0, endMs: 1000, text: 'Hello.' }]
+    });
+  });
+
+  it('passes a model and every reasoning effort through', async () => {
+    const { ipc, summarize } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+      ...summarizeRequest(),
+      modelId: 'gpt-4.1',
+      reasoningEffort: 'xhigh'
+    });
+
+    expect(summarize.mock.calls[0]?.[0]).toMatchObject({ modelId: 'gpt-4.1', reasoningEffort: 'xhigh' });
+    for (const reasoningEffort of ['none', 'minimal', 'low', 'medium', 'high', 'max']) {
+      await expect(
+        ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), reasoningEffort })
+      ).resolves.toBeDefined();
+    }
+  });
+
+  it('treats an empty model id as the provider default', async () => {
+    const { ipc, summarize } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), modelId: '' });
+
+    expect(summarize.mock.calls[0]?.[0]).toMatchObject({ modelId: undefined });
+  });
+
+  it('accepts blank segment text, which the workflow drops', async () => {
+    const { ipc } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: [{ startMs: 0, endMs: 1000, text: '' }]
+      })
+    ).resolves.toBeDefined();
+  });
+
+  it('rejects a reasoning effort outside the allowed list without echoing the value', async () => {
+    const { ipc, summarize } = setup();
+
+    const rejection = ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+      ...summarizeRequest(),
+      reasoningEffort: 'ultra-extreme-value'
+    });
+
+    await expect(rejection).rejects.toThrow('[UNKNOWN] reasoningEffort must be one of none, minimal, low, medium, high, xhigh, max.');
+    await expect(rejection).rejects.not.toThrow('ultra-extreme-value');
+    expect(summarize).not.toHaveBeenCalled();
+  });
+
+  it('rejects the renderer-only "default" effort, which must be mapped to no effort first', async () => {
+    const { ipc } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), reasoningEffort: 'default' })
+    ).rejects.toThrow('reasoningEffort must be one of');
+  });
+
+  it('rejects an empty system prompt and one over the length limit', async () => {
+    const { ipc, summarize } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), systemPrompt: '   ' })
+    ).rejects.toThrow('[UNKNOWN] systemPrompt must be a non-empty string.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), systemPrompt: 'a'.repeat(8001) })
+    ).rejects.toThrow('[UNKNOWN] systemPrompt must be at most 8000 characters.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), { ...summarizeRequest(), systemPrompt: 'a'.repeat(8000) })
+    ).resolves.toBeDefined();
+    expect(summarize).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects negative and inverted segment times', async () => {
+    const { ipc, summarize } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: [{ startMs: -1, endMs: 1000, text: 'Hello.' }]
+      })
+    ).rejects.toThrow('[UNKNOWN] segments[0].startMs must be a number >= 0.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: [{ startMs: 2000, endMs: 1000, text: 'Hello.' }]
+      })
+    ).rejects.toThrow('[UNKNOWN] segments[0].endMs must be a number >= startMs.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: [{ startMs: 0, endMs: Number.NaN, text: 'Hello.' }]
+      })
+    ).rejects.toThrow('[UNKNOWN] segments[0].endMs must be a finite number.');
+    expect(summarize).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transcript over the text limit and too many segments', async () => {
+    const { ipc, summarize } = setup();
+    const long = 'x'.repeat(60_000);
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: [
+          { startMs: 0, endMs: 1000, text: long },
+          { startMs: 1000, endMs: 2000, text: long }
+        ]
+      })
+    ).rejects.toThrow('[UNKNOWN] segments must be a transcript of at most 100000 characters.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowSummarize, fakeOwner(1), {
+        ...summarizeRequest(),
+        segments: Array.from({ length: 5001 }, (_, index) => ({ startMs: index, endMs: index + 1, text: '' }))
+      })
+    ).rejects.toThrow('[UNKNOWN] segments must be at most 5000 items.');
+    expect(summarize).not.toHaveBeenCalled();
+  });
+});
+
+describe('ai:listModels capability validation', () => {
+  it('accepts the summary capability and rejects unknown ones', async () => {
+    const ipc = fakeIpc();
+    const listModels = vi.fn(async () => []);
+    registerAiIpc({ ipc, registry: { listModels } as never });
+
+    await expect(ipc.invoke(IPC_CHANNELS.aiListModels, fakeOwner(1), 'openai', 'summary')).resolves.toEqual([]);
+    expect(listModels).toHaveBeenCalledWith('openai', 'summary');
+    await expect(ipc.invoke(IPC_CHANNELS.aiListModels, fakeOwner(1), 'openai', 'vision')).rejects.toThrow('capability must be one of');
   });
 });
 
@@ -557,5 +719,15 @@ function transcribeRequest(jobId: string) {
     providerId: 'openai',
     maxCharsPerLine: 42,
     maxLinesPerCaption: 2
+  };
+}
+
+function summarizeRequest(jobId = 'sum-1') {
+  return {
+    jobId,
+    providerId: 'openai',
+    systemPrompt: 'Make a tweet.',
+    language: 'en',
+    segments: [{ startMs: 0, endMs: 1000, text: 'Hello.' }]
   };
 }

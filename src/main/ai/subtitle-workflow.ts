@@ -6,6 +6,8 @@ import { AppError } from '../../shared/errors';
 import type {
   CaptionTimingSource,
   JobStage,
+  SummarizeTranscriptRequest,
+  SummarizeTranscriptResult,
   TranscribeClipRequest,
   TranscribeClipResult,
   TranslateCaptionsRequest,
@@ -19,6 +21,7 @@ import { buildCaptionsFromSegments, buildCaptionsFromSpeechRegions, buildCaption
 import type { AiProviderRegistry } from './provider-registry';
 import type { ProviderTextItem, ProviderTranscribeResult } from './provider';
 import { detectSpeechRegions } from './speech-regions';
+import { buildSummaryTranscript } from './text-prompts';
 
 export const TRANSLATION_BATCH_SIZE = 40;
 /** Provider upload limit is 25 MB; keep a margin for multipart overhead. */
@@ -43,7 +46,7 @@ type TextStage = Extract<JobStage, 'translating' | 'polishing'>;
  */
 export class SubtitleWorkflowService {
   constructor(
-    private readonly registry: Pick<AiProviderRegistry, 'transcribe' | 'translateTexts' | 'polishTexts'>,
+    private readonly registry: Pick<AiProviderRegistry, 'transcribe' | 'translateTexts' | 'polishTexts' | 'summarizeText'>,
     private readonly mediaService: Pick<MediaService, 'extractAudio'> = new MediaService(),
     private readonly ffmpeg: Pick<FfmpegService, 'run'> = new FfmpegService()
   ) {}
@@ -147,6 +150,50 @@ export class SubtitleWorkflowService {
     );
 
     return { translations: polished };
+  }
+
+  /**
+   * Sends the non-blank transcript lines with the user's system prompt. Text
+   * only: no audio is extracted and no captions are changed.
+   */
+  async summarize(request: SummarizeTranscriptRequest, context: WorkflowContext = {}): Promise<SummarizeTranscriptResult> {
+    throwIfCanceled(context.signal);
+
+    const segments = request.segments.filter((segment) => segment.text.trim().length > 0);
+    if (segments.length === 0) {
+      throw new AppError('NO_SPEECH', 'There is no transcript to summarize.');
+    }
+
+    context.onProgress?.({ stage: 'summarizing' });
+    let text: string;
+    try {
+      text = (
+        await this.registry.summarizeText(request.providerId, {
+          systemPrompt: request.systemPrompt,
+          transcript: buildSummaryTranscript(segments, request.language),
+          modelId: request.modelId,
+          reasoningEffort: request.reasoningEffort,
+          signal: context.signal
+        })
+      ).trim();
+    } catch (error) {
+      // Models without reasoning reject the effort parameter; name that instead of a generic failure.
+      if (
+        request.reasoningEffort &&
+        error instanceof AppError &&
+        error.code === 'PROVIDER_REQUEST_FAILED' &&
+        /reasoning|effort/i.test(error.detail ?? '')
+      ) {
+        throw new AppError('REASONING_UNSUPPORTED', error.detail);
+      }
+      throw error;
+    }
+
+    if (!text) {
+      throw new AppError('PROVIDER_REQUEST_FAILED', 'The AI provider returned an empty summary.');
+    }
+
+    return { text };
   }
 
   private async extractAudio(

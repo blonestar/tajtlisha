@@ -1,10 +1,12 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DEFAULT_SUMMARY_PROMPT } from '../../../shared/summary';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
 import type { ProjectSource } from '../../../shared/types/project';
 import type { ProviderStatus } from '../../../shared/types/ai';
 import type { AppSettings } from '../../../shared/types/settings';
 import type { GenerateProviderInfo } from '../components/workflow/GeneratePanel';
+import type { SummaryResult } from '../components/workflow/SummaryDialog';
 import { rowsNeedingTranslation } from '../state/selectors';
 import type { ProjectStore } from '../state/useProjectStore';
 import { captureJobContext, isContextCurrent, type JobRunner } from '../state/useJobRunner';
@@ -15,7 +17,8 @@ import {
   optionalModelId,
   polishFor,
   sourceLanguageCode,
-  spokenLanguageOf
+  spokenLanguageOf,
+  summaryTranscript
 } from './workspaceModel';
 
 export type Notice = { tone: 'error' | 'info'; text: string; detail?: string };
@@ -48,6 +51,14 @@ export type Workspace = {
   /** Asks for confirmation first when captions exist, because transcription replaces them. */
   requestTranscribe: () => void;
   translate: () => void;
+  /** Summary of the current project. Null after a project change or before the first run. */
+  summary: SummaryResult | null;
+  summaryOpen: boolean;
+  setSummaryOpen: (open: boolean) => void;
+  /** Runs the summary and opens the dialog with the result. */
+  summarize: () => void;
+  /** Opens the dialog for the summary that already exists. */
+  openSummary: () => void;
   /** Opens a video. Asks first when captions would be dropped. */
   openVideo: () => void;
   /** Picks the replacement for a missing or changed video. Captions stay. */
@@ -81,8 +92,21 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   const [jobResult, setJobResult] = useState<JobView | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
+  const [summaryState, setSummaryState] = useState<SummaryResult | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   // Input path for which a preview proxy was already attempted. Prevents a retry loop on a broken file.
   const proxyAttemptRef = useRef<string | null>(null);
+
+  const projectId = state.project.id;
+  const sourcePath = state.project.source?.inputPath ?? null;
+  // A summary belongs to the project and video it was made for. Opening another video keeps the
+  // project id, so the source path is checked too. The effect clears it once either changes.
+  const summary =
+    summaryState && summaryState.projectId === projectId && summaryState.inputPath === sourcePath ? summaryState : null;
+  useEffect(() => {
+    setSummaryState(null);
+    setSummaryOpen(false);
+  }, [projectId, sourcePath]);
 
   const activeId = settings.aiConnector.activeProviderId;
   const activeStatus = providers.find((provider) => provider.id === activeId) ?? null;
@@ -92,7 +116,8 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
         displayName: activeStatus?.displayName ?? activeId,
         connected: activeStatus?.connected ?? false,
         canTranscribe: activeStatus?.capabilities.transcription ?? false,
-        canTranslate: activeStatus?.capabilities.translation ?? false
+        canTranslate: activeStatus?.capabilities.translation ?? false,
+        canSummarize: activeStatus?.capabilities.summary ?? false
       }
     : null;
 
@@ -283,6 +308,57 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     });
   }, [api, dispatch, job, t]);
 
+  // The summary is informational, so caption edits during the run keep the result. Only a change of project discards it.
+  const summarize = useCallback(async () => {
+    const current = projectRef.current;
+    const config = settingsRef.current;
+    const providerId = config.aiConnector.activeProviderId;
+    if (!api || !providerId) return;
+
+    const segments = summaryTranscript(current);
+    if (segments.length === 0) {
+      setNotice({ tone: 'info', text: t('captions.summary.nothingToSummarize') });
+      return;
+    }
+
+    const summarySettings = config.summary;
+    const context = captureJobContext(current);
+    const outcome = await job.run(
+      'summarize',
+      (jobId) =>
+        api.workflow.summarize({
+          jobId,
+          providerId,
+          modelId:
+            optionalModelId(summarySettings.modelByProvider[providerId]) ??
+            optionalModelId(config.aiConnector.textModelByProvider[providerId]),
+          // 'default' sends no reasoning parameter, so non-reasoning models keep working.
+          ...(summarySettings.reasoningEffort === 'default' ? {} : { reasoningEffort: summarySettings.reasoningEffort }),
+          systemPrompt: summarySettings.systemPrompt.trim() || DEFAULT_SUMMARY_PROMPT,
+          language: sourceLanguageCode(current),
+          segments
+        }),
+      { isStillValid: () => isContextCurrent(context, projectRef.current, { allowEditsSince: true }) }
+    );
+
+    if (outcome.status !== 'done') {
+      setJobResult(jobOutcomeView('summarize', outcome, t, () => ''));
+      return;
+    }
+
+    // A failed earlier attempt must not reappear in the job bar once this one succeeded.
+    setJobResult(null);
+    setSummaryState({
+      projectId: context.projectId,
+      inputPath: context.inputPath,
+      revision: context.revision,
+      text: outcome.value.text
+    });
+    setSummaryOpen(true);
+  }, [api, job, t]);
+
+  const openSummary = useCallback(() => setSummaryOpen(true), []);
+
   const createPreviewProxy = useCallback(async () => {
     const current = projectRef.current;
     const source = current.source;
@@ -344,6 +420,11 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     answerConfirm,
     requestTranscribe,
     translate,
+    summary,
+    summaryOpen,
+    setSummaryOpen,
+    summarize,
+    openSummary,
     openVideo,
     relinkVideo,
     reportPlaybackError

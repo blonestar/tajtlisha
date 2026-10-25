@@ -1,5 +1,5 @@
 import { effectiveMaxCharsPerLine } from '../../../shared/subtitle-geometry';
-import type { ExportOutputs, PolishMode } from '../../../shared/types/jobs';
+import type { ExportOutputs, PolishMode, SummarizeTranscriptRequest } from '../../../shared/types/jobs';
 import type { CaptionRow, ProjectDocument } from '../../../shared/types/project';
 import type { AppSettings } from '../../../shared/types/settings';
 import {
@@ -75,6 +75,29 @@ export function captionsForExport(project: ProjectDocument): CaptionRow[] {
     startMs: Math.max(caption.startMs, trim.startMs),
     endMs: Math.min(caption.endMs, trim.endMs)
   }));
+}
+
+/**
+ * Transcript rows for the summary request. Only captions inside the trim range
+ * with text are sent. Times are relative to the trim start and clipped to the
+ * clip, so the model sees the same timeline the final export has.
+ */
+export function summaryTranscript(project: ProjectDocument): SummarizeTranscriptRequest['segments'] {
+  const { trim } = project;
+  const clipLength = trim.endMs - trim.startMs;
+
+  return captionsInTrim(project.captions, trim).flatMap((caption) => {
+    const text = caption.original.trim();
+    if (text === '') return [];
+
+    return [
+      {
+        startMs: Math.max(caption.startMs - trim.startMs, 0),
+        endMs: Math.min(caption.endMs - trim.startMs, clipLength),
+        text
+      }
+    ];
+  });
 }
 
 export function captionIssuesFor(

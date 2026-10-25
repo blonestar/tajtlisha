@@ -231,17 +231,24 @@ describe('AI provider registry', () => {
         wordTimestamps: false,
         translation: true,
         subtitlePolish: false,
-        textToSpeech: false
+        textToSpeech: false,
+        summary: false
       } satisfies AiProviderCapabilities,
       listModels: async () => [],
       testConnection: async () => ({ ok: true, providerId: 'openrouter', checkedAt: '' }),
       transcribe: vi.fn(),
       translateTexts: vi.fn(async () => []),
-      polishTexts: vi.fn(async () => [])
+      polishTexts: vi.fn(async () => []),
+      summarizeText: vi.fn(async () => 'should not run')
     };
     const store = new MemoryCredentialStore();
     await store.set({ providerId: 'openrouter', authMode: 'api_key', secret: 'sk-or-test-secret' });
     const registry = new AiProviderRegistry([textOnly], store);
+
+    await expect(registry.summarizeText('openrouter', { systemPrompt: 'p', transcript: 't' })).rejects.toMatchObject({
+      code: 'PROVIDER_UNSUPPORTED'
+    });
+    expect(textOnly.summarizeText).not.toHaveBeenCalled();
 
     await expect(registry.transcribe('openrouter', { audioPath: '/tmp/a.mp3', audioFormat: 'mp3' })).rejects.toMatchObject({
       code: 'PROVIDER_UNSUPPORTED'

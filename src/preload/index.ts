@@ -40,7 +40,8 @@ const api: TajtlishaApi = {
   },
   workflow: {
     transcribe: (request) => ipcRenderer.invoke(C.workflowTranscribe, request),
-    translate: (request) => ipcRenderer.invoke(C.workflowTranslate, request)
+    translate: (request) => ipcRenderer.invoke(C.workflowTranslate, request),
+    summarize: (request) => ipcRenderer.invoke(C.workflowSummarize, request)
   },
   jobs: {
     cancel: (jobId) => ipcRenderer.invoke(C.jobsCancel, jobId),
