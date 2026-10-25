@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-25
+
 ### Fixed
 - Serbian captions came out in Cyrillic when Serbian (Latin) was selected. Transcription models often write Serbian
   in Cyrillic, so transcripts, translations and polished text for Serbian (Latin) are now converted to Latin script.
@@ -110,7 +112,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.5.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.5.1...develop
+[0.5.1]: https://github.com/blonestar/tajtlisha/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/blonestar/tajtlisha/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/blonestar/tajtlisha/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/blonestar/tajtlisha/compare/v0.3.0...v0.3.1
