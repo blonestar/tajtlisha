@@ -1,7 +1,7 @@
 import { DEFAULT_SUBTITLE_STYLE, SUBTITLE_PRESETS, clamp } from '../../../shared/subtitle-geometry';
 import type { CaptionRow, CaptionWord, PreviewTrack, ProjectDocument, ProjectSource, TrimRange } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
-import { shiftCaptionWords } from '../../../shared/word-highlight';
+import { matchedCaptionWords, shiftCaptionWords } from '../../../shared/word-highlight';
 
 export const HISTORY_LIMIT = 100;
 export const MIN_TRIM_MS = 100;
@@ -288,7 +288,13 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
           },
           isUpToDate(current) && isUpToDate(next) ? original : undefined
         ),
-        current.words || next.words ? [...(current.words ?? []), ...(next.words ?? [])] : undefined
+        // Words deleted from either text are dropped first, so the merged text cannot match them.
+        current.words || next.words
+          ? [
+              ...matchedCaptionWords(current.original, current.words ?? []),
+              ...matchedCaptionWords(next.original, next.words ?? [])
+            ]
+          : undefined
       );
       const captions = [...project.captions.slice(0, index), merged, ...project.captions.slice(index + 2)];
       return applyEdit(state, { ...project, captions });

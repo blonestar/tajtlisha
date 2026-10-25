@@ -23,6 +23,13 @@ export type AssCaption = {
    * timing decides. Used only when word highlight is on.
    */
   activeWordIndex?: number;
+  /**
+   * Unclipped caption range on this timeline, when a trim cut the caption.
+   * Word timing is worked out over it, so the highlight matches the preview.
+   * Missing means startMs/endMs.
+   */
+  timingStartMs?: number;
+  timingEndMs?: number;
 };
 
 export type BuildAssDocumentInput = {
@@ -39,6 +46,9 @@ const ASS_EVENT_FORMAT = 'Layer, Start, End, Style, Name, MarginL, MarginR, Marg
 
 /** Shadow alpha used when the text has a drop shadow (ASS alpha: 00 opaque, FF transparent). */
 const SHADOW_ALPHA = '60';
+
+/** Default with no box, outline or shadow: the text layer drawn over the box layer. */
+const HIGHLIGHT_TEXT_STYLE = 'HighlightText';
 
 /**
  * Builds an ASS document whose PlayRes equals the video size. Every pixel value
@@ -83,6 +93,12 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
   ];
 
   const highlight = resolveWordHighlight(style);
+  // With a box, libass draws one box per colour run, and translucent boxes of
+  // neighbouring runs overlap into dark seams. So the box gets its own layer
+  // (text invisible, one run) and the coloured text is drawn above it without a box.
+  const layeredBox = highlight.mode !== 'off' && boxed;
+  const textStyleLine = layeredBox ? [HIGHLIGHT_TEXT_STYLE, ...styleLine.slice(1, 15), '1', '0', '0', ...styleLine.slice(18)] : null;
+
   const events = input.captions
     .filter((caption) => caption.text.replace(/\r/g, '').trim().length > 0)
     .flatMap((caption) =>
@@ -90,7 +106,7 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
         ? [
             `Dialogue: 0,${formatAssTimestamp(caption.startMs)},${formatAssTimestamp(caption.endMs)},Default,,0,0,0,,${escapeAssText(caption.text)}`
           ]
-        : highlightDialogues(caption, highlight)
+        : highlightDialogues(caption, highlight, layeredBox)
     );
 
   return [
@@ -107,6 +123,7 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
     '[V4+ Styles]',
     `Format: ${ASS_STYLE_FORMAT}`,
     `Style: ${styleLine.join(',')}`,
+    ...(textStyleLine ? [`Style: ${textStyleLine.join(',')}`] : []),
     '',
     '[Events]',
     `Format: ${ASS_EVENT_FORMAT}`,
@@ -119,7 +136,7 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
  * One Dialogue line per stretch with a constant lit word. The Default style
  * is shared, so only the highlighted word gets an inline colour override.
  */
-function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighlight): string[] {
+function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighlight, layeredBox: boolean): string[] {
   const text = caption.text.replace(/\r/g, '').trim();
   const parts = splitCaptionText(text);
   const startMs = Math.round(caption.startMs);
@@ -129,17 +146,27 @@ function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighligh
   const intervals =
     caption.activeWordIndex !== undefined
       ? [{ startMs, endMs, activeIndex: caption.activeWordIndex }]
-      : highlightIntervals(timeCaptionWords(text, startMs, endMs, caption.words).spans, startMs, endMs);
+      : highlightIntervals(
+          timeCaptionWords(text, caption.timingStartMs ?? startMs, caption.timingEndMs ?? endMs, caption.words).spans,
+          startMs,
+          endMs
+        );
 
-  return intervals.flatMap((interval) => {
+  const textLayer = layeredBox ? `1` : `0`;
+  const textStyle = layeredBox ? HIGHLIGHT_TEXT_STYLE : 'Default';
+  const dialogues = intervals.flatMap((interval) => {
     const start = formatAssTimestamp(interval.startMs);
     const end = formatAssTimestamp(interval.endMs);
     // Centisecond rounding can collapse a very short interval to nothing; skip it instead of writing an empty event.
     if (start === end) return [];
 
     const body = highlightedText(parts, highlight.mode, interval.activeIndex, colour);
-    return [`Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`];
+    return [`Dialogue: ${textLayer},${start},${end},${textStyle},,0,0,0,,${body}`];
   });
+
+  if (!layeredBox || dialogues.length === 0) return dialogues;
+  const box = `Dialogue: 0,${formatAssTimestamp(startMs)},${formatAssTimestamp(endMs)},Default,,0,0,0,,{\\1a&HFF&}${escapeAssText(text)}`;
+  return [box, ...dialogues];
 }
 
 function highlightedText(parts: CaptionTextPart[], mode: ResolvedWordHighlight['mode'], activeIndex: number, colour: string): string {
