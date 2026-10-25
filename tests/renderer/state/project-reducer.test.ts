@@ -1097,6 +1097,23 @@ describe('caption word timing', () => {
     expect(state.project.captions[0].words).toEqual([...timedWords, { text: 'four', startMs: 2100, endMs: 2500 }]);
   });
 
+  it('caption/mergeWithNext drops words deleted from a text, so the merged text cannot reuse them', () => {
+    const first: CaptionRow = {
+      ...caption('a', 0, 1000, 'one', ''),
+      words: [
+        { text: 'one', startMs: 0, endMs: 300 },
+        { text: 'two', startMs: 300, endMs: 600 }
+      ]
+    };
+    const second: CaptionRow = { ...caption('b', 1000, 2000, 'two', ''), words: [{ text: 'two', startMs: 1200, endMs: 1500 }] };
+    const state = run(stateWith([first, second]), { type: 'caption/mergeWithNext', id: 'a' });
+
+    expect(state.project.captions[0].words).toEqual([
+      { text: 'one', startMs: 0, endMs: 300 },
+      { text: 'two', startMs: 1200, endMs: 1500 }
+    ]);
+  });
+
   it('caption/mergeWithNext omits the words key when neither caption has words', () => {
     const state = run(stateWith([caption('a', 0, 1000), caption('b', 1000, 2000)]), {
       type: 'caption/mergeWithNext',
