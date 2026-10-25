@@ -3,7 +3,7 @@ import type { TajtlishaApi } from '../../../src/shared/types/ipc';
 import type { JobProgressEvent } from '../../../src/shared/types/jobs';
 import type { ProjectDocument, ProjectLoadResult, ProjectSource } from '../../../src/shared/types/project';
 import type { AppSettings } from '../../../src/shared/types/settings';
-import { OPENAI_STATUS, SETTINGS, makeProject } from './fixtures';
+import { OPENAI_STATUS, SETTINGS, SOURCE, makeProject } from './fixtures';
 
 type Fn<A extends unknown[], R> = ReturnType<typeof vi.fn<(...args: A) => R>>;
 
@@ -12,6 +12,7 @@ export type FakeWindowApi = {
   loadLast: Fn<[], Promise<ProjectLoadResult | null>>;
   save: Fn<[ProjectDocument], Promise<{ savedRevision: number }>>;
   selectVideo: Fn<[], Promise<ProjectSource | null>>;
+  openDroppedVideo: Fn<[File], Promise<ProjectSource>>;
   transcribe: Fn<[unknown], Promise<unknown>>;
   translate: Fn<[unknown], Promise<unknown>>;
   exportProject: Fn<[unknown], Promise<unknown>>;
@@ -39,6 +40,10 @@ export function createWindowApi(
     Promise.resolve({ savedRevision: saved.revision })
   );
   const selectVideo = vi.fn<() => Promise<ProjectSource | null>>(() => Promise.resolve(options.source ?? null));
+  // The dropped source is named after the file so tests can see which video was opened.
+  const openDroppedVideo = vi.fn<(file: File) => Promise<ProjectSource>>((file) =>
+    Promise.resolve({ ...SOURCE, inputPath: `/drops/${file.name}`, fileUrl: `tajtlisha-media://drop-${file.name}` })
+  );
   const transcribe = vi.fn<(request: unknown) => Promise<unknown>>(() =>
     Promise.resolve({ language: 'sr-Latn', captions: [], timingSource: 'word' })
   );
@@ -71,7 +76,14 @@ export function createWindowApi(
       testConnection: vi.fn(() => Promise.resolve({ ok: true, providerId: 'openai', checkedAt: '', message: '' })),
       listModels: vi.fn(() => Promise.resolve([]))
     },
-    project: { selectVideo, loadLast, save, createPreviewProxy, renderPreviewFrame: vi.fn(() => Promise.resolve({ dataUrl: 'data:image/png;base64,AA==' })) },
+    project: {
+      selectVideo,
+      openDroppedVideo,
+      loadLast,
+      save,
+      createPreviewProxy,
+      renderPreviewFrame: vi.fn(() => Promise.resolve({ dataUrl: 'data:image/png;base64,AA==' }))
+    },
     workflow: { transcribe, translate },
     jobs: {
       cancel,
@@ -107,6 +119,7 @@ export function createWindowApi(
     loadLast,
     save,
     selectVideo,
+    openDroppedVideo,
     transcribe,
     translate,
     exportProject,

@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Drag and drop: drop a video file onto the app window to open it. When a video or captions are already open, the app
+  asks first, because the current video, captions and translations are replaced.
+
+### Changed
+- Open video asks for confirmation whenever a video is open, not only when captions exist, because the current video and
+  its trim are replaced too.
+
 ## [0.5.1] - 2026-10-25
 
 ### Fixed
