@@ -1,11 +1,28 @@
 import { AppError } from '../../shared/errors';
 import { assFontSize, clamp, computeSubtitleGeometry } from '../../shared/subtitle-geometry';
+import type { CaptionWord } from '../../shared/types/project';
 import type { SubtitleStyle } from '../../shared/types/style';
+import {
+  type CaptionTextPart,
+  type ResolvedWordHighlight,
+  highlightIntervals,
+  isWordHighlighted,
+  resolveWordHighlight,
+  splitCaptionText,
+  timeCaptionWords
+} from '../../shared/word-highlight';
 
 export type AssCaption = {
   startMs: number;
   endMs: number;
   text: string;
+  /** Timed words of `text`. Used only when word highlight is on. */
+  words?: CaptionWord[];
+  /**
+   * Word lit for the whole caption (the preview frame). -1 or missing means
+   * timing decides. Used only when word highlight is on.
+   */
+  activeWordIndex?: number;
 };
 
 export type BuildAssDocumentInput = {
@@ -65,11 +82,15 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
     '1'
   ];
 
+  const highlight = resolveWordHighlight(style);
   const events = input.captions
     .filter((caption) => caption.text.replace(/\r/g, '').trim().length > 0)
-    .map(
-      (caption) =>
-        `Dialogue: 0,${formatAssTimestamp(caption.startMs)},${formatAssTimestamp(caption.endMs)},Default,,0,0,0,,${escapeAssText(caption.text)}`
+    .flatMap((caption) =>
+      highlight.mode === 'off'
+        ? [
+            `Dialogue: 0,${formatAssTimestamp(caption.startMs)},${formatAssTimestamp(caption.endMs)},Default,,0,0,0,,${escapeAssText(caption.text)}`
+          ]
+        : highlightDialogues(caption, highlight)
     );
 
   return [
@@ -94,6 +115,45 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
   ].join('\n');
 }
 
+/**
+ * One Dialogue line per stretch with a constant lit word. The Default style
+ * is shared, so only the highlighted word gets an inline colour override.
+ */
+function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighlight): string[] {
+  const text = caption.text.replace(/\r/g, '').trim();
+  const parts = splitCaptionText(text);
+  const startMs = Math.round(caption.startMs);
+  const endMs = Math.round(caption.endMs);
+  const colour = bgrHex(highlight.color);
+
+  const intervals =
+    caption.activeWordIndex !== undefined
+      ? [{ startMs, endMs, activeIndex: caption.activeWordIndex }]
+      : highlightIntervals(timeCaptionWords(text, startMs, endMs, caption.words).spans, startMs, endMs);
+
+  return intervals.flatMap((interval) => {
+    const start = formatAssTimestamp(interval.startMs);
+    const end = formatAssTimestamp(interval.endMs);
+    // Centisecond rounding can collapse a very short interval to nothing; skip it instead of writing an empty event.
+    if (start === end) return [];
+
+    const body = highlightedText(parts, highlight.mode, interval.activeIndex, colour);
+    return [`Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`];
+  });
+}
+
+function highlightedText(parts: CaptionTextPart[], mode: ResolvedWordHighlight['mode'], activeIndex: number, colour: string): string {
+  return parts
+    .map((part) => {
+      if (part.wordIndex === null) {
+        return part.text.replace(/\n/g, '\\N');
+      }
+      const word = escapeAssMarkup(part.text);
+      return isWordHighlighted(mode, part.wordIndex, activeIndex) ? `{\\c&H${colour}&}${word}{\\r}` : word;
+    })
+    .join('');
+}
+
 /** H:MM:SS.cc with centiseconds, as ASS requires. */
 export function formatAssTimestamp(ms: number): string {
   const centiseconds = Math.max(0, Math.round(ms / 10));
@@ -110,13 +170,12 @@ export function formatAssTimestamp(ms: number): string {
  * tags, a backslash would start an escape, and '\n' becomes the ASS line break.
  */
 export function escapeAssText(text: string): string {
-  return text
-    .replace(/\r/g, '')
-    .trim()
-    .replace(/\\/g, '⧵')
-    .replace(/\{/g, '(')
-    .replace(/\}/g, ')')
-    .replace(/\n/g, '\\N');
+  return escapeAssMarkup(text.replace(/\r/g, '').trim()).replace(/\n/g, '\\N');
+}
+
+/** Backslash and braces are the only characters ASS reads as markup inside a line. */
+function escapeAssMarkup(text: string): string {
+  return text.replace(/\\/g, '⧵').replace(/\{/g, '(').replace(/\}/g, ')');
 }
 
 /** Numpad alignment: bottom 1-3, middle 4-6, top 7-9 for left, center, right. */

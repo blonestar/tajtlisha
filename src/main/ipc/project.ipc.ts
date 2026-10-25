@@ -12,6 +12,7 @@ import type { PreviewProxyCache } from '../project/preview-proxy-cache';
 import { KnownSources, requireKnownSource } from '../project/known-sources';
 import { validateProjectDocument } from '../project/project-schema';
 import {
+  invalidInput,
   requireFiniteNumber,
   requireJobId,
   requireRecord,
@@ -164,7 +165,7 @@ export function registerProjectIpc({
 
 function toPreviewFrameRequest(payload: unknown): PreviewFrameRequest {
   const input = requireRecord(payload, 'request');
-  return {
+  const request: PreviewFrameRequest = {
     inputPath: requireString(input.inputPath, 'inputPath'),
     atMs: requireFiniteNumber(input.atMs, 'atMs'),
     videoWidth: requireFiniteNumber(input.videoWidth, 'videoWidth'),
@@ -172,6 +173,18 @@ function toPreviewFrameRequest(payload: unknown): PreviewFrameRequest {
     text: requireText(input.text, 'text'),
     style: requireRecord(input.style, 'style') as unknown as PreviewFrameRequest['style']
   };
+  if (input.activeWordIndex !== undefined) {
+    request.activeWordIndex = requireWordIndex(input.activeWordIndex, 'activeWordIndex');
+  }
+  return request;
+}
+
+/** -1 means no word is lit; any other value is the index of a word in the caption. */
+function requireWordIndex(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < -1) {
+    throw invalidInput(field, 'an integer of -1 or more');
+  }
+  return value;
 }
 
 function clamp01(value: number): number {

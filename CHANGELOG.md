@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Added
 - Drag and drop: drop a video file onto the app window to open it. When a video or captions are already open, the app
   asks first, because the current video, captions and translations are replaced.
+- Word highlight (karaoke): the word being spoken is drawn in a highlight color, in the preview and in the burned-in
+  MP4. Two modes: only the current word, or every word spoken so far, plus a new Karaoke preset. Timing is exact for
+  the original text when the transcription model returns word timestamps (whisper-1); the translation, edited text
+  and older projects are highlighted approximately. SRT files are unchanged.
 
 ### Changed
 - Open video asks for confirmation whenever a video is open, not only when captions exist, because the current video and

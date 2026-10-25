@@ -28,6 +28,8 @@ export type PreviewFrameRequest = {
   videoHeight: number;
   text: string;
   style: SubtitleStyle;
+  /** Word lit in the frame when word highlight is on. -1 or missing means none; see activeWordIndex(). */
+  activeWordIndex?: number;
 };
 
 export type PreviewFrameContext = {
@@ -69,7 +71,7 @@ export async function renderPreviewFrame(
     await writeFile(
       assPath,
       buildAssDocument({
-        captions: [{ startMs: 0, endMs: PREVIEW_CAPTION_MS, text: request.text }],
+        captions: [{ startMs: 0, endMs: PREVIEW_CAPTION_MS, text: request.text, activeWordIndex: request.activeWordIndex }],
         style: request.style,
         videoWidth: size.width,
         videoHeight: size.height

@@ -141,6 +141,32 @@ Trenutna implementacija ima project export servis koji:
 - pomera subtitle timing tako da exportovani timeline pocinje od `00:00:00`,
 - koristi isti `SubtitleStyle` ugovor za burned-in MP4 export.
 
+## Word highlight
+
+Karaoke highlight boji rec koja se trenutno izgovara. Ima dva rezima: `word` boji samo aktivnu rec, a `progressive` boji sve reci do aktivne. Boja je `highlightColor` (#rrggbb, podrazumevano `#ffd400`).
+
+Podaci:
+
+- `CaptionRow.words?: CaptionWord[]` cuva vremena reci originalnog teksta, sortirana, u SOURCE vremenu. Prisutna su samo kada je transkripcija imala word timing. Prevod nema word timing.
+- `SubtitleStyle.wordHighlight?: 'off' | 'word' | 'progressive'` i `SubtitleStyle.highlightColor?: '#rrggbb'`. Stari dokumenti bez ovih polja ucitavaju se kao `off`.
+- Export pomera reci za `-trim.startMs` istim pravilom kao titl, pa finalni timeline pocinje od `00:00:00`.
+
+Tacnost vremena:
+
+- Ako tekst titla odgovara timed recima (poredjenje bez velikih slova i interpunkcije, po redu), svaka rec dobija svoje vreme. To je tacno.
+- Reci koje ne odgovaraju (korisnicka izmena, bez word timing-a) dele razmak izmedju susednih poznatih reci po broju karaktera. To je aproksimacija. Isti pristup vazi za prevod i za titlove bez word timing-a.
+- Vreme reci je uvek ogranceno na [startMs, endMs] titla.
+
+ASS export:
+
+- Kada je `wordHighlight` `off`, izlaz je isti kao pre ove funkcije (bajt-po-bajt).
+- Inace se svaki titl deli na jedan `Dialogue` event po intervalu sa stalnom aktivnom recju. Eventi su uzastopni i ne preklapaju se. Interval koji se posle zaokruzivanja na centisekunde svede na nulu se preskace.
+- Aktivna (ili obojena) rec dobija inline override `{\c&HBBGGRR&}rec{\r}`. `Default` stil se ne menja.
+- Tekst reci prolazi kroz isto escapovanje kao `escapeAssText`, pa vitice i zagrade u tekstu ne mogu da ubace ASS tagove.
+- Preview frame prima `activeWordIndex` i crta jedan event za ceo titl, kako bi preview i export delili isti stil.
+
+SRT ostaje nepromenjen: word timing i boja se ne upisuju u SRT.
+
 ## Edge case-ovi
 
 ### Provider vrati samo tekst

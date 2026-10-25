@@ -89,6 +89,21 @@ describe('preview frame with a fake ffmpeg', () => {
     expect(probe.calls).toEqual([{ inputPath: fakeSource }]);
   });
 
+  it('passes the active word to the single caption when word highlight is on', async () => {
+    const probe = fakeProbe({ width: 720, height: 1280 });
+    const { service, calls } = fakeFfmpeg();
+    const style = { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'word' as const };
+
+    await renderPreviewFrame(
+      { inputPath: fakeSource, atMs: 0, videoWidth: 720, videoHeight: 1280, text: 'Prvi drugi', style, activeWordIndex: 1 },
+      {},
+      { ffmpeg: service, probe: probe.probe, fontsDir: '/fonts' }
+    );
+
+    // The colour override is the default highlight colour #ffd400 in BBGGRR order.
+    expect(calls[0].assDocument).toContain('Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Prvi {\\c&H00D4FF&}drugi{\\r}');
+  });
+
   it('removes its temp folder, including the ASS file, after rendering', async () => {
     const { service, calls } = fakeFfmpeg();
     await renderPreviewFrame(

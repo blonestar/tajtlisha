@@ -177,3 +177,6 @@ or update path.
 - 2026-10-25: Caption table follows the video: focusing a caption field seeks to it, a click on the video toggles
   playback, and a "shift all captions" bar moves every caption earlier or later (one undo step). 445 renderer tests.
 - 2026-10-25: v0.4.0 released (caption click seeks, click-to-play, shift all captions, seeking fixed).
+- 2026-10-25: Word highlight (karaoke) built on shared contracts (`src/shared/word-highlight.ts`) by two Haiku
+  workers (main, renderer). Word times are kept from word-timestamp transcription in `CaptionRow.words`; preview
+  and ASS export share the same lit-word logic; checked with libass that the highlighted word changes in the frame.
