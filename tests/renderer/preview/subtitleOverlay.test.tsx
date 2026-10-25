@@ -94,3 +94,75 @@ describe('SubtitleOverlay', () => {
     }
   });
 });
+
+describe('SubtitleOverlay word highlight', () => {
+  const highlightStyle = (wordHighlight: SubtitleStyle['wordHighlight']): SubtitleStyle => ({
+    ...DEFAULT_SUBTITLE_STYLE,
+    wordHighlight,
+    highlightColor: '#00ff00'
+  });
+
+  function renderOverlay(text: string, style: SubtitleStyle, activeWordIndex?: number) {
+    const { container } = renderWithI18n(
+      <SubtitleOverlay
+        text={text}
+        style={style}
+        frameWidth={360}
+        frameHeight={640}
+        activeWordIndex={activeWordIndex}
+      />
+    );
+    return container;
+  }
+
+  function highlightedWords(container: HTMLElement): string[] {
+    return Array.from(container.querySelectorAll<HTMLElement>('.subtitle-word.is-highlighted')).map((node) => node.textContent ?? '');
+  }
+
+  it('renders plain text with no word spans when highlight is off', () => {
+    const container = renderOverlay('one two three', highlightStyle('off'), 1);
+
+    expect(container.querySelector('.subtitle-text')?.textContent).toBe('one two three');
+    expect(container.querySelectorAll('.subtitle-word')).toHaveLength(0);
+  });
+
+  it('colors only the active word in word mode', () => {
+    const container = renderOverlay('one two three', highlightStyle('word'), 1);
+    const words = Array.from(container.querySelectorAll<HTMLElement>('.subtitle-word'));
+
+    expect(words.map((node) => node.textContent)).toEqual(['one', 'two', 'three']);
+    expect(highlightedWords(container)).toEqual(['two']);
+    expect(words[1]).toHaveStyle({ color: '#00ff00' });
+    expect(words[0].style.color).toBe('');
+    expect(container.querySelector('.subtitle-text')?.textContent).toBe('one two three');
+  });
+
+  it('colors every spoken word up to the active one in progressive mode', () => {
+    const container = renderOverlay('one two three', highlightStyle('progressive'), 1);
+
+    expect(highlightedWords(container)).toEqual(['one', 'two']);
+  });
+
+  it('colors nothing before the first word starts', () => {
+    const container = renderOverlay('one two three', highlightStyle('progressive'));
+
+    expect(highlightedWords(container)).toEqual([]);
+  });
+
+  it('keeps explicit line breaks while highlighting', () => {
+    const container = renderOverlay('one two\nthree four', highlightStyle('word'), 2);
+
+    expect(container.querySelector('.subtitle-text')?.textContent).toBe('one two\nthree four');
+    expect(highlightedWords(container)).toEqual(['three']);
+  });
+
+  it('keeps the block geometry and shadow unchanged', () => {
+    const plain = renderOverlay('one two', highlightStyle('off'));
+    const highlighted = renderOverlay('one two', highlightStyle('word'), 0);
+    const plainBlock = plain.querySelector<HTMLElement>('.subtitle-block');
+    const highlightedBlock = highlighted.querySelector<HTMLElement>('.subtitle-block');
+
+    expect(highlightedBlock?.style.fontSize).toBe(plainBlock?.style.fontSize);
+    expect(highlightedBlock?.style.textShadow).toBe(plainBlock?.style.textShadow);
+  });
+});

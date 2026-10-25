@@ -7,6 +7,7 @@ import type { TajtlishaApi } from '../../../shared/types/ipc';
 import { PROJECT_LANGUAGES, type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
 import type { AppSettings } from '../../../shared/types/settings';
+import { activeWordIndex as litWordIndex, resolveWordHighlight, timeCaptionWords } from '../../../shared/word-highlight';
 import { CaptionShiftBar } from '../components/captions/CaptionShiftBar';
 import { CaptionTable, type CaptionEdge, type CaptionPatch } from '../components/captions/CaptionTable';
 import { GeneratePanel } from '../components/workflow/GeneratePanel';
@@ -89,6 +90,15 @@ export function EditorPage({
       ? activeCaption.translation
       : activeCaption.original
     : null;
+  const wordHighlightMode = resolveWordHighlight(project.style).mode;
+  // Word spans depend on the caption and style, not on the playhead, so they are memoized per caption.
+  const wordSpans = useMemo(() => {
+    if (wordHighlightMode === 'off' || !activeCaption || captionText === null) return [];
+    // Only the original text has word timing; the translation is spread by characters.
+    const words = project.previewTrack === 'original' ? activeCaption.words : undefined;
+    return timeCaptionWords(captionText, activeCaption.startMs, activeCaption.endMs, words).spans;
+  }, [wordHighlightMode, activeCaption, captionText, project.previewTrack]);
+  const activeWordIndex = litWordIndex(wordSpans, playhead.timeMs);
 
   // An exact frame belongs to one file. Drop it when the file changes.
   useEffect(() => {
@@ -187,7 +197,8 @@ export function EditorPage({
         videoWidth: source.width,
         videoHeight: source.height,
         text: captionText ?? '',
-        style: project.style
+        style: project.style,
+        activeWordIndex: litWordIndex(wordSpans, atMs)
       });
       if (requestId === exactRequestRef.current) setExact({ dataUrl, atMs });
     } catch {
@@ -330,6 +341,7 @@ export function EditorPage({
             trim={project.trim}
             captionText={captionText}
             style={project.style}
+            activeWordIndex={activeWordIndex}
             onTimeUpdate={playhead.report}
             onPlayingChange={noop}
             onPlaybackError={workspace.reportPlaybackError}
