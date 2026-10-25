@@ -171,6 +171,18 @@ export function highlightIntervals(spans: readonly WordSpan[], captionStart: num
   return intervals;
 }
 
+/**
+ * The timed words that still match a word of `text` (same LCS match as
+ * `timeCaptionWords`), in time order. Words deleted from the text are dropped,
+ * so they cannot be matched by a word of another caption after a merge.
+ */
+export function matchedCaptionWords(text: string, words: readonly CaptionWord[]): CaptionWord[] {
+  const tokens = text.match(/\S+/g) ?? [];
+  const sorted = words.filter((word) => word.text.trim().length > 0).slice().sort((a, b) => a.startMs - b.startMs);
+  const matches = alignWords(tokens.map(normalizeWord), sorted.map((word) => normalizeWord(word.text)));
+  return matches.map(([, wordIndex]) => sorted[wordIndex]);
+}
+
 /** Shifts word times by `deltaMs`, never below 0. */
 export function shiftCaptionWords(words: readonly CaptionWord[], deltaMs: number): CaptionWord[] {
   return words.map((word) => ({
