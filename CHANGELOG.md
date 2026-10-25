@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Word highlight (karaoke): the word being spoken is drawn in a highlight color, in the preview and in the burned-in
+  MP4. Two modes: only the current word, or every word spoken so far, plus a new Karaoke preset. Timing is exact for
+  the original text when the transcription model returns word timestamps (whisper-1); the translation, edited text
+  and older projects are highlighted approximately. SRT files are unchanged.
+
 ## [0.5.1] - 2026-10-25
 
 ### Fixed
