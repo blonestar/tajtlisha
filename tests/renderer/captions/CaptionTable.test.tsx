@@ -188,7 +188,7 @@ describe('CaptionTable', () => {
     expect(rowOf('c3').classList.contains('is-active')).toBe(false);
   });
 
-  it('selects and seeks when a row is clicked, but only selects when a field is clicked', () => {
+  it('selects and seeks when a row is clicked, but not when a row action button is clicked', () => {
     const onSelect = vi.fn();
     const onSeek = vi.fn();
     renderWithI18n(<CaptionTable {...props({ onSelect, onSeek })} />);
@@ -198,7 +198,41 @@ describe('CaptionTable', () => {
     expect(onSeek).toHaveBeenCalledWith(2500);
 
     onSeek.mockClear();
-    fireEvent.click(within(rowOf('c3')).getByDisplayValue('Last one'));
+    const deleteButton = within(rowOf('c3')).getAllByRole('button').at(-1);
+    const icon = deleteButton?.querySelector('svg');
+    if (!icon) throw new Error('no button icon');
+    fireEvent.click(icon);
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+
+  it('seeks to the caption start when one of its fields gets focus from outside the row', () => {
+    const onSelect = vi.fn();
+    const onSeek = vi.fn();
+    renderWithI18n(<CaptionTable {...props({ onSelect, onSeek, activeCaptionId: 'c1' })} />);
+
+    fireEvent.focus(within(rowOf('c3')).getByDisplayValue('Last one'));
+    expect(onSelect).toHaveBeenCalledWith('c3');
+    expect(onSeek).toHaveBeenCalledWith(4000);
+
+    onSeek.mockClear();
+    fireEvent.focus(timeInput('c2', 'Start'));
+    expect(onSeek).toHaveBeenCalledWith(2500);
+  });
+
+  it('keeps the playhead when focus moves inside a row or into the playing caption', () => {
+    const onSelect = vi.fn();
+    const onSeek = vi.fn();
+    renderWithI18n(<CaptionTable {...props({ onSelect, onSeek, activeCaptionId: 'c1' })} />);
+
+    fireEvent.focus(within(rowOf('c1')).getByDisplayValue('Hello there'));
+    expect(onSelect).toHaveBeenCalledWith('c1');
+    expect(onSeek).not.toHaveBeenCalled();
+
+    const row = rowOf('c3');
+    fireEvent.focus(within(row).getByDisplayValue('Poslednji'), {
+      relatedTarget: within(row).getByDisplayValue('Last one')
+    });
+    expect(onSelect).toHaveBeenCalledWith('c3');
     expect(onSeek).not.toHaveBeenCalled();
   });
 

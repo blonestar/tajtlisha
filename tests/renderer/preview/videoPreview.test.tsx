@@ -111,4 +111,28 @@ describe('VideoPreview', () => {
     expect(screen.getByText('0:00.0 / 0:04.0')).toBeInTheDocument();
     expect(screen.getByText('Source 0:01.0')).toBeInTheDocument();
   });
+
+  it('toggles playback when the video frame is clicked', () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+    const paused = vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get');
+    try {
+      const { container } = renderPreview();
+      const video = container.querySelector('video');
+      if (!video) throw new Error('no video');
+
+      paused.mockReturnValue(true);
+      fireEvent.click(video);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(pause).not.toHaveBeenCalled();
+
+      paused.mockReturnValue(false);
+      fireEvent.click(video);
+      expect(pause).toHaveBeenCalledTimes(1);
+    } finally {
+      play.mockRestore();
+      pause.mockRestore();
+      paused.mockRestore();
+    }
+  });
 });

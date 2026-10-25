@@ -63,6 +63,11 @@ export type ProjectAction =
   | { type: 'caption/mergeWithNext'; id: string }
   | { type: 'caption/delete'; id: string }
   | { type: 'caption/nudge'; id: string; deltaMs: number; edge: NudgeEdge }
+  /**
+   * Moves every caption by the same amount, keeping their durations and gaps.
+   * An earlier shift stops when the first caption reaches 0.
+   */
+  | { type: 'captions/shiftAll'; deltaMs: number }
   | { type: 'style/set'; patch: Partial<Omit<SubtitleStyle, 'presetId'>> }
   | { type: 'style/applyPreset'; presetId: SubtitlePresetId }
   | { type: 'languages/set'; sourceLanguage?: string; targetLanguage?: string }
@@ -306,6 +311,17 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       return applyEdit(state, { ...project, captions });
     }
 
+    case 'captions/shiftAll': {
+      const shift = clampShiftAll(project.captions, action.deltaMs);
+      if (shift === 0) return state;
+      const captions = project.captions.map((caption) => ({
+        ...caption,
+        startMs: caption.startMs + shift,
+        endMs: Math.max(0, caption.endMs + shift)
+      }));
+      return applyEdit(state, { ...project, captions });
+    }
+
     case 'style/set': {
       const changes = withoutUndefined(action.patch) as Partial<SubtitleStyle>;
       const keys = Object.keys(changes) as Array<keyof SubtitleStyle>;
@@ -365,6 +381,17 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
   const exhaustive: never = action;
   void exhaustive;
   return state;
+}
+
+/**
+ * The shift captions/shiftAll actually applies: rounded to whole ms and, when
+ * moving earlier, limited so the first caption does not start before 0.
+ */
+export function clampShiftAll(captions: readonly CaptionRow[], deltaMs: number): number {
+  if (captions.length === 0 || !Number.isFinite(deltaMs)) return 0;
+  const delta = Math.round(deltaMs);
+  const firstStart = Math.min(...captions.map((caption) => caption.startMs));
+  return Math.max(delta, -firstStart);
 }
 
 function applyEdit(state: ProjectState, next: ProjectDocument, options: EditOptions = {}): ProjectState {

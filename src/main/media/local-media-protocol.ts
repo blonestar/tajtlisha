@@ -1,5 +1,5 @@
-import { net, protocol } from 'electron';
-import { pathToFileURL } from 'node:url';
+import { protocol } from 'electron';
+import { createMediaResponse } from './media-response';
 import { MediaTokenMap } from './media-token-map';
 
 export const LOCAL_MEDIA_SCHEME = 'tajtlisha-media';
@@ -37,20 +37,8 @@ export function createLocalMediaProtocol(): LocalMediaProtocol {
           return new Response('Media not found.', { status: 404 });
         }
 
-        // net.fetch on a file: URL keeps range requests working for seeking.
-        const response = await net.fetch(pathToFileURL(inputPath).toString(), {
-          headers: request.headers
-        });
-        const headers = new Headers(response.headers);
-        if (!headers.has('content-type')) {
-          headers.set('content-type', 'video/mp4');
-        }
-
-        return new Response(response.body, {
-          headers,
-          status: response.status,
-          statusText: response.statusText
-        });
+        // Range requests must get 206 answers, or the video cannot seek.
+        return createMediaResponse(inputPath, request.headers.get('range'));
       });
     },
     createVideoUrl: (inputPath) => `${LOCAL_MEDIA_SCHEME}://video/${tokens.tokenFor(inputPath)}`,
