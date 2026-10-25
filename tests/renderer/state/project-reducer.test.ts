@@ -4,6 +4,7 @@ import type { CaptionRow, ProjectDocument, ProjectSource } from '../../../src/sh
 import {
   COALESCE_WINDOW_MS,
   HISTORY_LIMIT,
+  clampShiftAll,
   createEmptyProject,
   createProjectState,
   projectReducer,
@@ -467,6 +468,51 @@ describe('caption/delete', () => {
     const state = stateWith([caption('a', 0, 1000)]);
 
     expect(projectReducer(state, { type: 'caption/delete', id: 'zzz' })).toBe(state);
+  });
+});
+
+describe('captions/shiftAll', () => {
+  it('moves every caption by the same amount and keeps durations and gaps', () => {
+    const state = stateWith([caption('a', 1000, 2000), caption('b', 2500, 4000)]);
+    const later = run(state, { type: 'captions/shiftAll', deltaMs: 500 });
+    const earlier = run(state, { type: 'captions/shiftAll', deltaMs: -800 });
+
+    expect(later.project.captions.map((item) => [item.startMs, item.endMs])).toEqual([
+      [1500, 2500],
+      [3000, 4500]
+    ]);
+    expect(earlier.project.captions.map((item) => [item.startMs, item.endMs])).toEqual([
+      [200, 1200],
+      [1700, 3200]
+    ]);
+  });
+
+  it('stops an earlier shift when the first caption reaches 0', () => {
+    const state = stateWith([caption('a', 400, 1400), caption('b', 2000, 3000)]);
+    const next = run(state, { type: 'captions/shiftAll', deltaMs: -1500 });
+
+    expect(next.project.captions.map((item) => [item.startMs, item.endMs])).toEqual([
+      [0, 1000],
+      [1600, 2600]
+    ]);
+    expect(clampShiftAll(state.project.captions, -1500)).toBe(-400);
+  });
+
+  it('is a no-op when nothing would move', () => {
+    const atZero = stateWith([caption('a', 0, 1000)]);
+    expect(run(atZero, { type: 'captions/shiftAll', deltaMs: -500 })).toBe(atZero);
+    expect(run(atZero, { type: 'captions/shiftAll', deltaMs: Number.NaN })).toBe(atZero);
+    const empty = stateWith([]);
+    expect(run(empty, { type: 'captions/shiftAll', deltaMs: 500 })).toBe(empty);
+  });
+
+  it('is one undo step', () => {
+    const state = stateWith([caption('a', 1000, 2000), caption('b', 2500, 4000)]);
+    const shifted = run(state, { type: 'captions/shiftAll', deltaMs: 700 });
+    const undone = run(shifted, { type: 'history/undo' });
+
+    expect(shifted.revision).toBe(state.revision + 1);
+    expect(undone.project.captions).toEqual(state.project.captions);
   });
 });
 

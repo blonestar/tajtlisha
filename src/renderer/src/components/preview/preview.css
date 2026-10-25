@@ -35,6 +35,7 @@
   position: relative;
 }
 .video-preview-video {
+  cursor: pointer;
   display: block;
   height: 100%;
   object-fit: contain;

@@ -7,6 +7,7 @@ import type { TajtlishaApi } from '../../../shared/types/ipc';
 import { PROJECT_LANGUAGES, type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
 import type { AppSettings } from '../../../shared/types/settings';
+import { CaptionShiftBar } from '../components/captions/CaptionShiftBar';
 import { CaptionTable, type CaptionEdge, type CaptionPatch } from '../components/captions/CaptionTable';
 import { GeneratePanel } from '../components/workflow/GeneratePanel';
 import { FRAME_MS } from '../components/preview/playback';
@@ -21,7 +22,7 @@ import { usePlayhead } from '../hooks/usePlayhead';
 import type { Workspace } from '../hooks/useWorkspace';
 import { captionIssuesFor, captionLineLimit, staleCaptionIds, UNKNOWN_LANGUAGE } from '../hooks/workspaceModel';
 import { findActiveCaption, isBlockingCaptionIssue, rowsNeedingTranslation } from '../state/selectors';
-import { MIN_INSERT_ROOM_MS } from '../state/project-reducer';
+import { clampShiftAll, MIN_INSERT_ROOM_MS } from '../state/project-reducer';
 import type { ProjectStore } from '../state/useProjectStore';
 
 export type EditorPageProps = {
@@ -148,6 +149,18 @@ export function EditorPage({
     dispatch({ type: 'caption/split', id, atMs });
   }
 
+  function shiftAllCaptions(deltaMs: number): void {
+    const applied = clampShiftAll(project.captions, deltaMs);
+    if (applied === 0) {
+      setLocalNotice(t('shell.captions.shiftAtStart'));
+      return;
+    }
+    dispatch({ type: 'captions/shiftAll', deltaMs });
+    if (applied !== deltaMs) {
+      setLocalNotice(t('shell.captions.shiftLimited', { seconds: String(-applied / 1000) }));
+    }
+  }
+
   function deleteCaption(id: string): void {
     dispatch({ type: 'caption/delete', id });
     setSelectedId((current) => (current === id ? null : current));
@@ -242,6 +255,7 @@ export function EditorPage({
         )}
 
         <div className="editor-captions" data-step-target="captions" tabIndex={-1}>
+          {project.captions.length > 0 && <CaptionShiftBar onShift={shiftAllCaptions} />}
           <CaptionTable
             captions={project.captions}
             issues={issues}

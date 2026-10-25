@@ -94,7 +94,9 @@ export const shellStrings = {
     cancelFailed: 'The job could not be stopped.',
     captions: {
       noRoom: 'There is no free space after this caption.',
-      exactFrameFailed: 'The exact frame could not be rendered.'
+      exactFrameFailed: 'The exact frame could not be rendered.',
+      shiftAtStart: 'The first caption already starts at the beginning of the video, so captions cannot move earlier.',
+      shiftLimited: 'Captions moved only {{seconds}} s earlier, so the first one starts at the beginning of the video.'
     },
     track: {
       label: 'Preview text',
@@ -207,7 +209,9 @@ export const shellStrings = {
     cancelFailed: 'Posao nije mogao da se zaustavi.',
     captions: {
       noRoom: 'Nema slobodnog prostora posle ovog titla.',
-      exactFrameFailed: 'Tačan kadar nije mogao da se prikaže.'
+      exactFrameFailed: 'Tačan kadar nije mogao da se prikaže.',
+      shiftAtStart: 'Prvi titl već počinje na početku videa, pa titlovi ne mogu ranije.',
+      shiftLimited: 'Titlovi su pomereni samo {{seconds}} s ranije, da prvi počne na početku videa.'
     },
     track: {
       label: 'Tekst u pregledu',
@@ -320,7 +324,9 @@ export const shellStrings = {
     cancelFailed: 'Посао није могао да се заустави.',
     captions: {
       noRoom: 'Нема слободног простора после овог титла.',
-      exactFrameFailed: 'Тачан кадар није могао да се прикаже.'
+      exactFrameFailed: 'Тачан кадар није могао да се прикаже.',
+      shiftAtStart: 'Први титл већ почиње на почетку видеа, па титлови не могу раније.',
+      shiftLimited: 'Титлови су померени само {{seconds}} с раније, да први почне на почетку видеа.'
     },
     track: {
       label: 'Текст у прегледу',

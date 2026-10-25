@@ -163,3 +163,5 @@ or update path.
 - 2026-10-22: v0.2.x still shows raw HTML for the v0.3.0 notes (the cleanup ships in 0.3.0 itself). Tightened the
   0.3.0 conversion on develop: one line per item, `<br>` soft wraps joined, Downloads section dropped.
 - 2026-10-25: v0.3.1 released (clean plain-text release notes).
+- 2026-10-25: Caption table follows the video: focusing a caption field seeks to it, a click on the video toggles
+  playback, and a "shift all captions" bar moves every caption earlier or later (one undo step). 445 renderer tests.
