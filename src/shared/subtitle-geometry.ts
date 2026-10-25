@@ -101,7 +101,9 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   position: 'bottom',
   align: 'center',
   marginVerticalPercent: 12,
-  maxWidthPercent: 86
+  maxWidthPercent: 86,
+  wordHighlight: 'off',
+  highlightColor: '#ffd400'
 };
 
 export const SUBTITLE_PRESETS: Record<SubtitlePresetId, SubtitleStyle> = {
@@ -122,6 +124,14 @@ export const SUBTITLE_PRESETS: Record<SubtitlePresetId, SubtitleStyle> = {
     fontSizePercent: 6.2,
     textColor: '#ffd84a',
     outlineWidthPercent: 11
+  },
+  karaoke: {
+    ...DEFAULT_SUBTITLE_STYLE,
+    presetId: 'karaoke',
+    fontSizePercent: 6.2,
+    outlineWidthPercent: 11,
+    wordHighlight: 'word',
+    highlightColor: '#ffd400'
   }
 };
 

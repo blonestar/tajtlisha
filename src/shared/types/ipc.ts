@@ -42,6 +42,7 @@ export const IPC_CHANNELS = {
   aiListModels: 'ai:listModels',
 
   projectSelectVideo: 'project:selectVideo',
+  projectOpenDroppedVideo: 'project:openDroppedVideo',
   projectLoadLast: 'project:loadLast',
   projectSave: 'project:save',
   projectCreatePreviewProxy: 'project:createPreviewProxy',
@@ -103,6 +104,12 @@ export type TajtlishaApi = {
     /** Opens a file dialog and probes the video. Null when canceled. */
     selectVideo(): Promise<ProjectSource | null>;
     /**
+     * Probes a video the user dropped onto the window. The preload resolves the
+     * OS path of the File (webUtils), so the renderer never supplies a path itself.
+     * Rejects when the file is not a supported video.
+     */
+    openDroppedVideo(file: File): Promise<ProjectSource>;
+    /**
      * Last opened project, or null when none was saved. Returned even when the
      * source video is missing so captions are never lost (relink via selectVideo).
      */
@@ -126,6 +133,11 @@ export type TajtlishaApi = {
       videoHeight: number;
       text: string;
       style: SubtitleStyle;
+      /**
+       * Word lit at this frame when the style has word highlight on, as given by
+       * activeWordIndex() in src/shared/word-highlight.ts. -1 or missing = none.
+       */
+      activeWordIndex?: number;
     }): Promise<{ dataUrl: string }>;
   };
   workflow: {

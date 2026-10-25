@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webFrame, type IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer, webFrame, webUtils, type IpcRendererEvent } from 'electron';
 import { IPC_CHANNELS as C, type QuitReadyResult, type TajtlishaApi } from '../shared/types/ipc';
 import type { JobProgressEvent } from '../shared/types/jobs';
 import type { UpdateState } from '../shared/types/updates';
@@ -33,6 +33,12 @@ const api: TajtlishaApi = {
   },
   project: {
     selectVideo: () => ipcRenderer.invoke(C.projectSelectVideo),
+    openDroppedVideo: (file) => {
+      // Empty for a File created in script (not from the OS), so main never gets a made-up path.
+      const path = webUtils.getPathForFile(file);
+      if (!path) return Promise.reject(new Error('The dropped file has no path on disk.'));
+      return ipcRenderer.invoke(C.projectOpenDroppedVideo, path);
+    },
     loadLast: () => ipcRenderer.invoke(C.projectLoadLast),
     save: (project) => ipcRenderer.invoke(C.projectSave, project),
     createPreviewProxy: (request) => ipcRenderer.invoke(C.projectCreatePreviewProxy, request),

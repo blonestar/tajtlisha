@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import CircleAlert from 'lucide-react/dist/esm/icons/circle-alert.js';
+import FileVideo from 'lucide-react/dist/esm/icons/file-video.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
 import type { TajtlishaApi } from '../../../../shared/types/ipc';
 import type { ProjectDocument } from '../../../../shared/types/project';
@@ -9,6 +10,7 @@ import { SettingsPage } from '../../pages/SettingsPage';
 import { EditorPage } from '../../pages/EditorPage';
 import type { AppRuntime } from '../../hooks/useAppRuntime';
 import { useExportDialog } from '../../hooks/useExportDialog';
+import { useFileDrop } from '../../hooks/useFileDrop';
 import { useFfmpegStatus } from '../../hooks/useFfmpegStatus';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useWorkspace } from '../../hooks/useWorkspace';
@@ -118,6 +120,10 @@ export function WorkspaceShell({ runtime }: WorkspaceShellProps): ReactElement {
 
   const statuses = stepStatuses(project, exportModel.result !== null);
   const sourceMissing = source !== null && (sourceStatus === 'missing' || sourceStatus === 'changed');
+
+  // Drops wait while the editor is not ready or another layer (dialog, settings) is on top.
+  const dropEnabled = ready && !workspace.confirm && !exportModel.open && !settingsOpen && !workspace.summaryOpen;
+  const fileDrop = useFileDrop({ enabled: dropEnabled, onFile: workspace.openDroppedVideo });
 
   return (
     <div className="app-shell">
@@ -267,6 +273,14 @@ export function WorkspaceShell({ runtime }: WorkspaceShellProps): ReactElement {
           onClose={() => setSettingsOpen(false)}
         />
       </SettingsSheet>
+
+      {fileDrop.dragging && (
+        <div className="drop-overlay">
+          <FileVideo size={40} aria-hidden="true" />
+          <p className="drop-overlay-title">{t('shell.drop.title')}</p>
+          {source && <p className="drop-overlay-hint muted">{t('shell.drop.replaceHint')}</p>}
+        </div>
+      )}
     </div>
   );
 }

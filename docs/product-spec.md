@@ -21,7 +21,7 @@ Sekundarni korisnici u kasnijim fazama:
 
 ## MVP workflow
 
-1. Korisnik importuje `.mp4` fajl.
+1. Korisnik importuje `.mp4` fajl dugmetom Otvori video ili prevlacenjem fajla na prozor aplikacije.
 2. App prikazuje video preview.
 3. Korisnik trimuje pocetak i kraj.
 4. App ekstraktuje audio iz trimovanog segmenta.

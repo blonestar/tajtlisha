@@ -498,6 +498,84 @@ describe('project:selectVideo', () => {
   });
 });
 
+describe('project:openDroppedVideo', () => {
+  function setupDrop(options: { probe?: Record<string, unknown>; isFile?: boolean } = {}) {
+    const ipc = fakeIpc();
+    const sources = new KnownSources();
+    const probe = vi.fn(
+      async () => options.probe ?? { hasVideo: true, hasAudio: false, durationMs: 4000, width: 1280, height: 720 }
+    );
+    registerProjectIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      dialogs: fakeDialogs(),
+      mediaService: { probe, createPreviewProxy: vi.fn() } as never,
+      projectStore: { loadLast: vi.fn(), save: vi.fn() } as never,
+      previewProxies: { get: vi.fn() } as never,
+      exporter: { renderPreviewFrame: vi.fn() } as never,
+      createVideoUrl: fakeVideoUrl,
+      strings: async () => ENGLISH,
+      sources,
+      statFile: async () => ({ size: 1234, mtimeMs: 99, isFile: options.isFile ?? true })
+    });
+    return { ipc, sources, probe };
+  }
+
+  it('returns a ProjectSource for the dropped path and lets later media calls use it', async () => {
+    const { ipc, sources } = setupDrop();
+
+    expect(await ipc.invoke(IPC_CHANNELS.projectOpenDroppedVideo, fakeOwner(1), '/videos/Clip.MP4')).toEqual({
+      inputPath: '/videos/Clip.MP4',
+      fileUrl: 'tajtlisha-media://video/fake-Clip.MP4',
+      durationMs: 4000,
+      width: 1280,
+      height: 720,
+      hasAudio: false,
+      fileSizeBytes: 1234,
+      mtimeMs: 99
+    });
+    expect(sources.has('/videos/Clip.MP4')).toBe(true);
+  });
+
+  it('rejects a relative path before probing', async () => {
+    const { ipc, sources, probe } = setupDrop();
+
+    await expect(ipc.invoke(IPC_CHANNELS.projectOpenDroppedVideo, fakeOwner(1), 'clip.mp4')).rejects.toThrow(
+      '[UNKNOWN] The dropped file path must be absolute.'
+    );
+    expect(probe).not.toHaveBeenCalled();
+    expect(sources.has('clip.mp4')).toBe(false);
+  });
+
+  it('rejects an unsupported extension before probing', async () => {
+    const { ipc, probe } = setupDrop();
+
+    await expect(ipc.invoke(IPC_CHANNELS.projectOpenDroppedVideo, fakeOwner(1), '/videos/notes.txt')).rejects.toThrow(
+      '[UNKNOWN] The dropped file is not a supported video.'
+    );
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it('rejects a directory even when its name looks like a video', async () => {
+    const { ipc, sources, probe } = setupDrop({ isFile: false });
+
+    await expect(ipc.invoke(IPC_CHANNELS.projectOpenDroppedVideo, fakeOwner(1), '/videos/folder.mp4')).rejects.toThrow(
+      '[UNKNOWN] The dropped item is not a file.'
+    );
+    expect(probe).not.toHaveBeenCalled();
+    expect(sources.has('/videos/folder.mp4')).toBe(false);
+  });
+
+  it('rejects a file without a video stream and does not remember it', async () => {
+    const { ipc, sources } = setupDrop({ probe: { hasVideo: false, hasAudio: true, durationMs: 4000 } });
+
+    await expect(ipc.invoke(IPC_CHANNELS.projectOpenDroppedVideo, fakeOwner(1), '/music/song.mp4')).rejects.toThrow(
+      '[UNKNOWN] The selected file has no video stream.'
+    );
+    expect(sources.has('/music/song.mp4')).toBe(false);
+  });
+});
+
 describe('project:createPreviewProxy', () => {
   it('reports rendering progress from ffmpeg time against the probed duration', async () => {
     const ipc = fakeIpc();
@@ -645,6 +723,39 @@ describe('project:save and project:loadLast', () => {
     await expect(ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), frame)).rejects.toThrow('[UNKNOWN]');
     expect(createPreviewProxy).not.toHaveBeenCalled();
     expect(renderPreviewFrame).not.toHaveBeenCalled();
+  });
+
+  it('accepts activeWordIndex only as an integer of -1 or more, and leaves it absent when not sent', async () => {
+    const ipc = fakeIpc();
+    const renderPreviewFrame = vi.fn(async (_request: Record<string, unknown>) => ({ dataUrl: 'data:image/png;base64,' }));
+    registerProjectIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      dialogs: fakeDialogs(),
+      mediaService: { probe: vi.fn(), createPreviewProxy: vi.fn() } as never,
+      projectStore: { loadLast: vi.fn(), save: vi.fn() } as never,
+      previewProxies: { get: vi.fn() } as never,
+      exporter: { renderPreviewFrame } as never,
+      createVideoUrl: fakeVideoUrl,
+      strings: async () => ENGLISH,
+      sources: sourcesWith('/videos/clip.mkv')
+    });
+    const frame = { inputPath: '/videos/clip.mkv', atMs: 0, videoWidth: 2, videoHeight: 2, text: 'x', style: DEFAULT_SUBTITLE_STYLE };
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: 2 });
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: -1 });
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), frame);
+
+    expect(renderPreviewFrame.mock.calls[0]?.[0]).toMatchObject({ activeWordIndex: 2 });
+    expect(renderPreviewFrame.mock.calls[1]?.[0]).toMatchObject({ activeWordIndex: -1 });
+    expect(renderPreviewFrame.mock.calls[2]?.[0]).not.toHaveProperty('activeWordIndex');
+
+    for (const bad of [1.5, -2, '1', null, Number.NaN]) {
+      await expect(ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: bad })).rejects.toThrow(
+        '[UNKNOWN] activeWordIndex must be an integer of -1 or more.'
+      );
+    }
+    expect(renderPreviewFrame).toHaveBeenCalledTimes(3);
   });
 
   it('gives the preview cache the source size and mtime as its fingerprint', async () => {

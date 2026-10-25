@@ -1,6 +1,7 @@
 import { DEFAULT_SUBTITLE_STYLE, SUBTITLE_PRESETS, clamp } from '../../../shared/subtitle-geometry';
-import type { CaptionRow, PreviewTrack, ProjectDocument, ProjectSource, TrimRange } from '../../../shared/types/project';
+import type { CaptionRow, CaptionWord, PreviewTrack, ProjectDocument, ProjectSource, TrimRange } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
+import { shiftCaptionWords } from '../../../shared/word-highlight';
 
 export const HISTORY_LIMIT = 100;
 export const MIN_TRIM_MS = 100;
@@ -193,8 +194,12 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       if (index < 0) return state;
       const current = project.captions[index];
       const updated = applyCaptionPatch(current, action.patch);
+      // Word times are source-absolute: they follow the caption only when it moved as a whole.
+      const startDelta = updated.startMs - current.startMs;
+      const movedAsWhole = startDelta !== 0 && startDelta === updated.endMs - current.endMs;
+      const moved = movedAsWhole && current.words ? withWords(updated, shiftCaptionWords(current.words, startDelta)) : updated;
       // A manual translation counts as up to date with the current original.
-      const next = action.patch.translation !== undefined ? withTranslatedFrom(updated, updated.original) : updated;
+      const next = action.patch.translation !== undefined ? withTranslatedFrom(moved, moved.original) : moved;
       if (isShallowEqual(current, next)) return state;
 
       const timingChanged = action.patch.startMs !== undefined || action.patch.endMs !== undefined;
@@ -238,24 +243,30 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       const [originalFirst, originalSecond] = splitTextAtRatio(caption.original, ratio);
       const [translationFirst, translationSecond] = splitTextAtRatio(caption.translation, ratio);
       const upToDate = isUpToDate(caption);
-      const first: CaptionRow = withTranslatedFrom(
-        {
-          ...caption,
-          endMs: atMs,
-          original: originalFirst,
-          translation: translationFirst
-        },
-        upToDate ? originalFirst : undefined
+      const first: CaptionRow = withWords(
+        withTranslatedFrom(
+          {
+            ...caption,
+            endMs: atMs,
+            original: originalFirst,
+            translation: translationFirst
+          },
+          upToDate ? originalFirst : undefined
+        ),
+        caption.words?.filter((word) => word.startMs < atMs)
       );
-      const second: CaptionRow = withTranslatedFrom(
-        {
-          id: createId(),
-          startMs: atMs,
-          endMs: caption.endMs,
-          original: originalSecond,
-          translation: translationSecond
-        },
-        upToDate ? originalSecond : undefined
+      const second: CaptionRow = withWords(
+        withTranslatedFrom(
+          {
+            id: createId(),
+            startMs: atMs,
+            endMs: caption.endMs,
+            original: originalSecond,
+            translation: translationSecond
+          },
+          upToDate ? originalSecond : undefined
+        ),
+        caption.words?.filter((word) => word.startMs >= atMs)
       );
       const captions = sortCaptions([...project.captions.slice(0, index), first, second, ...project.captions.slice(index + 1)]);
       return applyEdit(state, { ...project, captions });
@@ -267,14 +278,17 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       const current = project.captions[index];
       const next = project.captions[index + 1];
       const original = joinText(current.original, next.original);
-      const merged = withTranslatedFrom(
-        {
-          ...current,
-          endMs: next.endMs,
-          original,
-          translation: joinText(current.translation, next.translation)
-        },
-        isUpToDate(current) && isUpToDate(next) ? original : undefined
+      const merged = withWords(
+        withTranslatedFrom(
+          {
+            ...current,
+            endMs: next.endMs,
+            original,
+            translation: joinText(current.translation, next.translation)
+          },
+          isUpToDate(current) && isUpToDate(next) ? original : undefined
+        ),
+        current.words || next.words ? [...(current.words ?? []), ...(next.words ?? [])] : undefined
       );
       const captions = [...project.captions.slice(0, index), merged, ...project.captions.slice(index + 2)];
       return applyEdit(state, { ...project, captions });
@@ -305,7 +319,11 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
         endMs = Math.max(0, endMs + shift);
       }
 
-      const updated: CaptionRow = { ...current, startMs, endMs };
+      // Only a whole-caption move carries the words along; trimming an edge leaves them where they are.
+      const moved = action.edge === 'both' ? startMs - current.startMs : 0;
+      const shiftedCaption: CaptionRow = { ...current, startMs, endMs };
+      const updated =
+        moved !== 0 && current.words ? withWords(shiftedCaption, shiftCaptionWords(current.words, moved)) : shiftedCaption;
       if (isShallowEqual(current, updated)) return state;
       const captions = sortCaptions(replaceAt(project.captions, index, updated));
       return applyEdit(state, { ...project, captions });
@@ -314,11 +332,14 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
     case 'captions/shiftAll': {
       const shift = clampShiftAll(project.captions, action.deltaMs);
       if (shift === 0) return state;
-      const captions = project.captions.map((caption) => ({
-        ...caption,
-        startMs: caption.startMs + shift,
-        endMs: Math.max(0, caption.endMs + shift)
-      }));
+      const captions = project.captions.map((caption) => {
+        const moved: CaptionRow = {
+          ...caption,
+          startMs: caption.startMs + shift,
+          endMs: Math.max(0, caption.endMs + shift)
+        };
+        return caption.words ? withWords(moved, shiftCaptionWords(caption.words, shift)) : moved;
+      });
       return applyEdit(state, { ...project, captions });
     }
 
@@ -490,6 +511,14 @@ function joinText(first: string, second: string): string {
 /** A row's translation is up to date when it was made from the row's current original. */
 function isUpToDate(caption: CaptionRow): boolean {
   return caption.translatedFrom === caption.original;
+}
+
+/** Sets words, or removes the key when there are none, so rows never carry an undefined or empty words list. */
+function withWords(caption: CaptionRow, words: CaptionWord[] | undefined): CaptionRow {
+  const next: CaptionRow = { ...caption };
+  delete next.words;
+  if (words !== undefined && words.length > 0) next.words = words;
+  return next;
 }
 
 /** Sets translatedFrom, or removes it when undefined, so rows never carry an undefined key. */

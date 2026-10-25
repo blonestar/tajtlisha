@@ -60,6 +60,7 @@ describe('App shell', () => {
       return element as HTMLElement;
     });
     expect(within(card).getByRole('button', { name: 'Open video' })).toBeInTheDocument();
+    expect(within(card).getByText('or drag a video file here')).toBeInTheDocument();
     expect(within(card).getByText('FFmpeg is ready')).toBeInTheDocument();
   });
 
@@ -129,7 +130,10 @@ describe('App shell', () => {
     fireEvent.click(within(await aiPanel()).getByRole('button', { name: 'Transcribe' }));
     await waitFor(() => expect(fake.transcribe).toHaveBeenCalled());
 
+    // The project has a video, so opening another one asks first.
     fireEvent.click(screen.getByRole('button', { name: 'Open video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Open another video?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open video' }));
     await waitFor(() => expect(fake.selectVideo).toHaveBeenCalled());
 
     finish({ language: 'sr-Latn', captions: [caption('t1', 0, 2000, 'Stari titl')], timingSource: 'word' });
