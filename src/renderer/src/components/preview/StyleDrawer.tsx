@@ -24,7 +24,8 @@ export type StyleDrawerProps = {
 const PRESET_LABEL_KEYS: Record<SubtitlePresetId, string> = {
   clean: 'preview.presetClean',
   box: 'preview.presetBox',
-  bold_yellow: 'preview.presetBoldYellow'
+  bold_yellow: 'preview.presetBoldYellow',
+  karaoke: 'preview.presetKaraoke'
 };
 
 const SAMPLE_FONT_PX = 16;

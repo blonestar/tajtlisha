@@ -17,7 +17,7 @@ const MAX_MODEL = 200;
 const MAX_DIMENSION = 32768;
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-const PRESET_IDS: readonly SubtitlePresetId[] = ['clean', 'box', 'bold_yellow'];
+const PRESET_IDS: readonly SubtitlePresetId[] = ['clean', 'box', 'bold_yellow', 'karaoke'];
 const PREVIEW_TRACKS = ['original', 'translation'] as const;
 const TIMING_SOURCES = ['word', 'segment', 'speech_detection'] as const;
 const POSITIONS = ['top', 'middle', 'bottom'] as const;
