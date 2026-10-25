@@ -13,7 +13,7 @@ import type {
   TranslateCaptionsRequest,
   TranslateCaptionsResult
 } from '../../shared/types/jobs';
-import type { CaptionRow, TrimRange } from '../../shared/types/project';
+import type { CaptionRow, CaptionWord, TrimRange } from '../../shared/types/project';
 import { FfmpegService } from '../ffmpeg';
 import { MediaService } from '../media';
 import { validatePath } from '../media/contracts';
@@ -339,7 +339,26 @@ function toSourceCaptions(drafts: CaptionDraft[], trim: TrimRange): CaptionRow[]
     const endMs = clamp(draft.endMs + trim.startMs);
     if (endMs <= startMs) return [];
 
-    return [{ id: randomUUID(), startMs, endMs, original: draft.text, translation: '' }];
+    const words = draft.words ? toSourceWords(draft.words, trim.startMs, startMs, endMs) : [];
+    return [
+      {
+        id: randomUUID(),
+        startMs,
+        endMs,
+        original: draft.text,
+        translation: '',
+        ...(words.length > 0 ? { words } : {})
+      }
+    ];
+  });
+}
+
+/** Offsets word times like the caption, then keeps them inside the caption's clamped range. */
+function toSourceWords(words: NonNullable<CaptionDraft['words']>, offsetMs: number, startMs: number, endMs: number): CaptionWord[] {
+  const clamp = (value: number): number => Math.min(endMs, Math.max(startMs, value));
+  return words.map((word) => {
+    const wordStart = clamp(word.startMs + offsetMs);
+    return { text: word.text, startMs: wordStart, endMs: Math.max(wordStart, clamp(word.endMs + offsetMs)) };
   });
 }
 

@@ -1,12 +1,14 @@
 import { AppError } from '../../shared/errors';
-import { SUBTITLE_FONT_FAMILIES, type SubtitlePresetId, type SubtitleStyle } from '../../shared/types/style';
-import type { CaptionRow, ProjectDocument, ProjectSource } from '../../shared/types/project';
+import { SUBTITLE_FONT_FAMILIES, WORD_HIGHLIGHT_MODES, type SubtitlePresetId, type SubtitleStyle } from '../../shared/types/style';
+import type { CaptionRow, CaptionWord, ProjectDocument, ProjectSource } from '../../shared/types/project';
 
 /** Project ids double as file names, so only this alphabet is allowed. */
 export const PROJECT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 export const MAX_CAPTIONS = 5000;
 export const MAX_CAPTION_TEXT = 2000;
+const MAX_CAPTION_WORDS = 1000;
+const MAX_WORD_TEXT = 200;
 const MAX_ID = 128;
 const MAX_PATH = 4096;
 const MAX_URL = 2048;
@@ -111,7 +113,25 @@ function readCaptions(doc: Reader, value: unknown): CaptionRow[] {
     if (input.translatedFrom !== undefined) {
       caption.translatedFrom = doc.string(input.translatedFrom, `${path}.translatedFrom`, MAX_CAPTION_TEXT, true);
     }
+    if (input.words !== undefined) {
+      caption.words = readWords(doc, input.words, `${path}.words`);
+    }
     return caption;
+  });
+}
+
+function readWords(doc: Reader, value: unknown, path: string): CaptionWord[] {
+  const rows = doc.array(value, path, MAX_CAPTION_WORDS);
+  return rows.map((row, index) => {
+    const wordPath = `${path}[${index}]`;
+    const input = doc.object(row, wordPath);
+    const startMs = doc.number(input.startMs, `${wordPath}.startMs`, { min: 0 });
+    const endMs = doc.number(input.endMs, `${wordPath}.endMs`, { min: startMs });
+    return {
+      text: doc.string(input.text, `${wordPath}.text`, MAX_WORD_TEXT),
+      startMs,
+      endMs
+    };
   });
 }
 
@@ -138,6 +158,12 @@ function readStyle(doc: Reader, value: unknown): SubtitleStyle {
   };
   if (input.presetId !== undefined) {
     style.presetId = doc.oneOf(input.presetId, PRESET_IDS, 'project.style.presetId');
+  }
+  if (input.wordHighlight !== undefined) {
+    style.wordHighlight = doc.oneOf(input.wordHighlight, WORD_HIGHLIGHT_MODES, 'project.style.wordHighlight');
+  }
+  if (input.highlightColor !== undefined) {
+    style.highlightColor = doc.color(input.highlightColor, 'project.style.highlightColor');
   }
   return style;
 }
