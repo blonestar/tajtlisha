@@ -126,6 +126,11 @@ export type TajtlishaApi = {
       videoHeight: number;
       text: string;
       style: SubtitleStyle;
+      /**
+       * Word lit at this frame when the style has word highlight on, as given by
+       * activeWordIndex() in src/shared/word-highlight.ts. -1 or missing = none.
+       */
+      activeWordIndex?: number;
     }): Promise<{ dataUrl: string }>;
   };
   workflow: {
