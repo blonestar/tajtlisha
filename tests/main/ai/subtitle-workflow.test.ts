@@ -135,6 +135,60 @@ describe('SubtitleWorkflowService.transcribe', () => {
     );
   });
 
+  it('converts Cyrillic transcription text to Latin when the language is sr-Latn', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'sr-Latn',
+        text: 'Љубав и џем.',
+        words: [
+          { text: 'Љубав', startMs: 0, endMs: 400 },
+          { text: 'и', startMs: 450, endMs: 500 },
+          { text: 'џем.', startMs: 550, endMs: 900 }
+        ]
+      }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Latn' }));
+
+    expect(result.captions[0].original).toBe('Ljubav i džem.');
+  });
+
+  it('labels an undetected Serbian Cyrillic transcript as sr-Latn and converts it', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({ language: 'und', text: 'Ово је кућа.', segments: [{ text: 'Ово је кућа.', startMs: 0, endMs: 800 }] }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest());
+
+    expect(result.language).toBe('sr-Latn');
+    expect(result.captions[0].original).toBe('Ovo je kuća.');
+  });
+
+  it('leaves an undetected Cyrillic transcript without Serbian-only letters unchanged', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({ language: 'und', text: 'Привет, мир.', segments: [{ text: 'Привет, мир.', startMs: 0, endMs: 800 }] }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest());
+
+    expect(result.language).toBe('und');
+    expect(result.captions[0].original).toBe('Привет, мир.');
+  });
+
+  it('keeps Cyrillic transcription text when the language is sr-Cyrl', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({ language: 'sr-Cyrl', text: 'Здраво', segments: [{ text: 'Здраво', startMs: 0, endMs: 800 }] }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Cyrl' }));
+
+    expect(result.captions[0].original).toBe('Здраво');
+  });
+
   it('falls back to segment timing when the provider returns no words', async () => {
     const registry = fakeRegistry({
       transcribe: vi.fn(async () => ({
@@ -327,6 +381,37 @@ describe('SubtitleWorkflowService.translate', () => {
     expect(result.translations.map((item) => item.id)).toEqual(captions.map((item) => item.id));
     expect(result.translations[84].text).toBe('TEXT 84');
     expect(progress.events.filter((event) => event.stage === 'translating').at(-1)).toEqual({ stage: 'translating', progress: 1 });
+  });
+
+  it('converts Cyrillic output to Latin for an sr-Latn target, also after polish', async () => {
+    const registry = fakeRegistry({
+      translateTexts: vi.fn(async (_providerId: string, request: ProviderTranslateRequest) =>
+        request.items.map((item) => ({ id: item.id, text: 'Здраво свете' }))
+      ),
+      polishTexts: vi.fn(async (_providerId: string, request: ProviderPolishRequest) =>
+        request.items.map((item) => ({ id: item.id, text: 'ЊУШКА' }))
+      )
+    } as never);
+    const { service } = createService({ registry });
+
+    const plain = await service.translate(translateRequest({ targetLanguage: 'sr-Latn' }));
+    const polished = await service.translate(translateRequest({ targetLanguage: 'sr-Latn', polish: 'conservative' }));
+
+    expect(plain.translations.map((item) => item.text)).toEqual(['Zdravo svete', 'Zdravo svete']);
+    expect(polished.translations.map((item) => item.text)).toEqual(['NJUŠKA', 'NJUŠKA']);
+  });
+
+  it('leaves Cyrillic output as is for an sr-Cyrl target', async () => {
+    const registry = fakeRegistry({
+      translateTexts: vi.fn(async (_providerId: string, request: ProviderTranslateRequest) =>
+        request.items.map((item) => ({ id: item.id, text: 'Здраво' }))
+      )
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.translate(translateRequest({ targetLanguage: 'sr-Cyrl' }));
+
+    expect(result.translations.map((item) => item.text)).toEqual(['Здраво', 'Здраво']);
   });
 
   it('retries once for only the missing ids', async () => {

@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+- Serbian captions came out in Cyrillic when Serbian (Latin) was selected. Transcription models often write Serbian
+  in Cyrillic, so transcripts, translations and polished text for Serbian (Latin) are now converted to Latin script.
+  A transcript whose language was not detected is treated as Serbian when it contains the letters ђ or ћ.
+
 ## [0.5.0] - 2026-10-25
 
 ### Added
