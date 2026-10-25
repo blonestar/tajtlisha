@@ -20,6 +20,7 @@ import { validatePath } from '../media/contracts';
 import { buildCaptionsFromSegments, buildCaptionsFromSpeechRegions, buildCaptionsFromWords, type CaptionBuildOptions, type CaptionDraft } from './caption-builder';
 import type { AiProviderRegistry } from './provider-registry';
 import type { ProviderTextItem, ProviderTranscribeResult } from './provider';
+import { looksLikeSerbianCyrillic, requiresSerbianLatin, serbianCyrillicToLatin } from './serbian-script';
 import { detectSpeechRegions } from './speech-regions';
 import { buildSummaryTranscript } from './text-prompts';
 
@@ -75,13 +76,15 @@ export class SubtitleWorkflowService {
 
       throwIfCanceled(context.signal);
       context.onProgress?.({ stage: 'transcribing' });
-      const transcription = await this.registry.transcribe(request.providerId, {
-        audioPath,
-        audioFormat: 'mp3',
-        modelId: request.modelId,
-        language: request.language,
-        signal: context.signal
-      });
+      const transcription = toRequestedScript(
+        await this.registry.transcribe(request.providerId, {
+          audioPath,
+          audioFormat: 'mp3',
+          modelId: request.modelId,
+          language: request.language,
+          signal: context.signal
+        })
+      );
 
       if (!transcription.text.trim()) {
         throw new AppError('NO_SPEECH');
@@ -133,7 +136,7 @@ export class SubtitleWorkflowService {
     );
 
     if (request.polish === 'none') {
-      return { translations: translated };
+      return { translations: toScript(translated, request.targetLanguage) };
     }
 
     const mode = request.polish;
@@ -149,7 +152,7 @@ export class SubtitleWorkflowService {
       })
     );
 
-    return { translations: polished };
+    return { translations: toScript(polished, request.targetLanguage) };
   }
 
   /**
@@ -294,6 +297,38 @@ export class SubtitleWorkflowService {
 
     return items.map((item) => ({ id: item.id, text: resolved.get(item.id) ?? '' }));
   }
+}
+
+/**
+ * Whisper and some text models write Serbian in Cyrillic even when Latin was
+ * asked for. Cyrillic to Latin is lossless, so sr-Latn output is converted here.
+ */
+function toRequestedScript(transcription: ProviderTranscribeResult): ProviderTranscribeResult {
+  // Models that do not report the detected language return 'und'. Serbian found
+  // that way is labeled sr-Latn, like whisper-1's detected "serbian".
+  const detectedSerbian = isUnknownLanguage(transcription.language) && looksLikeSerbianCyrillic(transcription.text);
+  const result = detectedSerbian ? { ...transcription, language: 'sr-Latn' } : transcription;
+  if (!requiresSerbianLatin(result.language)) return result;
+
+  const convert = <T extends { text: string }>(items: T[] | undefined): T[] | undefined =>
+    items?.map((item) => ({ ...item, text: serbianCyrillicToLatin(item.text) }));
+
+  return {
+    ...result,
+    text: serbianCyrillicToLatin(result.text),
+    ...(result.words ? { words: convert(result.words) } : {}),
+    ...(result.segments ? { segments: convert(result.segments) } : {})
+  };
+}
+
+function isUnknownLanguage(language: string): boolean {
+  const trimmed = language.trim();
+  return trimmed === '' || trimmed === 'und';
+}
+
+function toScript(items: ProviderTextItem[], language: string): ProviderTextItem[] {
+  if (!requiresSerbianLatin(language)) return items;
+  return items.map((item) => ({ ...item, text: serbianCyrillicToLatin(item.text) }));
 }
 
 function toSourceCaptions(drafts: CaptionDraft[], trim: TrimRange): CaptionRow[] {

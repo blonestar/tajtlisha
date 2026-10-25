@@ -43,9 +43,11 @@ export function buildTranslationInstructions(
     'Each input item is one on-screen caption.',
     layoutInstruction(input),
     'Return exactly one output item for each input id, with the same id. Do not merge or split items.',
-    'Write the target language in the script named in its label: sr-Latn is Serbian in Latin script, sr-Cyrl is Serbian in Cyrillic script.',
+    scriptInstruction(input.targetLanguage),
     'Return only the JSON object described by the schema.'
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function buildPolishInstructions(input: CaptionLimits & { language: string; mode: ProviderPolishMode }): string {
@@ -60,8 +62,11 @@ export function buildPolishInstructions(input: CaptionLimits & { language: strin
     'Each input item is one on-screen caption.',
     layoutInstruction(input),
     'Return exactly one output item for each input id, with the same id. Do not merge or split items.',
+    scriptInstruction(input.language),
     'Return only the JSON object described by the schema.'
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function buildCaptionItemsInput(items: ProviderTextItem[]): string {
@@ -112,6 +117,17 @@ function formatClockTime(ms: number): string {
   const seconds = String(totalSeconds % 60).padStart(2, '0');
 
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+/** Explicit script rule for Serbian targets; empty for other languages. */
+function scriptInstruction(language: string): string {
+  if (language === 'sr-Latn') {
+    return 'Write Serbian only in Latin script (with č, ć, š, ž, đ). Never use Cyrillic letters.';
+  }
+  if (language === 'sr-Cyrl') {
+    return 'Write Serbian only in Cyrillic script. Never use Latin letters for Serbian words.';
+  }
+  return '';
 }
 
 function layoutInstruction({ maxCharsPerLine, maxLinesPerCaption }: CaptionLimits): string {

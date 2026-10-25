@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSummaryTranscript } from '../../../src/main/ai/text-prompts';
+import { buildPolishInstructions, buildSummaryTranscript, buildTranslationInstructions } from '../../../src/main/ai/text-prompts';
 
 describe('buildSummaryTranscript', () => {
   it('starts with the language name and a blank line, then one timed line per segment', () => {
@@ -37,5 +37,28 @@ describe('buildSummaryTranscript', () => {
     const transcript = buildSummaryTranscript([{ startMs: 0, endMs: 1000, text: '  first line\r\n\n  second line  ' }], 'en');
 
     expect(transcript.split('\n')[2]).toBe('[0:00] first line second line');
+  });
+});
+
+describe('script instructions', () => {
+  const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
+
+  it('asks for Latin script for an sr-Latn translation and polish', () => {
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn' })).toContain(
+      'Never use Cyrillic letters.'
+    );
+    expect(buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'conservative' })).toContain(
+      'Never use Cyrillic letters.'
+    );
+  });
+
+  it('asks for Cyrillic script for an sr-Cyrl target', () => {
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Cyrl' })).toContain(
+      'Write Serbian only in Cyrillic script.'
+    );
+  });
+
+  it('adds no script rule for other languages', () => {
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'sr-Latn', targetLanguage: 'de' })).not.toMatch(/Never use/);
   });
 });
