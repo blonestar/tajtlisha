@@ -41,6 +41,8 @@ export type VideoPreviewProps = {
   trim: TrimRange;
   captionText: string | null;
   style: SubtitleStyle;
+  /** Word lit at the playhead when word highlight is on. -1 or missing means none. */
+  activeWordIndex?: number;
   /** Source-absolute time. Fires every animation frame while playing, and on seek and pause. */
   onTimeUpdate: (ms: number) => void;
   onPlayingChange: (playing: boolean) => void;
@@ -68,6 +70,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(fu
     trim,
     captionText,
     style,
+    activeWordIndex,
     exactFrame = null,
     onRequestExactFrame,
     onCloseExactFrame,
@@ -266,6 +269,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(fu
               style={style}
               frameWidth={frame.width}
               frameHeight={frame.height}
+              activeWordIndex={activeWordIndex}
             />
           )}
         </div>

@@ -5,7 +5,8 @@ import * as Switch from '@radix-ui/react-switch';
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.js';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.js';
 import { SUBTITLE_PRESETS, computeSubtitleGeometry } from '../../../../shared/subtitle-geometry';
-import type { SubtitlePresetId, SubtitleStyle } from '../../../../shared/types/style';
+import type { SubtitlePresetId, SubtitleStyle, WordHighlightMode } from '../../../../shared/types/style';
+import { resolveWordHighlight } from '../../../../shared/word-highlight';
 import { buildSubtitleBoxStyle, buildSubtitleTextStyle } from './subtitleStyles';
 import './preview.css';
 
@@ -45,6 +46,7 @@ export function StyleDrawer({
   const open = controlledOpen ?? uncontrolledOpen;
   const bodyId = useId();
   const outlineDisabled = style.backgroundEnabled;
+  const highlight = resolveWordHighlight(style);
   const presetIds = Object.keys(SUBTITLE_PRESETS) as SubtitlePresetId[];
 
   function toggle(): void {
@@ -186,6 +188,26 @@ export function StyleDrawer({
                 disabled={!style.backgroundEnabled}
                 onCommit={(percent) => onChange({ backgroundOpacity: percent / 100 })}
               />
+            </div>
+
+            <div className="style-group">
+              <SegmentedField<WordHighlightMode>
+                label={t('preview.wordHighlight')}
+                value={highlight.mode}
+                options={[
+                  { value: 'off', label: t('preview.wordHighlightOff') },
+                  { value: 'word', label: t('preview.wordHighlightWord') },
+                  { value: 'progressive', label: t('preview.wordHighlightProgressive') }
+                ]}
+                onChange={(wordHighlight) => onChange({ wordHighlight })}
+              />
+              <ColorField
+                label={t('preview.wordHighlightColor')}
+                value={highlight.color}
+                disabled={highlight.mode === 'off'}
+                onChange={(highlightColor) => onChange({ highlightColor })}
+              />
+              <p className="style-hint muted">{t('preview.wordHighlightHint')}</p>
             </div>
 
             <SegmentedField<SubtitleStyle['position']>
