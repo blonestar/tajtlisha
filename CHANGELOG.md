@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+- Word highlight: when the trim cuts a caption, the exported highlight now matches the preview; translucent
+  background boxes no longer show dark seams around the highlighted word; merging captions no longer gives a word
+  the time of a word deleted from the text.
+
 ## [0.6.0] - 2026-10-25
 
 ### Added
