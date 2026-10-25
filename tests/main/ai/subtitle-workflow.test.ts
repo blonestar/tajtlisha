@@ -320,6 +320,42 @@ describe('SubtitleWorkflowService.transcribe', () => {
     expect(stagesOf(progress.events)).toEqual(['extracting_audio', 'transcribing', 'detecting_speech']);
   });
 
+  it('keeps word times on each CaptionRow in source time, clamped to the caption', async () => {
+    // Trim 1000..5000 (4 s clip). The last word runs past the clip end, so its caption and word stop at 5000.
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'en',
+        text: 'Hello world. late',
+        words: [
+          { text: 'Hello', startMs: 0, endMs: 400 },
+          { text: 'world.', startMs: 500, endMs: 900 },
+          { text: 'late', startMs: 3900, endMs: 4500 }
+        ]
+      }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ trim: { startMs: 1000, endMs: 5000 } }));
+
+    expect(result.captions.map((caption) => [caption.startMs, caption.endMs])).toEqual([
+      [1000, 1900],
+      [4900, 5000]
+    ]);
+    expect(result.captions[0].words).toEqual([
+      { text: 'Hello', startMs: 1000, endMs: 1400 },
+      { text: 'world.', startMs: 1500, endMs: 1900 }
+    ]);
+    expect(result.captions[1].words).toEqual([{ text: 'late', startMs: 4900, endMs: 5000 }]);
+  });
+
+  it('leaves words off captions that have no word timing', async () => {
+    const { service } = createService();
+
+    const result = await service.transcribe(createRequest());
+
+    expect(result.captions[0]).not.toHaveProperty('words');
+  });
+
   it('clamps caption times inside the trimmed range', async () => {
     // A 9 s segment runs past the 4 s trim. Its captions must stay within 1000..5000.
     const registry = fakeRegistry({

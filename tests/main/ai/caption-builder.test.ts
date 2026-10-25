@@ -69,7 +69,7 @@ describe('buildCaptionsFromWords', () => {
     // Words start at 0, 400, 800 and last 200 ms each, so the caption ends at 1000.
     const captions = buildCaptionsFromWords(timedWords('Good morning everyone', 400), twoLines(42));
 
-    expect(captions).toEqual([{ startMs: 0, endMs: 1000, text: 'Good morning everyone' }]);
+    expect(withoutWords(captions)).toEqual([{ startMs: 0, endMs: 1000, text: 'Good morning everyone' }]);
   });
 
   it('never lets a line exceed maxCharsPerLine with one line per caption', () => {
@@ -181,7 +181,7 @@ describe('buildCaptionsFromWords', () => {
       { ...twoLines(42), clipDurationMs: 600 }
     );
 
-    expect(captions).toEqual([{ startMs: 0, endMs: 600, text: 'Late' }]);
+    expect(withoutWords(captions)).toEqual([{ startMs: 0, endMs: 600, text: 'Late' }]);
   });
 
   it('drops empty words and returns nothing for empty input', () => {
@@ -189,6 +189,54 @@ describe('buildCaptionsFromWords', () => {
     expect(buildCaptionsFromWords([{ text: '   ', startMs: 0, endMs: 100 }], twoLines(42))).toEqual([]);
   });
 });
+
+describe('word timing on drafts', () => {
+  it('attaches each caption its own words, sorted and inside the caption', () => {
+    const captions = buildCaptionsFromWords(timedWords('Good morning everyone', 400), twoLines(42));
+
+    expect(captions[0].words).toEqual([
+      { text: 'Good', startMs: 0, endMs: 200 },
+      { text: 'morning', startMs: 400, endMs: 600 },
+      { text: 'everyone', startMs: 800, endMs: 1000 }
+    ]);
+  });
+
+  it('keeps word times inside the caption after the clip clamp', () => {
+    const captions = buildCaptionsFromWords(
+      [
+        { text: 'Late', startMs: 0, endMs: 500 },
+        { text: 'again', startMs: 550, endMs: 900 }
+      ],
+      { ...twoLines(42), clipDurationMs: 600 }
+    );
+
+    expect(captions).toEqual([
+      {
+        startMs: 0,
+        endMs: 600,
+        text: 'Late again',
+        words: [
+          { text: 'Late', startMs: 0, endMs: 500 },
+          { text: 'again', startMs: 550, endMs: 600 }
+        ]
+      }
+    ]);
+  });
+
+  it('gives segment and speech-detection drafts no words', () => {
+    const fromSegments = buildCaptionsFromSegments([{ text: 'Hello world', startMs: 0, endMs: 1500 }], twoLines(42));
+    const fromSpeech = buildCaptionsFromSpeechRegions('Hello world again', [{ startMs: 0, endMs: 2000 }], twoLines(42));
+
+    for (const caption of [...fromSegments, ...fromSpeech]) {
+      expect(caption).not.toHaveProperty('words');
+    }
+  });
+});
+
+/** Drops word timing so the grouping and timing of a draft can be compared exactly. */
+function withoutWords(captions: CaptionDraft[]): Omit<CaptionDraft, 'words'>[] {
+  return captions.map(({ words: _words, ...caption }) => caption);
+}
 
 describe('buildCaptionsFromSegments', () => {
   it('keeps a segment that fits the limits as a single caption', () => {
