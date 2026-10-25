@@ -1,4 +1,4 @@
-import type { KeyboardEvent, MouseEvent, ReactElement, ReactNode } from 'react';
+import type { FocusEvent, KeyboardEvent, MouseEvent, ReactElement, ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import GitMerge from 'lucide-react/dist/esm/icons/git-merge.js';
@@ -9,8 +9,8 @@ import type { CaptionRow } from '../../../../shared/types/project';
 import { formatSeconds } from '../../utils/time';
 import { AutoGrowTextarea } from './AutoGrowTextarea';
 import { TimecodeField } from './TimecodeField';
-import { isBlockingIssue, issueLabelKey } from './issues';import './captions.css';
-
+import { isBlockingIssue, issueLabelKey } from './issues';
+import './captions.css';
 
 export type CaptionIssue = { code: string; overlapMs?: number };
 export type CaptionIssues = Record<string, CaptionIssue[]>;
@@ -44,7 +44,7 @@ export type CaptionTableProps = {
   emptyState?: ReactNode;
 };
 
-const EDITABLE_TAGS = ['INPUT', 'TEXTAREA', 'BUTTON'];
+const CONTROL_SELECTOR = 'input, textarea, button, select';
 
 function overlongLines(text: string, maxChars: number): Array<{ line: number; length: number }> {
   return text.split('\n').flatMap((line, index) =>
@@ -102,12 +102,26 @@ export function CaptionTable({
   }
 
   function handleRowClick(caption: CaptionRow, event: MouseEvent<HTMLTableRowElement>): void {
-    const target = event.target as HTMLElement;
-    // Focus already selects the row; clicks on controls must not seek.
-    if (EDITABLE_TAGS.includes(target.tagName)) return;
+    // Controls handle their own clicks; fields seek through focus instead.
+    if (event.target instanceof Element && event.target.closest(CONTROL_SELECTOR)) return;
 
     onSelect(caption.id);
     onSeek(caption.startMs);
+  }
+
+  function handleRowFocus(caption: CaptionRow, event: FocusEvent<HTMLTableRowElement>): void {
+    onSelect(caption.id);
+
+    // Entering a caption's text or time field moves the video to that caption. Moving between
+    // fields of the same row, or editing the caption already under the playhead, keeps the position.
+    const from = event.relatedTarget;
+    if (from instanceof Node && event.currentTarget.contains(from)) return;
+    if (caption.id === activeCaptionId) return;
+
+    const target = event.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      onSeek(caption.startMs);
+    }
   }
 
   function handleTextKeyDown(
@@ -195,7 +209,7 @@ export function CaptionTable({
                 data-row-id={caption.id}
                 aria-current={isActive ? 'true' : undefined}
                 onClick={(event) => handleRowClick(caption, event)}
-                onFocus={() => onSelect(caption.id)}
+                onFocus={(event) => handleRowFocus(caption, event)}
               >
                 <td className="caption-col-index">
                   <span className="caption-index">{index + 1}</span>

@@ -32,6 +32,16 @@ export const captionsStrings = {
     line: {
       tooLong: 'Line {{detail}} characters'
     },
+    shift: {
+      label: 'Shift all captions',
+      earlier: 'Earlier',
+      later: 'Later',
+      amount: 'Shift amount in seconds',
+      unit: 's',
+      earlierTooltip: 'Move all captions {{seconds}} s earlier',
+      laterTooltip: 'Move all captions {{seconds}} s later',
+      invalid: 'Enter seconds greater than 0, for example 0.5 or 1.5'
+    },
     actions: {
       insertAfter: 'Insert caption after',
       split: 'Split at playhead',
@@ -232,6 +242,16 @@ export const captionsStrings = {
     line: {
       tooLong: 'Red {{detail}} znakova'
     },
+    shift: {
+      label: 'Pomeri sve titlove',
+      earlier: 'Ranije',
+      later: 'Kasnije',
+      amount: 'Pomeraj u sekundama',
+      unit: 's',
+      earlierTooltip: 'Pomeri sve titlove {{seconds}} s ranije',
+      laterTooltip: 'Pomeri sve titlove {{seconds}} s kasnije',
+      invalid: 'Unesi broj sekundi veći od 0, na primer 0.5 ili 1.5'
+    },
     actions: {
       insertAfter: 'Dodaj titl posle',
       split: 'Podeli na poziciji reprodukcije',
@@ -431,6 +451,16 @@ export const captionsStrings = {
     },
     line: {
       tooLong: 'Ред {{detail}} знакова'
+    },
+    shift: {
+      label: 'Помери све титлове',
+      earlier: 'Раније',
+      later: 'Касније',
+      amount: 'Померај у секундама',
+      unit: 'с',
+      earlierTooltip: 'Помери све титлове {{seconds}} с раније',
+      laterTooltip: 'Помери све титлове {{seconds}} с касније',
+      invalid: 'Унеси број секунди већи од 0, на пример 0.5 или 1.5'
     },
     actions: {
       insertAfter: 'Додај титл после',

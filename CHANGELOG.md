@@ -7,9 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ## [Unreleased]
 
 ### Added
-- Video summary (optional, Settings > AI): a Summarize button in the editor sends the transcript to the active AI
+- Video summary (optional, Settings > Summary): a Summarize button in the editor sends the transcript to the active AI
   provider with your own system prompt, for example to get the point of a clip for a post. Choose the model per
   provider and the thinking effort; the result opens in a dialog where you can edit and copy it.
+- Shift all captions: a bar above the caption table moves every caption earlier or later by a typed number of
+  seconds (0.5 s by default). Durations and gaps stay the same, and one Undo reverts the shift.
+- Clicking into a caption's text or time field moves the video to that caption.
+- Clicking the video plays or pauses it.
+
+### Fixed
+- The video could not be moved to another position (clicking a caption, the trim bar or seek shortcuts left it
+  where it was): local video files are now served with byte-range support, so seeking works.
+- Clicking the icon of a caption row button no longer moves the video.
 
 ## [0.3.1] - 2026-10-25
 

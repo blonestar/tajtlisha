@@ -58,8 +58,8 @@ type StageSize = { width: number; height: number };
 
 /**
  * Video player with a subtitle layer over the displayed frame. Has no native
- * controls: transport lives in the bar below the frame. Playback stays inside
- * the trim range.
+ * controls: transport lives in the bar below the frame, and a click on the
+ * frame toggles playback. Playback stays inside the trim range.
  */
 export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(function VideoPreview(props, ref) {
   const { t } = useTranslation();
@@ -233,6 +233,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(fu
             src={source.fileUrl}
             preload="auto"
             playsInline
+            onClick={toggle}
             onPlay={() => setPlayingState(true)}
             onPause={() => {
               setPlayingState(false);

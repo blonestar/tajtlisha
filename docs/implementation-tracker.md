@@ -174,3 +174,5 @@ or update path.
   stacked under the sticky caption header (z-index), REASONING_UNSUPPORTED message when a model rejects the
   thinking effort, prompt/model drafts saved when Settings closes with Esc. Sol review: no P0/P1; four P2/P3 fixed
   (summary of the previous video kept, blank-prompt double write, model draft lost on Esc, stale error after retry).
+- 2026-10-25: Caption table follows the video: focusing a caption field seeks to it, a click on the video toggles
+  playback, and a "shift all captions" bar moves every caption earlier or later (one undo step). 445 renderer tests.
