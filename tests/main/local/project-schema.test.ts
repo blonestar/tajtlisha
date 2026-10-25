@@ -16,6 +16,10 @@ function validSource(): Record<string, unknown> {
   };
 }
 
+function captionWithWords(words: unknown[]): Record<string, unknown> {
+  return { id: 'c1', startMs: 0, endMs: 2000, original: 'Hello world', translation: '', words };
+}
+
 function validDocument(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     schemaVersion: 1,
@@ -104,9 +108,47 @@ describe('validateProjectDocument', () => {
     ['caption text too long', { captions: [{ id: 'c1', startMs: 0, endMs: 1, original: 'x'.repeat(2001), translation: '' }] }, 'project.captions[0].original'],
     ['caption with a non-string translation', { captions: [{ id: 'c1', startMs: 0, endMs: 1, original: '', translation: 3 }] }, 'project.captions[0].translation'],
     ['caption ending before it starts', { captions: [{ id: 'c1', startMs: 5, endMs: 1, original: '', translation: '' }] }, 'project.captions[0].endMs'],
-    ['unknown transcription timing', { transcription: { providerId: 'openai', timingSource: 'guess' } }, 'project.transcription.timingSource']
+    ['unknown transcription timing', { transcription: { providerId: 'openai', timingSource: 'guess' } }, 'project.transcription.timingSource'],
+    ['word with empty text', { captions: [captionWithWords([{ text: ' ', startMs: 0, endMs: 1 }])] }, 'project.captions[0].words[0].text'],
+    ['word text over 200 characters', { captions: [captionWithWords([{ text: 'x'.repeat(201), startMs: 0, endMs: 1 }])] }, 'project.captions[0].words[0].text'],
+    ['word with negative start', { captions: [captionWithWords([{ text: 'a', startMs: -1, endMs: 1 }])] }, 'project.captions[0].words[0].startMs'],
+    ['word ending before it starts', { captions: [captionWithWords([{ text: 'a', startMs: 500, endMs: 400 }])] }, 'project.captions[0].words[0].endMs'],
+    ['word with a non-finite end', { captions: [captionWithWords([{ text: 'a', startMs: 0, endMs: Number.POSITIVE_INFINITY }])] }, 'project.captions[0].words[0].endMs'],
+    ['words not an array', { captions: [{ ...captionWithWords([]), words: 'hello' }] }, 'project.captions[0].words'],
+    ['more than 1000 words', { captions: [captionWithWords(Array.from({ length: 1001 }, (_, i) => ({ text: 'a', startMs: i, endMs: i })))] }, 'project.captions[0].words'],
+    ['unknown word highlight mode', { style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'karaoke' } }, 'project.style.wordHighlight'],
+    ['highlight colour not hex', { style: { ...DEFAULT_SUBTITLE_STYLE, highlightColor: 'yellow' } }, 'project.style.highlightColor']
   ])('rejects %s', (_label, overrides, field) => {
     expect(() => validateProjectDocument(validDocument(overrides))).toThrow(`[UNKNOWN] invalid project: ${field}`);
+  });
+
+  it('keeps caption words and the highlight style through a JSON round trip', () => {
+    const input = validDocument({
+      captions: [captionWithWords([{ text: 'Hello', startMs: 1000, endMs: 1400 }, { text: 'world', startMs: 1500, endMs: 1900 }])],
+      style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'progressive', highlightColor: '#ffd400' }
+    });
+
+    const doc = validateProjectDocument(input);
+
+    expect(doc.captions[0].words).toEqual([
+      { text: 'Hello', startMs: 1000, endMs: 1400 },
+      { text: 'world', startMs: 1500, endMs: 1900 }
+    ]);
+    expect(doc.style.wordHighlight).toBe('progressive');
+    expect(doc.style.highlightColor).toBe('#ffd400');
+    expect(validateProjectDocument(JSON.parse(JSON.stringify(doc)))).toEqual(doc);
+  });
+
+  it('loads a legacy document without word timing or highlight fields, leaving them absent', () => {
+    const legacyStyle: Record<string, unknown> = { ...DEFAULT_SUBTITLE_STYLE };
+    delete legacyStyle.wordHighlight;
+    delete legacyStyle.highlightColor;
+
+    const doc = validateProjectDocument(validDocument({ style: legacyStyle }));
+
+    expect(doc.captions[0]).not.toHaveProperty('words');
+    expect(doc.style).not.toHaveProperty('wordHighlight');
+    expect(doc.style).not.toHaveProperty('highlightColor');
   });
 
   it('rejects values that are not objects at all', () => {

@@ -985,3 +985,136 @@ describe('revision mirror', () => {
     expect(state.project.captions[0].translatedFrom).toBe('Hello');
   });
 });
+
+describe('caption word timing', () => {
+  // Source-absolute word times for a caption that starts at 0 and spans 2000 ms.
+  const timedWords = [
+    { text: 'one', startMs: 100, endMs: 500 },
+    { text: 'two', startMs: 600, endMs: 900 },
+    { text: 'three', startMs: 1000, endMs: 1500 }
+  ];
+
+  function timed(id: string, startMs: number, endMs: number, words = timedWords): CaptionRow {
+    return { ...caption(id, startMs, endMs, 'one two three', ''), words };
+  }
+
+  it('caption/update moving both edges by the same delta shifts the words', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), {
+      type: 'caption/update',
+      id: 'a',
+      patch: { startMs: 200, endMs: 2200 }
+    });
+
+    expect(state.project.captions[0].words).toEqual([
+      { text: 'one', startMs: 300, endMs: 700 },
+      { text: 'two', startMs: 800, endMs: 1100 },
+      { text: 'three', startMs: 1200, endMs: 1700 }
+    ]);
+  });
+
+  it('caption/update changing only one edge keeps the words where they were', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), {
+      type: 'caption/update',
+      id: 'a',
+      patch: { endMs: 1800 }
+    });
+
+    expect(state.project.captions[0].words).toEqual(timedWords);
+  });
+
+  it('caption/update text edits keep the words', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), {
+      type: 'caption/update',
+      id: 'a',
+      patch: { original: 'one two three four' }
+    });
+
+    expect(state.project.captions[0].words).toEqual(timedWords);
+  });
+
+  it('caption/nudge moving the whole caption shifts the words by the applied shift', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), { type: 'caption/nudge', id: 'a', deltaMs: 300, edge: 'both' });
+
+    expect(state.project.captions[0].words?.map((word) => word.startMs)).toEqual([400, 900, 1300]);
+  });
+
+  it('caption/nudge clamped at zero shifts the words by the clamped amount only', () => {
+    const state = run(stateWith([timed('a', 100, 2100)]), { type: 'caption/nudge', id: 'a', deltaMs: -500, edge: 'both' });
+
+    expect(state.project.captions[0].startMs).toBe(0);
+    expect(state.project.captions[0].words?.map((word) => word.startMs)).toEqual([0, 500, 900]);
+  });
+
+  it('caption/nudge on a single edge keeps the words', () => {
+    const start = run(stateWith([timed('a', 0, 2000)]), { type: 'caption/nudge', id: 'a', deltaMs: 300, edge: 'start' });
+    const end = run(stateWith([timed('a', 0, 2000)]), { type: 'caption/nudge', id: 'a', deltaMs: 300, edge: 'end' });
+
+    expect(start.project.captions[0].words).toEqual(timedWords);
+    expect(end.project.captions[0].words).toEqual(timedWords);
+  });
+
+  it('captions/shiftAll shifts the words of every caption by the applied shift', () => {
+    const state = run(stateWith([timed('a', 300, 2300), caption('b', 3000, 4000)]), {
+      type: 'captions/shiftAll',
+      deltaMs: -1000
+    });
+
+    // The first caption starts at 300, so the shift stops at -300.
+    expect(state.project.captions[0].startMs).toBe(0);
+    expect(state.project.captions[0].words?.map((word) => word.startMs)).toEqual([0, 300, 700]);
+    expect(state.project.captions[1]).not.toHaveProperty('words');
+    expect(state.project.captions[1].startMs).toBe(2700);
+  });
+
+  it('caption/split gives each part the words that start in it', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), { type: 'caption/split', id: 'a', atMs: 800 });
+    const [first, second] = state.project.captions;
+
+    expect(first.words).toEqual(timedWords.slice(0, 2));
+    expect(second.words).toEqual([timedWords[2]]);
+  });
+
+  it('caption/split omits the words key on a part that has none', () => {
+    const state = run(stateWith([timed('a', 0, 2000)]), { type: 'caption/split', id: 'a', atMs: 50 });
+    const [first, second] = state.project.captions;
+
+    expect(first).not.toHaveProperty('words');
+    expect(second.words).toEqual(timedWords);
+  });
+
+  it('caption/split leaves captions without words without a words key', () => {
+    const state = run(stateWith([caption('a', 0, 2000)]), { type: 'caption/split', id: 'a', atMs: 800 });
+
+    expect(state.project.captions[0]).not.toHaveProperty('words');
+    expect(state.project.captions[1]).not.toHaveProperty('words');
+  });
+
+  it('caption/mergeWithNext concatenates the word lists in order', () => {
+    const later: CaptionRow = { ...caption('b', 2000, 3000, 'four', ''), words: [{ text: 'four', startMs: 2100, endMs: 2500 }] };
+    const state = run(stateWith([timed('a', 0, 2000), later]), { type: 'caption/mergeWithNext', id: 'a' });
+
+    expect(state.project.captions).toHaveLength(1);
+    expect(state.project.captions[0].words).toEqual([...timedWords, { text: 'four', startMs: 2100, endMs: 2500 }]);
+  });
+
+  it('caption/mergeWithNext omits the words key when neither caption has words', () => {
+    const state = run(stateWith([caption('a', 0, 1000), caption('b', 1000, 2000)]), {
+      type: 'caption/mergeWithNext',
+      id: 'a'
+    });
+
+    expect(state.project.captions[0]).not.toHaveProperty('words');
+  });
+
+  it('caption/insert creates a caption without words', () => {
+    const state = run(stateWith([]), { type: 'caption/insert', atMs: 1000 });
+
+    expect(state.project.captions[0]).not.toHaveProperty('words');
+  });
+
+  it('captions/replaceAll keeps the words it receives', () => {
+    const state = run(stateWith([]), { type: 'captions/replaceAll', captions: [timed('a', 0, 2000)] });
+
+    expect(state.project.captions[0].words).toEqual(timedWords);
+  });
+});

@@ -1,6 +1,18 @@
 import type { SubtitleStyle } from './style';
 
 /**
+ * One spoken word of a caption's `original` text, with SOURCE-absolute times.
+ * Comes from a word-timestamp transcription. The text may drift from the
+ * caption after manual edits; `timeCaptionWords` in src/shared/word-highlight.ts
+ * re-aligns them, so never assume a 1:1 match.
+ */
+export type CaptionWord = {
+  text: string;
+  startMs: number;
+  endMs: number;
+};
+
+/**
  * One caption = one shared timing pair with the original text and its
  * translation. Times are absolute positions in the SOURCE video (not trimmed
  * timeline). Export shifts them so the trimmed output starts at 00:00:00.
@@ -20,6 +32,12 @@ export type CaptionRow = {
    * instead of clearing so manual translation fixes are never thrown away.
    */
   translatedFrom?: string;
+  /**
+   * Timed words of `original`, sorted by startMs. Absent when the transcription
+   * had no word timing or the caption was added by hand. Used only for word
+   * highlighting; caption timing is always startMs/endMs.
+   */
+  words?: CaptionWord[];
 };
 
 export type ProjectSource = {

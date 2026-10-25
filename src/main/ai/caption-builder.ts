@@ -20,6 +20,11 @@ export type CaptionDraft = {
   startMs: number;
   endMs: number;
   text: string;
+  /**
+   * Timed words of `text`, sorted and inside [startMs, endMs]. Only word-timed
+   * transcription sets them; segment and speech-detection drafts have none.
+   */
+  words?: TimedSpan[];
 };
 
 export type CaptionLimits = {
@@ -50,7 +55,10 @@ type Token = {
 /** Groups timed words into captions. Words are sorted and overlaps are clamped. */
 export function buildCaptionsFromWords(words: TimedSpan[], options: CaptionBuildOptions): CaptionDraft[] {
   const tokens = normalizeTokens(words);
-  const drafts = chunkTokens(tokens, options, true).map(captionFromTokens(options));
+  const drafts = chunkTokens(tokens, options, true).map((group) => ({
+    ...captionFromTokens(options)(group),
+    words: group.map((token) => ({ text: token.text, startMs: token.startMs, endMs: token.endMs }))
+  }));
   return finalizeDrafts(drafts, options);
 }
 
@@ -267,11 +275,25 @@ function finalizeDrafts(drafts: CaptionDraft[], options: CaptionBuildOptions): C
     }
 
     if (endMs > startMs) {
-      result.push({ startMs, endMs, text: draft.text });
+      result.push({
+        startMs,
+        endMs,
+        text: draft.text,
+        ...(draft.words ? { words: clampWords(draft.words, startMs, endMs) } : {})
+      });
     }
   });
 
   return result;
+}
+
+/** Keeps word times inside the final caption range. Clamping never reorders sorted words. */
+function clampWords(words: TimedSpan[], startMs: number, endMs: number): TimedSpan[] {
+  const clamp = (value: number): number => Math.min(endMs, Math.max(startMs, value));
+  return words.map((word) => {
+    const wordStart = clamp(word.startMs);
+    return { text: word.text, startMs: wordStart, endMs: Math.max(wordStart, clamp(word.endMs)) };
+  });
 }
 
 function normalizeTokens(words: TimedSpan[]): Token[] {

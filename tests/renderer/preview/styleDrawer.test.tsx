@@ -172,3 +172,50 @@ describe('StyleDrawer', () => {
     expect(container.querySelector('.style-drawer')).not.toHaveClass('style-drawer-sized');
   });
 });
+
+describe('StyleDrawer word highlight', () => {
+  it('sends the chosen highlight mode as a single field patch', () => {
+    const { props } = renderDrawer();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Current word' }));
+    expect(props.onChange).toHaveBeenLastCalledWith({ wordHighlight: 'word' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Spoken words' }));
+    expect(props.onChange).toHaveBeenLastCalledWith({ wordHighlight: 'progressive' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Off' }));
+    expect(props.onChange).toHaveBeenLastCalledWith({ wordHighlight: 'off' });
+  });
+
+  it('disables the highlight color while highlight is off', () => {
+    renderDrawer({ style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'off' } });
+
+    expect(screen.getByLabelText('Highlight color')).toBeDisabled();
+  });
+
+  it('enables the highlight color when a mode is on and sends its change', () => {
+    const { props } = renderDrawer({
+      style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'word', highlightColor: '#ffd400' }
+    });
+
+    const color = screen.getByLabelText('Highlight color');
+    expect(color).toBeEnabled();
+    expect(color).toHaveValue('#ffd400');
+
+    fireEvent.change(color, { target: { value: '#00ff00' } });
+    expect(props.onChange).toHaveBeenLastCalledWith({ highlightColor: '#00ff00' });
+  });
+
+  it('shows the default highlight color when the style has none', () => {
+    renderDrawer({ style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'word', highlightColor: undefined } });
+
+    expect(screen.getByLabelText('Highlight color')).toHaveValue('#ffd400');
+  });
+
+  it('marks the active highlight mode as pressed', () => {
+    renderDrawer({ style: { ...DEFAULT_SUBTITLE_STYLE, wordHighlight: 'progressive' } });
+
+    expect(screen.getByRole('button', { name: 'Spoken words' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'false');
+  });
+});

@@ -136,6 +136,148 @@ describe('ASS document', () => {
   });
 });
 
+describe('ASS word highlight', () => {
+  const HIGHLIGHT = '{\\c&H00D4FF&}'; // #ffd400 (the default highlight colour) in BBGGRR
+  const RESET = '{\\r}';
+  const wordStyle = (wordHighlight: SubtitleStyle['wordHighlight']): SubtitleStyle => ({ ...DEFAULT_SUBTITLE_STYLE, wordHighlight });
+  const timedWords = [
+    { text: 'Hello', startMs: 0, endMs: 400 },
+    { text: 'big', startMs: 400, endMs: 800 },
+    { text: 'world', startMs: 800, endMs: 1200 }
+  ];
+
+  it('is byte-identical to the plain export when highlight is off, whatever words are given', () => {
+    const plain = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world' }],
+      style: DEFAULT_SUBTITLE_STYLE,
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+    const withWords = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world', words: timedWords, activeWordIndex: 1 }],
+      style: wordStyle('off'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(withWords).toBe(plain);
+  });
+
+  it('writes one event per interval in word mode, coloring only the spoken word', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world', words: timedWords }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([
+      `Dialogue: 0,0:00:00.00,0:00:00.40,Default,,0,0,0,,${HIGHLIGHT}Hello${RESET} big world`,
+      `Dialogue: 0,0:00:00.40,0:00:00.80,Default,,0,0,0,,Hello ${HIGHLIGHT}big${RESET} world`,
+      `Dialogue: 0,0:00:00.80,0:00:01.20,Default,,0,0,0,,Hello big ${HIGHLIGHT}world${RESET}`
+    ]);
+  });
+
+  it('keeps every word up to the spoken one colored in progressive mode', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world', words: timedWords }],
+      style: wordStyle('progressive'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([
+      `Dialogue: 0,0:00:00.00,0:00:00.40,Default,,0,0,0,,${HIGHLIGHT}Hello${RESET} big world`,
+      `Dialogue: 0,0:00:00.40,0:00:00.80,Default,,0,0,0,,${HIGHLIGHT}Hello${RESET} ${HIGHLIGHT}big${RESET} world`,
+      `Dialogue: 0,0:00:00.80,0:00:01.20,Default,,0,0,0,,${HIGHLIGHT}Hello${RESET} ${HIGHLIGHT}big${RESET} ${HIGHLIGHT}world${RESET}`
+    ]);
+  });
+
+  it('writes one event for the whole caption when an active word index is given', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1000, text: 'Hello big world', words: timedWords, activeWordIndex: 1 }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hello ${HIGHLIGHT}big${RESET} world`]);
+  });
+
+  it('colors nothing when the active index is -1', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1000, text: 'Hello big world', activeWordIndex: -1 }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual(['Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hello big world']);
+  });
+
+  it('cannot let braces or backslashes in the text inject override tags', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1000, text: 'Hi {\\an8}there', activeWordIndex: 1 }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    const [line] = dialogueLines(doc);
+    expect(line).toBe(`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hi ${HIGHLIGHT}(⧵an8)there${RESET}`);
+    // Only our own colour override and reset may appear as tags.
+    expect(line.match(/\{[^}]*\}/g)).toEqual([HIGHLIGHT, RESET]);
+  });
+
+  it('keeps explicit line breaks as \\N and colors words on the second line', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1000, text: 'Hello big\nworld', activeWordIndex: 2 }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hello big\\N${HIGHLIGHT}world${RESET}`]);
+  });
+
+  it('skips an interval that rounds to zero length in centiseconds', () => {
+    const doc = buildAssDocument({
+      captions: [
+        {
+          startMs: 0,
+          endMs: 1000,
+          text: 'Hello big',
+          words: [
+            { text: 'Hello', startMs: 0, endMs: 2 },
+            { text: 'big', startMs: 2, endMs: 1000 }
+          ]
+        }
+      ],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hello ${HIGHLIGHT}big${RESET}`]);
+  });
+
+  it('uses the highlight colour from the style, in ASS colour order', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1000, text: 'Hi there', activeWordIndex: 0 }],
+      style: { ...wordStyle('word'), highlightColor: '#112233' },
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\\c&H332211&}Hi${RESET} there`]);
+  });
+});
+
+/** The Dialogue lines of an ASS document, in order. */
+function dialogueLines(doc: string): string[] {
+  return doc.split('\n').filter((line) => line.startsWith('Dialogue:'));
+}
+
 /** Returns the Style line as a field map keyed by the Format line names. */
 function styleLine(doc: string): Record<string, string> {
   const format = doc.split('\n').find((line) => line.startsWith('Format: Name, Fontname'));

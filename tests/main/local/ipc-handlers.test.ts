@@ -725,6 +725,39 @@ describe('project:save and project:loadLast', () => {
     expect(renderPreviewFrame).not.toHaveBeenCalled();
   });
 
+  it('accepts activeWordIndex only as an integer of -1 or more, and leaves it absent when not sent', async () => {
+    const ipc = fakeIpc();
+    const renderPreviewFrame = vi.fn(async (_request: Record<string, unknown>) => ({ dataUrl: 'data:image/png;base64,' }));
+    registerProjectIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      dialogs: fakeDialogs(),
+      mediaService: { probe: vi.fn(), createPreviewProxy: vi.fn() } as never,
+      projectStore: { loadLast: vi.fn(), save: vi.fn() } as never,
+      previewProxies: { get: vi.fn() } as never,
+      exporter: { renderPreviewFrame } as never,
+      createVideoUrl: fakeVideoUrl,
+      strings: async () => ENGLISH,
+      sources: sourcesWith('/videos/clip.mkv')
+    });
+    const frame = { inputPath: '/videos/clip.mkv', atMs: 0, videoWidth: 2, videoHeight: 2, text: 'x', style: DEFAULT_SUBTITLE_STYLE };
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: 2 });
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: -1 });
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), frame);
+
+    expect(renderPreviewFrame.mock.calls[0]?.[0]).toMatchObject({ activeWordIndex: 2 });
+    expect(renderPreviewFrame.mock.calls[1]?.[0]).toMatchObject({ activeWordIndex: -1 });
+    expect(renderPreviewFrame.mock.calls[2]?.[0]).not.toHaveProperty('activeWordIndex');
+
+    for (const bad of [1.5, -2, '1', null, Number.NaN]) {
+      await expect(ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, activeWordIndex: bad })).rejects.toThrow(
+        '[UNKNOWN] activeWordIndex must be an integer of -1 or more.'
+      );
+    }
+    expect(renderPreviewFrame).toHaveBeenCalledTimes(3);
+  });
+
   it('gives the preview cache the source size and mtime as its fingerprint', async () => {
     const ipc = fakeIpc();
     const get = vi.fn(async (_input: string, _fingerprint: unknown, _create: unknown) => '/tmp/preview.mp4');
