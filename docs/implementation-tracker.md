@@ -165,3 +165,4 @@ or update path.
 - 2026-10-25: v0.3.1 released (clean plain-text release notes).
 - 2026-10-25: Caption table follows the video: focusing a caption field seeks to it, a click on the video toggles
   playback, and a "shift all captions" bar moves every caption earlier or later (one undo step). 445 renderer tests.
+- 2026-10-25: v0.4.0 released (caption click seeks, click-to-play, shift all captions, seeking fixed).
