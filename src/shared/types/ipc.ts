@@ -42,6 +42,7 @@ export const IPC_CHANNELS = {
   aiListModels: 'ai:listModels',
 
   projectSelectVideo: 'project:selectVideo',
+  projectOpenDroppedVideo: 'project:openDroppedVideo',
   projectLoadLast: 'project:loadLast',
   projectSave: 'project:save',
   projectCreatePreviewProxy: 'project:createPreviewProxy',
@@ -102,6 +103,12 @@ export type TajtlishaApi = {
   project: {
     /** Opens a file dialog and probes the video. Null when canceled. */
     selectVideo(): Promise<ProjectSource | null>;
+    /**
+     * Probes a video the user dropped onto the window. The preload resolves the
+     * OS path of the File (webUtils), so the renderer never supplies a path itself.
+     * Rejects when the file is not a supported video.
+     */
+    openDroppedVideo(file: File): Promise<ProjectSource>;
     /**
      * Last opened project, or null when none was saved. Returned even when the
      * source video is missing so captions are never lost (relink via selectVideo).

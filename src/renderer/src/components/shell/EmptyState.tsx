@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next';
 import CircleAlert from 'lucide-react/dist/esm/icons/circle-alert.js';
 import CircleCheck from 'lucide-react/dist/esm/icons/circle-check.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
+import { SUPPORTED_FORMATS } from '../../../../shared/video-formats';
 import type { FfmpegStatusState } from '../../hooks/useFfmpegStatus';
 import { withShortcut } from './TopBar';
-
-/** Container formats the open dialog offers. Shown as-is: they are file extensions, not translatable text. */
-export const SUPPORTED_FORMATS = 'MP4, M4V, MOV, MKV, WebM';
 
 export type EmptyStateProps = {
   onOpenVideo: () => void;
@@ -73,6 +71,7 @@ export function EmptyState({ onOpenVideo, ffmpeg }: EmptyStateProps): ReactEleme
           <FolderOpen aria-hidden="true" size={18} />
           {t('shell.top.openVideo')}
         </button>
+        <p className="empty-drop muted">{t('shell.empty.dropHint')}</p>
 
         <ol className="empty-steps">
           <li>{t('shell.empty.step1')}</li>

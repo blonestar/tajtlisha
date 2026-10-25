@@ -1,6 +1,8 @@
+import { isAbsolute } from 'node:path';
 import { AppError } from '../../shared/errors';
 import { IPC_CHANNELS } from '../../shared/types/ipc';
 import type { ProjectSource } from '../../shared/types/project';
+import { isSupportedVideoPath, VIDEO_EXTENSIONS } from '../../shared/video-formats';
 import type { PreviewFrameRequest, PreviewFrameResult, ProjectExportService } from '../export';
 import type { MediaService } from '../media';
 import { type JobRegistry, runJob } from '../jobs/job-registry';
@@ -34,9 +36,6 @@ export type ProjectIpcDeps = {
   statFile?: StatFile;
 };
 
-/** Extensions Chromium may or may not decode; files Chromium cannot play go through the preview proxy. */
-const VIDEO_EXTENSIONS = ['mp4', 'm4v', 'mov', 'mkv', 'webm'];
-
 export function registerProjectIpc({
   ipc,
   jobs,
@@ -55,10 +54,32 @@ export function registerProjectIpc({
     const result = await dialogs.showOpenDialog({
       title: s.selectVideoTitle,
       properties: ['openFile'],
-      filters: [{ name: s.videoFilterName, extensions: VIDEO_EXTENSIONS }]
+      filters: [{ name: s.videoFilterName, extensions: [...VIDEO_EXTENSIONS] }]
     });
     const inputPath = result.canceled ? undefined : result.filePaths[0];
     if (!inputPath) return null;
+
+    const source = await buildProjectSource(inputPath);
+    sources.remember(inputPath);
+    return source;
+  });
+
+  /**
+   * Opens a video dropped onto the window. The path comes from the renderer's
+   * File via webUtils in preload, so it is an OS path, never a renderer guess.
+   */
+  ipc.handle(IPC_CHANNELS.projectOpenDroppedVideo, async (_event, payload: unknown) => {
+    const inputPath = requireString(payload, 'path');
+    if (!isAbsolute(inputPath)) {
+      throw new AppError('UNKNOWN', 'The dropped file path must be absolute.');
+    }
+    if (!isSupportedVideoPath(inputPath)) {
+      throw new AppError('UNKNOWN', 'The dropped file is not a supported video.');
+    }
+    const stats = await statFile(inputPath);
+    if (!stats.isFile) {
+      throw new AppError('UNKNOWN', 'The dropped item is not a file.');
+    }
 
     const source = await buildProjectSource(inputPath);
     sources.remember(inputPath);

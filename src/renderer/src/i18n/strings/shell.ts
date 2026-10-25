@@ -43,7 +43,8 @@ export const shellStrings = {
       step1: 'Open a short video and trim the start and end if needed.',
       step2: 'Transcribe the speech, then translate the captions.',
       step3: 'Check the timing, style the text and export.',
-      formats: 'Supported formats'
+      formats: 'Supported formats',
+      dropHint: 'or drag a video file here'
     },
     ffmpeg: {
       checking: 'Checking FFmpeg…',
@@ -64,7 +65,8 @@ export const shellStrings = {
     },
     confirm: {
       openVideoTitle: 'Open another video?',
-      openVideoBody: 'The {{count}} current captions belong to the old video and will be removed.',
+      openVideoBody: 'The current video, its {{count}} captions and their translations will be discarded.',
+      openVideoBodyNoCaptions: 'The current video and its trim will be replaced.',
       openVideoAction: 'Open video',
       transcribeTitle: 'Transcribe again?',
       transcribeBody: 'The {{count}} existing captions will be replaced by the new transcript. Their translations are lost too.',
@@ -73,6 +75,11 @@ export const shellStrings = {
       replaceEditedBody: 'You edited captions while transcription was running. The new transcript replaces them.',
       replaceAction: 'Replace',
       cancel: 'Cancel'
+    },
+    drop: {
+      title: 'Drop the video to open it',
+      replaceHint: 'The current project will be replaced after you confirm.',
+      unsupported: 'Only video files can be opened ({{formats}}).'
     },
     result: {
       transcribed: 'Created {{count}} captions.',
@@ -158,7 +165,8 @@ export const shellStrings = {
       step1: 'Otvori kratak video i po potrebi skrati početak i kraj.',
       step2: 'Transkribuj govor, pa prevedi titlove.',
       step3: 'Proveri vreme, stil titla i izvezi rezultat.',
-      formats: 'Podržani formati'
+      formats: 'Podržani formati',
+      dropHint: 'ili prevuci video fajl ovde'
     },
     ffmpeg: {
       checking: 'Provera FFmpeg-a…',
@@ -179,7 +187,8 @@ export const shellStrings = {
     },
     confirm: {
       openVideoTitle: 'Otvoriti drugi video?',
-      openVideoBody: 'Trenutnih {{count}} titlova pripada starom videu i biće uklonjeni.',
+      openVideoBody: 'Trenutni video, njegovih {{count}} titlova i njihovi prevodi biće odbačeni.',
+      openVideoBodyNoCaptions: 'Trenutni video i njegovo skraćivanje biće zamenjeni.',
       openVideoAction: 'Otvori video',
       transcribeTitle: 'Transkribovati ponovo?',
       transcribeBody: 'Postojećih {{count}} titlova biće zamenjeno novom transkripcijom. Prevodi se gube.',
@@ -188,6 +197,11 @@ export const shellStrings = {
       replaceEditedBody: 'Menjao si titlove dok je transkripcija radila. Novi rezultat ih zamenjuje.',
       replaceAction: 'Zameni',
       cancel: 'Otkaži'
+    },
+    drop: {
+      title: 'Prevuci video ovde da ga otvoriš',
+      replaceHint: 'Trenutni projekat biće zamenjen kada potvrdiš.',
+      unsupported: 'Mogu da se otvore samo video fajlovi ({{formats}}).'
     },
     result: {
       transcribed: 'Napravljeno titlova: {{count}}.',
@@ -273,7 +287,8 @@ export const shellStrings = {
       step1: 'Отвори кратак видео и по потреби скрати почетак и крај.',
       step2: 'Транскрибуј говор, па преведи титлове.',
       step3: 'Провери време, стил титла и извези резултат.',
-      formats: 'Подржани формати'
+      formats: 'Подржани формати',
+      dropHint: 'или превуци видео фајл овде'
     },
     ffmpeg: {
       checking: 'Провера FFmpeg-а…',
@@ -294,7 +309,8 @@ export const shellStrings = {
     },
     confirm: {
       openVideoTitle: 'Отворити други видео?',
-      openVideoBody: 'Тренутних {{count}} титлова припада старом видеу и биће уклоњени.',
+      openVideoBody: 'Тренутни видео, његових {{count}} титлова и њихови преводи биће одбачени.',
+      openVideoBodyNoCaptions: 'Тренутни видео и његово скраћивање биће замењени.',
       openVideoAction: 'Отвори видео',
       transcribeTitle: 'Транскрибовати поново?',
       transcribeBody: 'Постојећих {{count}} титлова биће замењено новом транскрипцијом. Преводи се губе.',
@@ -303,6 +319,11 @@ export const shellStrings = {
       replaceEditedBody: 'Мењао си титлове док је транскрипција радила. Нови резултат их замењује.',
       replaceAction: 'Замени',
       cancel: 'Откажи'
+    },
+    drop: {
+      title: 'Превуци видео овде да га отвориш',
+      replaceHint: 'Тренутни пројекат биће замењен када потврдиш.',
+      unsupported: 'Могу да се отворе само видео фајлови ({{formats}}).'
     },
     result: {
       transcribed: 'Направљено титлова: {{count}}.',

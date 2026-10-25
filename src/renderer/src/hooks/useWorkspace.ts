@@ -7,6 +7,7 @@ import type { ProviderStatus } from '../../../shared/types/ai';
 import type { AppSettings } from '../../../shared/types/settings';
 import type { GenerateProviderInfo } from '../components/workflow/GeneratePanel';
 import type { SummaryResult } from '../components/workflow/SummaryDialog';
+import { isSupportedVideoPath, SUPPORTED_FORMATS } from '../../../shared/video-formats';
 import { rowsNeedingTranslation } from '../state/selectors';
 import type { ProjectStore } from '../state/useProjectStore';
 import { captureJobContext, isContextCurrent, type JobRunner } from '../state/useJobRunner';
@@ -59,8 +60,10 @@ export type Workspace = {
   summarize: () => void;
   /** Opens the dialog for the summary that already exists. */
   openSummary: () => void;
-  /** Opens a video. Asks first when captions would be dropped. */
+  /** Opens a video. Asks first when a video is loaded or captions exist, because both are replaced. */
   openVideo: () => void;
+  /** Opens a video dropped on the window, with the same confirmation as openVideo. Other files get an error notice. */
+  openDroppedVideo: (file: File) => void;
   /** Picks the replacement for a missing or changed video. Captions stay. */
   relinkVideo: () => void;
   /** Called by the preview on a media error. Code 4 starts a preview proxy job. */
@@ -129,11 +132,11 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     [t]
   );
 
-  const chooseSource = useCallback(
-    async (mode: 'open' | 'relink') => {
-      if (!api) return;
+  /** The one place a picked or dropped video reaches the project. Captions are kept only for relink. */
+  const applySource = useCallback(
+    async (mode: 'open' | 'relink', pick: () => Promise<ProjectSource | null>) => {
       try {
-        const source: ProjectSource | null = await api.project.selectVideo();
+        const source = await pick();
         if (!source) return;
         dispatch(mode === 'open' ? { type: 'source/set', source } : { type: 'source/relink', source });
         setNotice(null);
@@ -141,23 +144,52 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
         setNotice(noticeFromError(error));
       }
     },
-    [api, dispatch, noticeFromError]
+    [dispatch, noticeFromError]
   );
 
-  const openVideo = useCallback(() => {
-    const current = projectRef.current;
-    const open = () => void chooseSource('open');
-    if (current.captions.length === 0) {
-      open();
-      return;
-    }
-    setConfirm({
-      title: t('shell.confirm.openVideoTitle'),
-      description: t('shell.confirm.openVideoBody', { count: current.captions.length }),
-      confirmLabel: t('shell.confirm.openVideoAction'),
-      onConfirm: open
-    });
-  }, [chooseSource, t]);
+  const chooseSource = useCallback(
+    (mode: 'open' | 'relink') => {
+      if (!api) return;
+      void applySource(mode, () => api.project.selectVideo());
+    },
+    [api, applySource]
+  );
+
+  /** Runs `replace` now, or after the user confirms when a video is loaded or captions exist. */
+  const confirmReplacement = useCallback(
+    (replace: () => void) => {
+      const current = projectRef.current;
+      if (current.source === null && current.captions.length === 0) {
+        replace();
+        return;
+      }
+      const count = current.captions.length;
+      setConfirm({
+        title: t('shell.confirm.openVideoTitle'),
+        description:
+          count > 0
+            ? t('shell.confirm.openVideoBody', { count })
+            : t('shell.confirm.openVideoBodyNoCaptions'),
+        confirmLabel: t('shell.confirm.openVideoAction'),
+        onConfirm: replace
+      });
+    },
+    [t]
+  );
+
+  const openVideo = useCallback(() => confirmReplacement(() => chooseSource('open')), [chooseSource, confirmReplacement]);
+
+  const openDroppedVideo = useCallback(
+    (file: File) => {
+      if (!api) return;
+      if (!isSupportedVideoPath(file.name)) {
+        setNotice({ tone: 'error', text: t('shell.drop.unsupported', { formats: SUPPORTED_FORMATS }) });
+        return;
+      }
+      confirmReplacement(() => void applySource('open', () => api.project.openDroppedVideo(file)));
+    },
+    [api, applySource, confirmReplacement, t]
+  );
 
   const relinkVideo = useCallback(() => void chooseSource('relink'), [chooseSource]);
 
@@ -426,6 +458,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     summarize,
     openSummary,
     openVideo,
+    openDroppedVideo,
     relinkVideo,
     reportPlaybackError
   };
