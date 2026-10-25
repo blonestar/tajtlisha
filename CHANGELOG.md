@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
 ### Added
 - Video summary (optional, Settings > Summary): a Summarize button in the editor sends the transcript to the active AI
   provider with your own system prompt, for example to get the point of a clip for a post. Choose the model per
@@ -103,7 +105,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.4.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.5.0...develop
+[0.5.0]: https://github.com/blonestar/tajtlisha/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/blonestar/tajtlisha/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/blonestar/tajtlisha/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/blonestar/tajtlisha/compare/v0.2.1...v0.3.0
