@@ -2,6 +2,7 @@ import type { AppSettings } from '../../../src/shared/types/settings';
 import type { ProviderStatus } from '../../../src/shared/types/ai';
 import type { CaptionRow, ProjectDocument, ProjectSource } from '../../../src/shared/types/project';
 import { DEFAULT_SUBTITLE_STYLE } from '../../../src/shared/subtitle-geometry';
+import { DEFAULT_WATERMARK } from '../../../src/shared/watermark-geometry';
 
 export const SOURCE: ProjectSource = {
   inputPath: '/clips/intro.mp4',
@@ -76,7 +77,8 @@ export const SETTINGS: AppSettings = {
     systemPrompt: 'Summarize the clip.',
     modelByProvider: {},
     reasoningEffort: 'default'
-  }
+  },
+  watermark: { ...DEFAULT_WATERMARK }
 };
 
 export const OPENAI_STATUS: ProviderStatus = {

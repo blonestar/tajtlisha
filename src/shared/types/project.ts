@@ -131,5 +131,13 @@ export const PROJECT_LANGUAGES = [
   'ru',
   'uk',
   'pl',
-  'tr'
+  'tr',
+  'ar',
+  'hi',
+  'id',
+  'th',
+  'vi',
+  'zh',
+  'ja',
+  'ko'
 ] as const;

@@ -13,6 +13,14 @@ import { PROJECT_LANGUAGES } from '../../../../shared/types/project';
 import { VideoContextDialog } from './VideoContextDialog';
 import './workflow.css';
 
+/** Localized name for a language code outside PROJECT_LANGUAGES, or the code itself. */
+function detectedLanguageName(code: string, uiLanguage: string): string {
+  try {
+    return new Intl.DisplayNames([uiLanguage, 'en'], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 export type GenerateProviderInfo = {
   id: string;
@@ -108,7 +116,7 @@ function summarizeBlock(props: GeneratePanelProps): Reason | null {
  * next to it, so the user never has to guess why a button does nothing.
  */
 export function GeneratePanel(props: GeneratePanelProps): ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     provider,
     sourceLanguage,
@@ -130,6 +138,9 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
     onOpenSettings
   } = props;
 
+  // Detected language that is not in the list (for example Malay), shown as its own option.
+  const otherSourceLanguage =
+    sourceLanguage !== 'auto' && !(PROJECT_LANGUAGES as readonly string[]).includes(sourceLanguage) ? sourceLanguage : null;
   const transcribeReason = transcribeBlock(props);
   const translateReason = translateBlock(props);
   const summarizeReason = summarizeBlock(props);
@@ -159,6 +170,9 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
             onChange={(event) => onSourceLanguageChange(event.target.value)}
           >
             <option value="auto">{t('captions.languages.auto')}</option>
+            {otherSourceLanguage ? (
+              <option value={otherSourceLanguage}>{detectedLanguageName(otherSourceLanguage, i18n.language)}</option>
+            ) : null}
             {PROJECT_LANGUAGES.map((code) => (
               <option key={code} value={code}>
                 {t(`captions.languages.${code}`)}

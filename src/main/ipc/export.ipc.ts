@@ -13,7 +13,8 @@ import {
   requireJobId,
   requireOneOf,
   requireRecord,
-  requireString
+  requireString,
+  requireWatermark
 } from './validation';
 import type { DesktopDialogs, DesktopShell, IpcRegistrar } from './types';
 
@@ -109,7 +110,8 @@ function toExportRequest(payload: unknown): ProjectExportRequest {
     outputFolder: requireString(input.outputFolder, 'outputFolder'),
     baseName: requireString(input.baseName, 'baseName'),
     captions: requireArray(input.captions, 'captions') as ProjectExportRequest['captions'],
-    overwritePolicy: requireOneOf(input.overwritePolicy, OVERWRITE_POLICIES, 'overwritePolicy')
+    overwritePolicy: requireOneOf(input.overwritePolicy, OVERWRITE_POLICIES, 'overwritePolicy'),
+    ...(input.watermark === undefined ? {} : { watermark: requireWatermark(input.watermark, 'watermark') })
   };
 }
 

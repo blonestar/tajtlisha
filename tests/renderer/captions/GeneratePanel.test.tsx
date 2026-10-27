@@ -39,6 +39,24 @@ function props(overrides: Partial<GeneratePanelProps> = {}): GeneratePanelProps 
 afterEach(cleanup);
 
 describe('GeneratePanel', () => {
+  it('offers the added Asian languages for source and target', () => {
+    renderWithI18n(<GeneratePanel {...props()} />);
+
+    const [source, target] = screen.getAllByRole('combobox');
+    for (const select of [source, target]) {
+      const labels = Array.from((select as HTMLSelectElement).options).map((option) => option.text);
+      expect(labels).toEqual(expect.arrayContaining(['Indonesian', 'Japanese', 'Chinese (Simplified)', 'Korean', 'Thai', 'Hindi']));
+    }
+  });
+
+  it('shows a detected language that is not in the list instead of auto-detect', () => {
+    renderWithI18n(<GeneratePanel {...props({ sourceLanguage: 'ms' })} />);
+
+    const source = screen.getAllByRole('combobox')[0] as HTMLSelectElement;
+    expect(source.value).toBe('ms');
+    expect(source.options[source.selectedIndex].text).toBe('Malay');
+  });
+
   it('enables transcription when the video, audio and provider are ready', () => {
     const onTranscribe = vi.fn();
     renderWithI18n(<GeneratePanel {...props({ onTranscribe })} />);

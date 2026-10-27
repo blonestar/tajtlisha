@@ -49,6 +49,24 @@ describe('App shell', () => {
     expect(screen.getByDisplayValue('Zdravo svima')).toBeInTheDocument();
   });
 
+  it('drops the exact frame when the logo settings change, because the old logo is burned into it', async () => {
+    render(<App />);
+    await screen.findByDisplayValue('Zdravo svima');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exact frame' }));
+    expect(await screen.findByText('Exact preview')).toBeInTheDocument();
+    expect(fake.api.project.renderPreviewFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ watermark: expect.objectContaining({ enabled: true }) })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Logo' }));
+    fireEvent.click(await within(dialog).findByRole('switch', { name: 'Logo on video' }));
+
+    await waitFor(() => expect(screen.queryByText('Exact preview')).not.toBeInTheDocument());
+  });
+
   it('shows the empty state with Open video and the FFmpeg status when no clip is open', async () => {
     fake = createWindowApi({ project: null });
     installApi(fake);

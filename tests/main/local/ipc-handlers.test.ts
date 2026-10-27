@@ -843,6 +843,105 @@ function summarizeRequest(jobId = 'sum-1') {
   };
 }
 
+describe('watermark at the IPC boundary', () => {
+  const logo = {
+    enabled: true,
+    content: 'mark_text',
+    markText: 'MK',
+    text: 'Moj kanal',
+    background: 'all',
+    backgroundColor: '#112233',
+    markColor: '#F2A93B',
+    textColor: '#F2F2F2',
+    cornerRadiusPercent: 19,
+    position: 'bottom_right',
+    sizePercent: 40,
+    marginPercent: 3,
+    opacity: 0.5
+  };
+
+  it('clamps a valid export logo and passes it to the exporter', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: logo });
+
+    expect(exportProject.mock.calls[0]?.[0]).toMatchObject({ watermark: { ...logo, sizePercent: 15 } });
+  });
+
+  it('leaves the export logo absent when the request has none', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), exportPayload);
+
+    expect(exportProject.mock.calls[0]?.[0]).not.toHaveProperty('watermark');
+  });
+
+  it('rejects an export logo with wrong types, naming the field and not the value', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, enabled: 'yes' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.enabled must be a boolean.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, content: 'big' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.content must be one of mark_text, mark, text.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, position: 'center' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.position must be one of');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, text: 5 } })
+    ).rejects.toThrow('[UNKNOWN] watermark.text must be a string.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, backgroundColor: 'red' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.backgroundColor must be a #rrggbb colour.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, background: 'some' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.background must be one of all, mark, none.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, sizePercent: '7' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.sizePercent must be a finite number.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, opacity: Number.NaN } })
+    ).rejects.toThrow('[UNKNOWN] watermark.opacity must be a finite number.');
+    await expect(ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: null })).rejects.toThrow(
+      '[UNKNOWN] watermark must be an object.'
+    );
+    expect(exportProject).not.toHaveBeenCalled();
+  });
+
+  it('validates the preview frame logo the same way', async () => {
+    const ipc = fakeIpc();
+    const renderPreviewFrame = vi.fn(async (_request: Record<string, unknown>) => ({ dataUrl: 'data:image/png;base64,' }));
+    registerProjectIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      dialogs: fakeDialogs(),
+      mediaService: { probe: vi.fn(), createPreviewProxy: vi.fn() } as never,
+      projectStore: { loadLast: vi.fn(), save: vi.fn() } as never,
+      previewProxies: { get: vi.fn() } as never,
+      exporter: { renderPreviewFrame } as never,
+      createVideoUrl: fakeVideoUrl,
+      strings: async () => ENGLISH,
+      sources: sourcesWith('/videos/clip.mkv')
+    });
+    const frame = { inputPath: '/videos/clip.mkv', atMs: 0, videoWidth: 2, videoHeight: 2, text: 'x', style: DEFAULT_SUBTITLE_STYLE };
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, watermark: logo });
+    expect(renderPreviewFrame.mock.calls[0]?.[0]).toMatchObject({ watermark: { ...logo, sizePercent: 15 } });
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), frame);
+    expect(renderPreviewFrame.mock.calls[1]?.[0]).not.toHaveProperty('watermark');
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, watermark: { ...logo, enabled: 1 } })
+    ).rejects.toThrow('[UNKNOWN] watermark.enabled must be a boolean.');
+    expect(renderPreviewFrame).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('workflow:transcribe correction validation', () => {
   function setup() {
     const ipc = fakeIpc();

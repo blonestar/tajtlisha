@@ -1,5 +1,6 @@
 import AudioLines from 'lucide-react/dist/esm/icons/audio-lines.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
+import Stamp from 'lucide-react/dist/esm/icons/stamp.js';
 import Info from 'lucide-react/dist/esm/icons/info.js';
 import Languages from 'lucide-react/dist/esm/icons/languages.js';
 import Plug from 'lucide-react/dist/esm/icons/plug.js';
@@ -15,6 +16,7 @@ import { AboutSection } from '../components/settings/AboutSection';
 import { ConnectorsSection } from '../components/settings/ConnectorsSection';
 import { ExportSection } from '../components/settings/ExportSection';
 import { GeneralSection } from '../components/settings/GeneralSection';
+import { LogoSection } from '../components/settings/LogoSection';
 import { SummarySettings } from '../components/settings/SummarySettings';
 import { TranscriptionSettings } from '../components/settings/TranscriptionSettings';
 import { TranslationSettings } from '../components/settings/TranslationSettings';
@@ -34,7 +36,7 @@ type SettingsPageProps = {
   onClose?: () => void;
 };
 
-type SettingsSectionId = 'general' | 'connectors' | 'transcription' | 'translation' | 'summary' | 'export' | 'about';
+type SettingsSectionId = 'general' | 'connectors' | 'transcription' | 'translation' | 'summary' | 'export' | 'logo' | 'about';
 
 const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
   { id: 'general', icon: Settings },
@@ -43,6 +45,7 @@ const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
   { id: 'translation', icon: Languages },
   { id: 'summary', icon: ScrollText },
   { id: 'export', icon: FolderOpen },
+  { id: 'logo', icon: Stamp },
   { id: 'about', icon: Info }
 ];
 
@@ -121,6 +124,7 @@ export function SettingsPage({
               />
             ) : null}
             {section === 'export' ? <ExportSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
+            {section === 'logo' ? <LogoSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
             {section === 'about' ? <AboutSection /> : null}
           </div>
         </div>

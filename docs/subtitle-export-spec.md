@@ -141,6 +141,41 @@ Trenutna implementacija ima project export servis koji:
 - pomera subtitle timing tako da exportovani timeline pocinje od `00:00:00`,
 - koristi isti `SubtitleStyle` ugovor za burned-in MP4 export.
 
+## Logo watermark
+
+Logo (`src/shared/types/watermark.ts`, `src/shared/watermark-geometry.ts`) se
+crta u burned-in MP4 i u preview-u. Podrazumevano je ukljucen; moze se iskljuciti
+u Settings > Logo i za pojedinacan izvoz (checkbox "Add logo" u Export dijalogu).
+
+- Sadrzaj: `mark_text` (znak + tekst, podrazumevano), `mark` (samo znak) ili `text` (samo tekst).
+  Znak su do 3 znaka u kucici (podrazumevano `T`), tekst je do 30 znakova (podrazumevano `tajtliša`).
+  Prazan znak ili prazan tekst se ne crta. Ako nema ni jednog ni drugog, logo se ne crta.
+- Ciscenje teksta (`cleanWatermarkText`, isto za settings, IPC i UI): NFC (slovo + kombinovani akcenat
+  postaje jedan znak), bez kontrolnih znakova, bez `{`, `}` i `\` (libass ih cita kao tagove), samo
+  znakovi koje ugradjeni font ima (ostali bi se crtali fallback fontom nepoznate sirine), trim, limit u
+  kodnim tackama. Tako preview i export crtaju i mere isti tekst.
+- Logo siri od prostora izmedju bocnih margina se srazmerno smanjuje da stane u kadar.
+- Stari settings sa `variant` se migriraju: `icon` -> `mark`, `icon_text` -> `mark_text`.
+- Pozadina: `all` (iza svega), `mark` (samo iza kucice) ili `none`. Boje su `backgroundColor`, `markColor` i `textColor` (`#rrggbb`).
+- Tekst je pravi tekst u Noto Sans Bold (ugradjen u `resources/fonts`). Sirine dolaze iz
+  `src/shared/logo-font-metrics.generated.ts` preko `measureLogoText(text, emPx)`: zbir advance-a po
+  kodnoj tacki. libass ne kerna bez `Kerning: yes`, pa se taj red ne upisuje, a preview ima `font-kerning: none`.
+- Velicina: visina loga `S` je procenat krace strane videa (3..15%, podrazumevano 7%).
+  Margina `M` je procenat iste strane (0..10%, podrazumevano 3%).
+- Em velicine: znak `0.70 S`, tekst `0.62 S`. Kucica za znak je `max(S, sirina znaka + 0.5 S)` siroka,
+  slova su centrirana u njoj. Tekst pocinje `0.1 S` posle desne ivice slova (ne posle ivice kucice),
+  pa ostaje isti razmak kad je znak duzi. Sa leve i desne strane teksta je `0.3 S`.
+- Zaobljenost ivica: `cornerRadiusPercent` (0..50%) visine loga, ogranicena na pola manje stranice pozadine.
+- Neprozirnost: 0.2..1 (podrazumevano 0.9). Primenjuje se po obliku, kao u ASS exportu.
+- Geometrija je u jednom modulu (`computeWatermarkLayout`); preview i export ga koriste oba.
+- ASS export: pozadina je `\p3` crtez (rounded rect) na layer 5. Znak i tekst su `WatermarkText`
+  dogadjaji na layer 6, sa `\an7\pos(x, baseline - E * 1124 / 1000)` i `\fs = E * 1.519`
+  (1124 je winAscent, 1.519 je `fontMetricFactor('Noto Sans')`). Sve traje od 0 do kraja
+  trimovanog timeline-a. Logo se pojavljuje i kad nema nijednog titla.
+- Preview (`WatermarkOverlay`) crta isti raspored: `<rect>` za pozadinu i `<text>` za znak i tekst,
+  sa `font-kerning: none` i `white-space: pre`.
+- Ako logo nije ukljucen, ASS nema Watermark stil ni dogadjaje.
+
 ## Word highlight
 
 Karaoke highlight boji rec koja se trenutno izgovara. Ima dva rezima: `word` boji samo aktivnu rec, a `progressive` boji sve reci do aktivne. Boja je `highlightColor` (#rrggbb, podrazumevano `#ffd400`).

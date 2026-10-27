@@ -36,6 +36,7 @@ describe('Settings tabs', () => {
       'Translation',
       'Summary',
       'Export',
+      'Logo',
       'About'
     ]);
   });

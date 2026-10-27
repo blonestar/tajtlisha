@@ -7,6 +7,7 @@ import type { AppSettings, SummarySettings } from '../../shared/types/settings';
 import { MAX_AI_INSTRUCTIONS_CHARS } from '../../shared/ai-instructions';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../shared/summary';
 import { normalizeUiZoom } from '../../shared/ui-zoom';
+import { normalizeWatermark } from '../../shared/watermark-geometry';
 import { DEFAULT_APP_SETTINGS } from './defaults';
 import { rejectSecretFields } from './secret-fields';
 
@@ -120,7 +121,8 @@ function normalizeSettings(settings: AppSettings): AppSettings {
       transcriptCorrectionInstructions: normalizeInstructions(settings.aiConnector.transcriptCorrectionInstructions),
       translationInstructions: normalizeInstructions(settings.aiConnector.translationInstructions)
     },
-    summary: normalizeSummary(settings.summary)
+    summary: normalizeSummary(settings.summary),
+    watermark: normalizeWatermark(settings.watermark)
   };
 }
 

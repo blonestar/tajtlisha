@@ -1,7 +1,10 @@
 import { AppError } from '../../shared/errors';
-import { assFontSize, clamp, computeSubtitleGeometry } from '../../shared/subtitle-geometry';
+import { LOGO_FONT_METRICS } from '../../shared/logo-font-metrics.generated';
+import { assFontSize, clamp, computeSubtitleGeometry, fontMetricFactor } from '../../shared/subtitle-geometry';
 import type { CaptionWord } from '../../shared/types/project';
 import type { SubtitleStyle } from '../../shared/types/style';
+import type { WatermarkSettings } from '../../shared/types/watermark';
+import { type WatermarkLayout, type WatermarkTextPart, computeWatermarkLayout } from '../../shared/watermark-geometry';
 import {
   type CaptionTextPart,
   type ResolvedWordHighlight,
@@ -37,12 +40,71 @@ export type BuildAssDocumentInput = {
   style: SubtitleStyle;
   videoWidth: number;
   videoHeight: number;
+  /** Logo layer. Off or missing = no logo. The logo is drawn for the whole `endMs`, even with no captions. */
+  watermark?: { settings: WatermarkSettings; endMs: number };
 };
 
 const ASS_STYLE_FORMAT =
   'Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding';
 
 const ASS_EVENT_FORMAT = 'Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+
+/** Unstyled style for the logo background drawing: no outline, no shadow, top-left anchor (overridden per event). */
+const WATERMARK_STYLE_LINE = [
+  'Watermark',
+  'Noto Sans',
+  '20',
+  '&H00FFFFFF',
+  '&H000000FF',
+  '&H00000000',
+  '&H00000000',
+  '0',
+  '0',
+  '0',
+  '0',
+  '100',
+  '100',
+  '0',
+  '0',
+  '1',
+  '0',
+  '0',
+  '7',
+  '0',
+  '0',
+  '0',
+  '1'
+].join(',');
+
+/**
+ * Bold Noto Sans with no outline or shadow for the logo letters and text. The
+ * size is set per event (\fs), so this line only fixes the face and the anchor.
+ */
+const WATERMARK_TEXT_STYLE_LINE = [
+  'WatermarkText',
+  'Noto Sans',
+  '20',
+  '&H00FFFFFF',
+  '&H000000FF',
+  '&H00000000',
+  '&H00000000',
+  '-1',
+  '0',
+  '0',
+  '0',
+  '100',
+  '100',
+  '0',
+  '0',
+  '1',
+  '0',
+  '0',
+  '7',
+  '0',
+  '0',
+  '0',
+  '1'
+].join(',');
 
 /** Shadow alpha used when the text has a drop shadow (ASS alpha: 00 opaque, FF transparent). */
 const SHADOW_ALPHA = '60';
@@ -99,7 +161,9 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
   const layeredBox = highlight.mode !== 'off' && boxed;
   const textStyleLine = layeredBox ? [HIGHLIGHT_TEXT_STYLE, ...styleLine.slice(1, 15), '1', '0', '0', ...styleLine.slice(18)] : null;
 
-  const events = input.captions
+  const logo = input.watermark ? computeWatermarkLayout(input.watermark.settings, width, height) : null;
+
+  const captionEvents = input.captions
     .filter((caption) => caption.text.replace(/\r/g, '').trim().length > 0)
     .flatMap((caption) =>
       highlight.mode === 'off'
@@ -108,6 +172,7 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
           ]
         : highlightDialogues(caption, highlight, layeredBox)
     );
+  const events = [...captionEvents, ...(logo && input.watermark ? watermarkDialogues(logo, input.watermark.endMs) : [])];
 
   return [
     '[Script Info]',
@@ -124,12 +189,58 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
     `Format: ${ASS_STYLE_FORMAT}`,
     `Style: ${styleLine.join(',')}`,
     ...(textStyleLine ? [`Style: ${textStyleLine.join(',')}`] : []),
+    ...(logo ? [`Style: ${WATERMARK_STYLE_LINE}`, `Style: ${WATERMARK_TEXT_STYLE_LINE}`] : []),
     '',
     '[Events]',
     `Format: ${ASS_EVENT_FORMAT}`,
     ...events,
     ''
   ].join('\n');
+}
+
+/**
+ * Logo on layer 5 (background) and 6 (badge letters and text). The background
+ * is a vector drawing; the letters and text are Noto Sans Bold text events.
+ * libass places a drawing by its bounding box, so the background is drawn
+ * relative to its own bbox and `\pos` is that bbox's top-left corner (\an7).
+ * Text is placed by its pen start and baseline: libass puts the baseline
+ * winAscent below the \an7 position, so the position is shifted up by that.
+ * Coordinates are quarter pixels (\p3). Verified against libass.
+ */
+function watermarkDialogues(logo: WatermarkLayout, endMs: number): string[] {
+  const end = formatAssTimestamp(endMs);
+  const alpha = alphaByte(1 - logo.opacity);
+  const events: string[] = [];
+
+  if (logo.background) {
+    const { x, y, width, height, radius } = logo.background;
+    events.push(
+      `Dialogue: 5,0:00:00.00,${end},Watermark,,0,0,0,,{\\an7\\pos(${x.toFixed(2)},${y.toFixed(2)})\\1c&H${bgrHex(logo.backgroundColor)}&\\alpha&H${alpha}&\\p3}${roundedRectDrawing(width, height, radius)}`
+    );
+  }
+
+  for (const part of [logo.mark, logo.text]) {
+    if (part) events.push(watermarkTextDialogue(part, end, alpha));
+  }
+  return events;
+}
+
+function watermarkTextDialogue(part: WatermarkTextPart, end: string, alpha: string): string {
+  const fontSize = (part.em * fontMetricFactor('Noto Sans')).toFixed(1);
+  const baseline = part.baseline - (part.em * LOGO_FONT_METRICS.winAscent) / LOGO_FONT_METRICS.unitsPerEm;
+  return `Dialogue: 6,0:00:00.00,${end},WatermarkText,,0,0,0,,{\\an7\\pos(${part.x.toFixed(2)},${baseline.toFixed(2)})\\fs${fontSize}\\1c&H${bgrHex(part.color)}&\\alpha&H${alpha}&}${escapeAssText(part.text)}`;
+}
+
+/** Rounded rectangle at 0,0 with cubic corners (control offset 0.5523 of the radius). */
+function roundedRectDrawing(w: number, h: number, r: number): string {
+  const c = r * (1 - 0.5523);
+  const q = quarterPixels;
+  return `m ${q(r)} 0 l ${q(w - r)} 0 b ${q(w - c)} 0 ${q(w)} ${q(c)} ${q(w)} ${q(r)} l ${q(w)} ${q(h - r)} b ${q(w)} ${q(h - c)} ${q(w - c)} ${q(h)} ${q(w - r)} ${q(h)} l ${q(r)} ${q(h)} b ${q(c)} ${q(h)} 0 ${q(h - c)} 0 ${q(h - r)} l 0 ${q(r)} b 0 ${q(c)} ${q(c)} 0 ${q(r)} 0`;
+}
+
+/** Drawing units are quarter pixels because the tags use \p3. */
+function quarterPixels(value: number): number {
+  return Math.round(value * 4);
 }
 
 /**
