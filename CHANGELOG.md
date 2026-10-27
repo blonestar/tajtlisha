@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-27
+
 ### Changed
 - Editor layout is flatter: panels run edge to edge and are split by thin lines instead of framed boxes.
 - The AI toolbar keeps everything on the left and wraps group by group, so the provider status no longer slides
@@ -172,7 +174,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...develop
+[0.7.1]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/blonestar/tajtlisha/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/blonestar/tajtlisha/compare/v0.5.1...v0.6.0
