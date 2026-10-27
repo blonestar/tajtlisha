@@ -190,7 +190,7 @@ app.whenReady().then(async () => {
   registerJobsIpc({ ipc, jobs });
   registerExportIpc({ ipc, jobs, exporter, dialogs, shell: desktopShell, strings, sources });
   registerMediaIpc({ ipc, ffmpeg });
-  registerAppIpc({ ipc, quit });
+  registerAppIpc({ ipc, quit, openExternal: (url) => shell.openExternal(url) });
 
   // Auto-update (packaged AppImage / NSIS only; 'unsupported' elsewhere). Never
   // downloads or installs without a user action.
