@@ -26,7 +26,7 @@ import { ProjectStore } from './project/project-store';
 import { QuitCoordinator, withTimeout, type UnsavedQuitAnswer } from './quit-coordinator';
 import { bundledFontsDir } from './resources-path';
 import { SettingsStore } from './settings';
-import { createDefaultUpdateService, scheduleStartupCheck } from './updater';
+import { createDefaultUpdateService, scheduleAutoChecks } from './updater';
 
 // A separate profile folder (used by the E2E tests so they never touch the
 // user's real projects, settings or API keys). Must run before anything reads
@@ -190,7 +190,7 @@ app.whenReady().then(async () => {
   registerJobsIpc({ ipc, jobs });
   registerExportIpc({ ipc, jobs, exporter, dialogs, shell: desktopShell, strings, sources });
   registerMediaIpc({ ipc, ffmpeg });
-  registerAppIpc({ ipc, quit });
+  registerAppIpc({ ipc, quit, openExternal: (url) => shell.openExternal(url) });
 
   // Auto-update (packaged AppImage / NSIS only; 'unsupported' elsewhere). Never
   // downloads or installs without a user action.
@@ -198,7 +198,11 @@ app.whenReady().then(async () => {
   registerUpdatesIpc(updateService, ipc);
 
   createWindow(jobs);
-  scheduleStartupCheck(updateService);
+  // Checks at startup and hourly while the setting is on. Never downloads by itself.
+  scheduleAutoChecks({
+    service: updateService,
+    isEnabled: async () => (await settingsStore.get()).autoCheckUpdates
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

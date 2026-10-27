@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-27
+
+### Added
+- Settings > About shows the author and a link that opens the source repository in the system browser.
+- Automatic update check at startup and every hour, with a "Check for updates automatically" switch in Settings > About (on by default).
+- Update button in the top bar when a new version is available: it downloads the update, then offers "Restart to update" to install it. A failed download can be retried from the same button.
+
 ## [0.7.1] - 2026-10-27
 
 ### Changed
@@ -174,7 +181,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...develop
+[0.8.0]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/blonestar/tajtlisha/compare/v0.6.0...v0.6.1

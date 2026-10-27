@@ -71,6 +71,8 @@ export const IPC_CHANNELS = {
   updatesState: 'updates:state',
 
   appGetInfo: 'app:getInfo',
+  /** renderer -> main invoke: opens REPOSITORY_URL in the system browser. */
+  appOpenRepository: 'app:openRepository',
   /** main -> renderer event: the app is about to quit; flush pending work. */
   appPrepareQuit: 'app:prepareQuit',
   /**
@@ -172,6 +174,8 @@ export type TajtlishaApi = {
   };
   app: {
     getInfo(): Promise<{ version: string; platform: string; isPackaged: boolean }>;
+    /** Opens the public source repository in the system browser. */
+    openRepository(): Promise<void>;
     /**
      * Sets the Chromium page zoom of this window (1 = 100%). Applied in the
      * preload with webFrame, so it is local to the renderer and needs no IPC

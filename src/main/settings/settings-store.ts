@@ -113,6 +113,7 @@ function normalizeSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     neverModifyOriginalVideo: true,
+    autoCheckUpdates: settings.autoCheckUpdates !== false,
     uiZoomPercent: normalizeUiZoom(settings.uiZoomPercent),
     aiConnector: {
       ...settings.aiConnector,

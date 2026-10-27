@@ -98,6 +98,7 @@ describe('about section', () => {
     onDownload?: () => void;
     onInstall?: () => void;
     onCheck?: () => void;
+    onOpenRepository?: () => void;
   }): Record<string, unknown> {
     const state = options.state ?? updateState({ status: 'idle' });
     const ffmpeg = options.ffmpeg ?? fullFfmpegStatus;
@@ -108,7 +109,10 @@ describe('about section', () => {
           platform: options.info?.platform ?? 'linux',
           isPackaged: options.info?.isPackaged ?? true
         }),
-        setZoomFactor: () => undefined
+        setZoomFactor: () => undefined,
+        openRepository: async () => {
+          options.onOpenRepository?.();
+        }
       },
       updates: {
         getState: async () => state,
@@ -136,12 +140,51 @@ describe('about section', () => {
     };
   }
 
+  it('turns the automatic update check off through the switch without checking', async () => {
+    const onCheck = vi.fn();
+    installFakeApi(aboutApi({ onCheck }));
+    const onSettingsChange = vi.fn();
+    openSection('About', { onSettingsChange });
+
+    const toggle = await screen.findByRole('switch', { name: 'Check for updates automatically' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(onSettingsChange).toHaveBeenCalledWith({ autoCheckUpdates: false });
+    expect(onCheck).not.toHaveBeenCalled();
+  });
+
+  it('checks right away when the automatic update check is turned on', async () => {
+    const onCheck = vi.fn();
+    installFakeApi(aboutApi({ onCheck }));
+    const onSettingsChange = vi.fn();
+    openSection('About', { onSettingsChange, settings: { ...noFolderSettings, autoCheckUpdates: false } });
+
+    const toggle = await screen.findByRole('switch', { name: 'Check for updates automatically' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(onSettingsChange).toHaveBeenCalledWith({ autoCheckUpdates: true });
+    await waitFor(() => expect(onCheck).toHaveBeenCalledTimes(1));
+  });
+
   it('shows the version and a readable platform name', async () => {
     installFakeApi(aboutApi({}));
     openSection('About');
 
     expect(await screen.findByText('0.2.0')).toBeInTheDocument();
     expect(screen.getByText('Linux')).toBeInTheDocument();
+  });
+
+  it('shows the author and opens the repository through the app bridge', async () => {
+    const onOpenRepository = vi.fn();
+    installFakeApi(aboutApi({ onOpenRepository }));
+    openSection('About');
+
+    expect(await screen.findByText('Bojan')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /github\.com\/blonestar\/tajtlisha/ }));
+
+    await waitFor(() => expect(onOpenRepository).toHaveBeenCalledTimes(1));
   });
 
   it('offers Download when an update is available and shows the release notes', async () => {

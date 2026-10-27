@@ -70,6 +70,7 @@ const api: TajtlishaApi = {
   },
   app: {
     getInfo: () => ipcRenderer.invoke(C.appGetInfo),
+    openRepository: () => ipcRenderer.invoke(C.appOpenRepository),
     setZoomFactor: (factor) => applyZoomFactor(factor),
     onPrepareQuit: (listener) => {
       quitListeners.add(listener);

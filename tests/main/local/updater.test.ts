@@ -7,7 +7,8 @@ import {
   isUpdateSupported,
   htmlToText,
   normalizeReleaseNotes,
-  scheduleStartupCheck,
+  scheduleAutoChecks,
+  AUTO_CHECK_INTERVAL_MS,
   type UpdaterLike
 } from '../../../src/main/updater/update-service';
 
@@ -178,7 +179,44 @@ describe('update service', () => {
       await service.check();
       const result = await service.download();
 
-      expect(result).toEqual({ status: 'error', currentVersion: '0.1.0', message: 'socket hang up' });
+      expect(result).toEqual({
+        status: 'error',
+        currentVersion: '0.1.0',
+        availableVersion: '0.2.0',
+        message: 'socket hang up'
+      });
+    });
+
+    it('retries a failed download without a new check', async () => {
+      const { autoUpdater, service } = setup();
+      autoUpdater.checkForUpdates.mockImplementation(async () => {
+        autoUpdater.emit('update-available', { version: '0.2.0', releaseNotes: null });
+        return null;
+      });
+      autoUpdater.downloadUpdate.mockRejectedValueOnce(new Error('socket hang up'));
+      autoUpdater.downloadUpdate.mockImplementationOnce(async () => {
+        autoUpdater.emit('update-downloaded', { version: '0.2.0', releaseNotes: undefined });
+        return [];
+      });
+
+      await service.check();
+      await service.download();
+      const result = await service.download();
+
+      expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+      expect(autoUpdater.downloadUpdate).toHaveBeenCalledTimes(2);
+      expect(result.status).toBe('downloaded');
+    });
+
+    it('drops the version when a check fails', async () => {
+      const { autoUpdater, service } = setup();
+      autoUpdater.checkForUpdates.mockRejectedValue(new Error('offline'));
+
+      const result = await service.check();
+
+      expect(result).toEqual({ status: 'error', currentVersion: '0.1.0', message: 'offline' });
+      expect((await service.download()).status).toBe('error');
+      expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled();
     });
 
     it('ignores download when no update is available', async () => {
@@ -197,6 +235,21 @@ describe('update service', () => {
       autoUpdater.emit('update-downloaded', { version: '0.2.0' });
       service.install();
       expect(autoUpdater.quitAndInstall).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not re-check over a downloaded update', async () => {
+      const { autoUpdater, service } = setup();
+
+      autoUpdater.emit('update-downloaded', { version: '0.2.0' });
+      const result = await service.check();
+
+      expect(result).toEqual({
+        status: 'downloaded',
+        currentVersion: '0.1.0',
+        availableVersion: '0.2.0',
+        downloadProgress: 1
+      });
+      expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled();
     });
   });
 });
@@ -236,7 +289,7 @@ describe('isUpdateSupported', () => {
   });
 });
 
-describe('scheduleStartupCheck', () => {
+describe('auto-check scheduling', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -245,27 +298,144 @@ describe('scheduleStartupCheck', () => {
     vi.useRealTimers();
   });
 
-  it('runs one check after the default delay', () => {
-    const service = { check: vi.fn(async () => ({}) as UpdateState) };
+  function fakeService(status: UpdateState['status'] = 'idle') {
+    let current: UpdateState = { status, currentVersion: '0.1.0' };
+    return {
+      check: vi.fn(async () => current),
+      getState: vi.fn(() => current),
+      setStatus(next: UpdateState['status']) {
+        current = { status: next, currentVersion: '0.1.0' };
+      }
+    };
+  }
 
-    scheduleStartupCheck(service);
-    vi.advanceTimersByTime(7999);
+  const logger = { info: vi.fn(), warn: vi.fn() };
+
+  it('exports an hourly interval', () => {
+    expect(AUTO_CHECK_INTERVAL_MS).toBe(60 * 60 * 1000);
+  });
+
+  it('runs the first check after the default startup delay', async () => {
+    const service = fakeService();
+
+    const stop = scheduleAutoChecks({ service, isEnabled: async () => true });
+    await vi.advanceTimersByTimeAsync(7999);
     expect(service.check).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(service.check).toHaveBeenCalledTimes(1);
+    stop();
   });
 
-  it('can be cancelled through the returned timer', () => {
-    const service = { check: vi.fn(async () => ({}) as UpdateState) };
+  it('checks again after each interval', async () => {
+    const service = fakeService();
 
-    const timer = scheduleStartupCheck(service, 1000);
-    clearTimeout(timer);
-    vi.advanceTimersByTime(5000);
+    const stop = scheduleAutoChecks({ service, isEnabled: async () => true, startupDelayMs: 1000, intervalMs: 5000 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(service.check).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(service.check).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(service.check).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('does nothing while the setting is off, but reads it again on the next tick', async () => {
+    const service = fakeService();
+    let enabled = false;
+
+    const stop = scheduleAutoChecks({
+      service,
+      isEnabled: async () => enabled,
+      startupDelayMs: 1000,
+      intervalMs: 1000
+    });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(service.check).not.toHaveBeenCalled();
+
+    enabled = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(service.check).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('skips the tick and logs a warning when reading the setting fails', async () => {
+    const service = fakeService();
+    const warn = vi.fn();
+
+    const stop = scheduleAutoChecks({
+      service,
+      isEnabled: async () => {
+        throw new Error('settings file unreadable');
+      },
+      startupDelayMs: 1000,
+      logger: { info: vi.fn(), warn }
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(service.check).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('Automatic update check skipped: settings file unreadable');
+    stop();
+  });
+
+  it.each(['available', 'downloading', 'downloaded', 'checking', 'unsupported'] as const)(
+    'does not check while the status is %s',
+    async (status) => {
+      const service = fakeService(status);
+
+      const stop = scheduleAutoChecks({ service, isEnabled: async () => true, startupDelayMs: 1000, intervalMs: 1000 });
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(service.check).not.toHaveBeenCalled();
+      stop();
+    }
+  );
+
+  it('checks again from not_available and error states', async () => {
+    const service = fakeService('error');
+
+    const stop = scheduleAutoChecks({ service, isEnabled: async () => true, startupDelayMs: 1000, intervalMs: 1000 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(service.check).toHaveBeenCalledTimes(1);
+
+    service.setStatus('not_available');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(service.check).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('stops all timers when the stop function is called', async () => {
+    const service = fakeService();
+
+    const stop = scheduleAutoChecks({ service, isEnabled: async () => true, startupDelayMs: 1000, intervalMs: 1000 });
+    stop();
+    await vi.advanceTimersByTimeAsync(10_000);
 
     expect(service.check).not.toHaveBeenCalled();
   });
 
+  it('does not check if stopped while the setting is being read', async () => {
+    const service = fakeService();
+    let release: (value: boolean) => void = () => undefined;
+
+    const stop = scheduleAutoChecks({
+      service,
+      isEnabled: () => new Promise<boolean>((resolve) => (release = resolve)),
+      startupDelayMs: 1000,
+      logger
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    stop();
+    release(true);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(service.check).not.toHaveBeenCalled();
+  });
+});
+
+describe('release notes', () => {
   it('turns GitHub HTML release notes into plain text', () => {
     expect(
       normalizeReleaseNotes('<h3>Fixed</h3>\n<ul>\n<li>The ffmpeg check &amp; Settings</li>\n<li>Publish step</li>\n</ul>')

@@ -63,7 +63,12 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
   function fail(error: unknown): void {
     const message = errorMessage(error);
     logger.warn(`Update error: ${message}`);
-    setState('error', { message });
+    // A failed download keeps the offered version so the user can retry it directly.
+    const keepVersion = state.status === 'downloading' || state.status === 'error';
+    setState('error', {
+      message,
+      ...(keepVersion && state.availableVersion ? { availableVersion: state.availableVersion } : {})
+    });
   }
 
   if (isSupported) {
@@ -105,7 +110,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     getState: current,
 
     async check() {
-      if (!isSupported || state.status === 'checking' || state.status === 'downloading') {
+      if (!isSupported || state.status === 'checking' || state.status === 'downloading' || state.status === 'downloaded') {
         return state;
       }
       setState('checking');
@@ -122,7 +127,7 @@ export function createUpdateService(options: UpdateServiceOptions): UpdateServic
     },
 
     async download() {
-      if (!isSupported || state.status !== 'available') {
+      if (!isSupported || !canDownload(state)) {
         return state;
       }
       setState('downloading', {
@@ -220,11 +225,64 @@ function codePoint(code: number, fallback: string): string {
   return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : fallback;
 }
 
-/** Runs one check shortly after startup so the window is visible before the network call. */
-export function scheduleStartupCheck(service: Pick<UpdateService, 'check'>, delayMs = 8000): ReturnType<typeof setTimeout> {
-  return setTimeout(() => {
+export const AUTO_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+/** Only these states may be replaced by a new check; anything else (e.g. 'downloaded') must stay put. */
+const AUTO_CHECK_STATUSES: ReadonlySet<UpdateStatus> = new Set<UpdateStatus>(['idle', 'not_available', 'error']);
+
+export type AutoCheckOptions = {
+  service: Pick<UpdateService, 'check' | 'getState'>;
+  /** Read on every tick so toggling the setting needs no restart. */
+  isEnabled: () => Promise<boolean>;
+  startupDelayMs?: number;
+  intervalMs?: number;
+  logger?: UpdateLogger;
+};
+
+/**
+ * Checks for a new version shortly after startup (so the window is visible before
+ * the network call), then every hour. Returns a function that stops the timers.
+ */
+export function scheduleAutoChecks(options: AutoCheckOptions): () => void {
+  const { service, isEnabled, startupDelayMs = 8000, intervalMs = AUTO_CHECK_INTERVAL_MS, logger = console } = options;
+  let stopped = false;
+
+  async function tick(): Promise<void> {
+    let enabled: boolean;
+    try {
+      enabled = await isEnabled();
+    } catch (error) {
+      logger.warn(`Automatic update check skipped: ${errorMessage(error)}`);
+      return;
+    }
+    if (stopped || !enabled) {
+      return;
+    }
+    // A re-check would reset 'available' or 'downloaded' back to 'checking' and lose them.
+    if (!AUTO_CHECK_STATUSES.has(service.getState().status)) {
+      return;
+    }
     void service.check();
-  }, delayMs);
+  }
+
+  let interval: ReturnType<typeof setInterval> | undefined;
+  const startup = setTimeout(() => {
+    void tick();
+    interval = setInterval(() => void tick(), intervalMs);
+  }, startupDelayMs);
+
+  return () => {
+    stopped = true;
+    clearTimeout(startup);
+    if (interval !== undefined) {
+      clearInterval(interval);
+    }
+  };
+}
+
+/** An offered update, or one whose download failed (electron-updater keeps the last check's info). */
+function canDownload(state: UpdateState): boolean {
+  return state.status === 'available' || (state.status === 'error' && Boolean(state.availableVersion));
 }
 
 function sameState(a: UpdateState, b: UpdateState): boolean {
