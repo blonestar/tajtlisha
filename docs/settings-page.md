@@ -14,6 +14,7 @@ Settings stranica ima ove sekcije:
 - Language & localization
 - AI connector
 - Export defaults
+- Logo
 - Advanced / diagnostics
 
 ## General
@@ -167,17 +168,33 @@ Opcije:
   - overwrite,
   - create copy.
 
-### Logo
+## Logo
 
-- switch "Logo on video" (podrazumevano ukljucen),
-- stil: `T` ili `T + tajtliša` (brend se uvek pise latinicom, i u srpskoj cirilici),
-- ugao: gore levo, gore desno, dole levo, dole desno (podrazumevano gore levo),
+Zaseban tab u Settings, odmah posle Export. Logo se crta u izvezeni MP4 i u pregled
+istim rasporedom (`computeWatermarkLayout`), pa pregled i izvoz izgledaju isto.
+
+Kontrole:
+
+- switch "Logo na videu" (podrazumevano ukljucen). Dok je iskljucen, sve ostale kontrole su onemogucene,
+  ukljucujuci "Vrati podrazumevano",
+- sadrzaj: "Znak + tekst" (podrazumevano), "Samo znak" ili "Samo tekst". Polje za znak i polje za tekst
+  nestaju kad ta strana nije u sadrzaju,
+- slova u znaku: do 3 znaka (podrazumevano `T`). Prazno sakriva znak,
+- tekst: do 30 znakova (podrazumevano `tajtliša`). Prazno sakriva tekst,
+- pozadina: "Iza svega" (podrazumevano), "Samo iza znaka" ili "Bez pozadine",
+- boje: pozadina (`#1D2025`), znak (`#F2A93B`) i tekst (`#F2F2F2`),
+- zaobljenost ivica: 0..50% visine loga (podrazumevano 19%),
+- polozaj: mreza 3 x 2 (gore levo, gore u sredini, gore desno, dole levo, dole u sredini, dole desno;
+  podrazumevano gore levo). Strelice na tastaturi pomeraju izbor,
 - velicina: 3..15% krace strane videa (podrazumevano 7%),
-- neprozirnost: 20..100% (podrazumevano 90%).
+- margina: 0..10% krace strane videa (podrazumevano 3%),
+- neprozirnost: 20..100% (podrazumevano 90%),
+- pregled: uzorak 16:9 sa trenutnim podesavanjem, odmah ispod switch-a,
+- "Vrati podrazumevano" vraca ceo logo na podrazumevana podesavanja.
 
-Kada je logo iskljucen, kontrole za stil, ugao, velicinu i neprozirnost su onemogucene.
-Margina (3%) nije u UI-ju i koristi podrazumevanu vrednost. Logo nije tajna, pa ide u
-obican settings store.
+Tekst se upisuje dok se kuca, ociscen (bez novih redova i spoljnih razmaka, po limitu znakova).
+Razmak izmedju reci ostaje u polju dok se kuca. Velicina, margina, zaobljenost i neprozirnost
+se upisuju pri svakom koraku klizaca. Logo nije tajna, pa ide u obican settings store.
 
 ## Advanced / diagnostics
 

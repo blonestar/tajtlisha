@@ -61,7 +61,7 @@ describe('App shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     const dialog = await screen.findByRole('dialog', { name: 'Settings' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Export' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Logo' }));
     fireEvent.click(await within(dialog).findByRole('switch', { name: 'Logo on video' }));
 
     await waitFor(() => expect(screen.queryByText('Exact preview')).not.toBeInTheDocument());

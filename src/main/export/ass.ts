@@ -1,10 +1,10 @@
 import { AppError } from '../../shared/errors';
-import { assFontSize, clamp, computeSubtitleGeometry } from '../../shared/subtitle-geometry';
+import { LOGO_FONT_METRICS } from '../../shared/logo-font-metrics.generated';
+import { assFontSize, clamp, computeSubtitleGeometry, fontMetricFactor } from '../../shared/subtitle-geometry';
 import type { CaptionWord } from '../../shared/types/project';
 import type { SubtitleStyle } from '../../shared/types/style';
 import type { WatermarkSettings } from '../../shared/types/watermark';
-import { type WatermarkLayout, computeWatermarkLayout } from '../../shared/watermark-geometry';
-import { WORDMARK } from '../../shared/watermark-wordmark.generated';
+import { type WatermarkLayout, type WatermarkTextPart, computeWatermarkLayout } from '../../shared/watermark-geometry';
 import {
   type CaptionTextPart,
   type ResolvedWordHighlight,
@@ -49,7 +49,7 @@ const ASS_STYLE_FORMAT =
 
 const ASS_EVENT_FORMAT = 'Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
 
-/** Unstyled text style for the logo drawings: no outline, no shadow, top-left anchor (overridden per event). */
+/** Unstyled style for the logo background drawing: no outline, no shadow, top-left anchor (overridden per event). */
 const WATERMARK_STYLE_LINE = [
   'Watermark',
   'Noto Sans',
@@ -59,6 +59,36 @@ const WATERMARK_STYLE_LINE = [
   '&H00000000',
   '&H00000000',
   '0',
+  '0',
+  '0',
+  '0',
+  '100',
+  '100',
+  '0',
+  '0',
+  '1',
+  '0',
+  '0',
+  '7',
+  '0',
+  '0',
+  '0',
+  '1'
+].join(',');
+
+/**
+ * Bold Noto Sans with no outline or shadow for the logo letters and text. The
+ * size is set per event (\fs), so this line only fixes the face and the anchor.
+ */
+const WATERMARK_TEXT_STYLE_LINE = [
+  'WatermarkText',
+  'Noto Sans',
+  '20',
+  '&H00FFFFFF',
+  '&H000000FF',
+  '&H00000000',
+  '&H00000000',
+  '-1',
   '0',
   '0',
   '0',
@@ -159,7 +189,7 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
     `Format: ${ASS_STYLE_FORMAT}`,
     `Style: ${styleLine.join(',')}`,
     ...(textStyleLine ? [`Style: ${textStyleLine.join(',')}`] : []),
-    ...(logo ? [`Style: ${WATERMARK_STYLE_LINE}`] : []),
+    ...(logo ? [`Style: ${WATERMARK_STYLE_LINE}`, `Style: ${WATERMARK_TEXT_STYLE_LINE}`] : []),
     '',
     '[Events]',
     `Format: ${ASS_EVENT_FORMAT}`,
@@ -169,49 +199,36 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
 }
 
 /**
- * Logo as ASS vector drawings: background on layer 5, T badge and wordmark on
- * layer 6. libass places a drawing by its bounding box, so each shape is drawn
+ * Logo on layer 5 (background) and 6 (badge letters and text). The background
+ * is a vector drawing; the letters and text are Noto Sans Bold text events.
+ * libass places a drawing by its bounding box, so the background is drawn
  * relative to its own bbox and `\pos` is that bbox's top-left corner (\an7).
+ * Text is placed by its pen start and baseline: libass puts the baseline
+ * winAscent below the \an7 position, so the position is shifted up by that.
  * Coordinates are quarter pixels (\p3). Verified against libass.
  */
 function watermarkDialogues(logo: WatermarkLayout, endMs: number): string[] {
   const end = formatAssTimestamp(endMs);
   const alpha = alphaByte(1 - logo.opacity);
-  const dialogue = (layer: number, x: number, y: number, colour: string, drawing: string): string =>
-    `Dialogue: ${layer},0:00:00.00,${end},Watermark,,0,0,0,,{\\an7\\pos(${x.toFixed(2)},${y.toFixed(2)})\\1c&H${bgrHex(colour)}&\\alpha&H${alpha}&\\p3}${drawing}`;
+  const events: string[] = [];
 
-  const { origin, width, height, radius, tRects, wordmark, colors } = logo;
-  const tLeft = Math.min(...tRects.map((rect) => rect.x));
-  const tTop = Math.min(...tRects.map((rect) => rect.y));
-
-  const events = [
-    dialogue(5, origin.x, origin.y, colors.background, roundedRectDrawing(width, height, radius)),
-    dialogue(
-      6,
-      tLeft,
-      tTop,
-      colors.tMark,
-      tRects
-        .map(
-          (rect) =>
-            `m ${quarterPixels(rect.x - tLeft)} ${quarterPixels(rect.y - tTop)} l ${quarterPixels(rect.x + rect.width - tLeft)} ${quarterPixels(rect.y - tTop)} ${quarterPixels(rect.x + rect.width - tLeft)} ${quarterPixels(rect.y + rect.height - tTop)} ${quarterPixels(rect.x - tLeft)} ${quarterPixels(rect.y + rect.height - tTop)}`
-        )
-        .join(' ')
-    )
-  ];
-
-  if (wordmark) {
+  if (logo.background) {
+    const { x, y, width, height, radius } = logo.background;
     events.push(
-      dialogue(
-        6,
-        wordmark.offsetX + WORDMARK.minX * wordmark.scale,
-        wordmark.baselineY + WORDMARK.minY * wordmark.scale,
-        colors.wordmark,
-        wordmarkDrawing(wordmark.scale)
-      )
+      `Dialogue: 5,0:00:00.00,${end},Watermark,,0,0,0,,{\\an7\\pos(${x.toFixed(2)},${y.toFixed(2)})\\1c&H${bgrHex(logo.backgroundColor)}&\\alpha&H${alpha}&\\p3}${roundedRectDrawing(width, height, radius)}`
     );
   }
+
+  for (const part of [logo.mark, logo.text]) {
+    if (part) events.push(watermarkTextDialogue(part, end, alpha));
+  }
   return events;
+}
+
+function watermarkTextDialogue(part: WatermarkTextPart, end: string, alpha: string): string {
+  const fontSize = (part.em * fontMetricFactor('Noto Sans')).toFixed(1);
+  const baseline = part.baseline - (part.em * LOGO_FONT_METRICS.winAscent) / LOGO_FONT_METRICS.unitsPerEm;
+  return `Dialogue: 6,0:00:00.00,${end},WatermarkText,,0,0,0,,{\\an7\\pos(${part.x.toFixed(2)},${baseline.toFixed(2)})\\fs${fontSize}\\1c&H${bgrHex(part.color)}&\\alpha&H${alpha}&}${escapeAssText(part.text)}`;
 }
 
 /** Rounded rectangle at 0,0 with cubic corners (control offset 0.5523 of the radius). */
@@ -219,30 +236,6 @@ function roundedRectDrawing(w: number, h: number, r: number): string {
   const c = r * (1 - 0.5523);
   const q = quarterPixels;
   return `m ${q(r)} 0 l ${q(w - r)} 0 b ${q(w - c)} 0 ${q(w)} ${q(c)} ${q(w)} ${q(r)} l ${q(w)} ${q(h - r)} b ${q(w)} ${q(h - c)} ${q(w - c)} ${q(h)} ${q(w - r)} ${q(h)} l ${q(r)} ${q(h)} b ${q(c)} ${q(h)} 0 ${q(h - c)} 0 ${q(h - r)} l 0 ${q(r)} b 0 ${q(c)} ${q(c)} 0 ${q(r)} 0`;
-}
-
-/**
- * Wordmark outlines from WORDMARK.path, moved so their bbox starts at 0,0 and
- * scaled. SVG M/L/C become ASS m/l/b; Z is dropped because ASS closes contours itself.
- */
-function wordmarkDrawing(scale: number): string {
-  const commands: string[] = [];
-  for (const match of WORDMARK.path.matchAll(/([MLCZ])([^MLCZ]*)/g)) {
-    const command = match[1];
-    if (command === 'Z') continue;
-
-    const numbers = match[2].trim().split(/[\s,]+/).map(Number);
-    const arity = command === 'C' ? 6 : 2;
-    for (let i = 0; i + arity <= numbers.length; i += arity) {
-      const points: string[] = [];
-      for (let j = i; j < i + arity; j += 2) {
-        points.push(`${quarterPixels((numbers[j] - WORDMARK.minX) * scale)} ${quarterPixels((numbers[j + 1] - WORDMARK.minY) * scale)}`);
-      }
-      const kind = command === 'C' ? 'b' : command === 'M' && i === 0 ? 'm' : 'l';
-      commands.push(`${kind} ${points.join(' ')}`);
-    }
-  }
-  return commands.join(' ');
 }
 
 /** Drawing units are quarter pixels because the tags use \p3. */

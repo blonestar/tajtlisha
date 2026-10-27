@@ -1,5 +1,4 @@
-import { computeWatermarkLayout } from '../../../../shared/watermark-geometry';
-import { WORDMARK } from '../../../../shared/watermark-wordmark.generated';
+import { computeWatermarkLayout, type WatermarkTextPart } from '../../../../shared/watermark-geometry';
 import type { WatermarkSettings } from '../../../../shared/types/watermark';
 import './preview.css';
 
@@ -13,7 +12,8 @@ export type WatermarkOverlayProps = {
 /**
  * Logo laid over the displayed video frame, with the same layout the export
  * burns in. Renders nothing when the logo is off. Opacity is applied per shape,
- * as the ASS export does, so overlapping shapes blend the same way.
+ * as the ASS export does, so overlapping shapes blend the same way. Text uses
+ * the bundled Noto Sans Bold with kerning off, as libass lays it out.
  */
 export function WatermarkOverlay({ watermark, frameWidth, frameHeight }: WatermarkOverlayProps) {
   if (frameWidth <= 0 || frameHeight <= 0) return null;
@@ -21,30 +21,40 @@ export function WatermarkOverlay({ watermark, frameWidth, frameHeight }: Waterma
   const logo = computeWatermarkLayout(watermark, frameWidth, frameHeight);
   if (!logo) return null;
 
-  const { origin, width, height, radius, tRects, wordmark, colors, opacity } = logo;
+  const { background, backgroundColor, opacity } = logo;
 
   return (
     <svg className="watermark-overlay" viewBox={`0 0 ${frameWidth} ${frameHeight}`} aria-hidden="true" focusable="false">
-      <rect x={origin.x} y={origin.y} width={width} height={height} rx={radius} fill={colors.background} opacity={opacity} />
-      {tRects.map((rect, index) => (
+      {background ? (
         <rect
-          key={index}
-          x={rect.x}
-          y={rect.y}
-          width={rect.width}
-          height={rect.height}
-          fill={colors.tMark}
-          opacity={opacity}
-        />
-      ))}
-      {wordmark ? (
-        <path
-          d={WORDMARK.path}
-          transform={`translate(${wordmark.offsetX} ${wordmark.baselineY}) scale(${wordmark.scale})`}
-          fill={colors.wordmark}
+          x={background.x}
+          y={background.y}
+          width={background.width}
+          height={background.height}
+          rx={background.radius}
+          fill={backgroundColor}
           opacity={opacity}
         />
       ) : null}
+      {logo.mark ? <LogoText part={logo.mark} opacity={opacity} /> : null}
+      {logo.text ? <LogoText part={logo.text} opacity={opacity} /> : null}
     </svg>
+  );
+}
+
+function LogoText({ part, opacity }: { part: WatermarkTextPart; opacity: number }) {
+  return (
+    <text
+      x={part.x}
+      y={part.baseline}
+      fill={part.color}
+      opacity={opacity}
+      fontFamily="Noto Sans"
+      fontWeight={700}
+      fontSize={part.em}
+      style={{ fontKerning: 'none', whiteSpace: 'pre' }}
+    >
+      {part.text}
+    </text>
   );
 }

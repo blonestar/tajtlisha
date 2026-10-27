@@ -1,5 +1,6 @@
 import Bot from 'lucide-react/dist/esm/icons/bot.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
+import Stamp from 'lucide-react/dist/esm/icons/stamp.js';
 import Info from 'lucide-react/dist/esm/icons/info.js';
 import ScrollText from 'lucide-react/dist/esm/icons/scroll-text.js';
 import Settings from 'lucide-react/dist/esm/icons/settings.js';
@@ -13,6 +14,7 @@ import { AboutSection } from '../components/settings/AboutSection';
 import { AiSection } from '../components/settings/AiSection';
 import { ExportSection } from '../components/settings/ExportSection';
 import { GeneralSection } from '../components/settings/GeneralSection';
+import { LogoSection } from '../components/settings/LogoSection';
 import { SummarySettings } from '../components/settings/SummarySettings';
 import '../components/settings/settings.css';
 
@@ -30,13 +32,14 @@ type SettingsPageProps = {
   onClose?: () => void;
 };
 
-type SettingsSectionId = 'general' | 'ai' | 'summary' | 'export' | 'about';
+type SettingsSectionId = 'general' | 'ai' | 'summary' | 'export' | 'logo' | 'about';
 
 const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
   { id: 'general', icon: Settings },
   { id: 'ai', icon: Bot },
   { id: 'summary', icon: ScrollText },
   { id: 'export', icon: FolderOpen },
+  { id: 'logo', icon: Stamp },
   { id: 'about', icon: Info }
 ];
 
@@ -109,6 +112,7 @@ export function SettingsPage({
               />
             ) : null}
             {section === 'export' ? <ExportSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
+            {section === 'logo' ? <LogoSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
             {section === 'about' ? <AboutSection /> : null}
           </div>
         </div>

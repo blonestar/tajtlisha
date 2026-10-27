@@ -844,7 +844,21 @@ function summarizeRequest(jobId = 'sum-1') {
 }
 
 describe('watermark at the IPC boundary', () => {
-  const logo = { enabled: true, variant: 'icon', position: 'bottom_right', sizePercent: 40, marginPercent: 3, opacity: 0.5 };
+  const logo = {
+    enabled: true,
+    content: 'mark_text',
+    markText: 'MK',
+    text: 'Moj kanal',
+    background: 'all',
+    backgroundColor: '#112233',
+    markColor: '#F2A93B',
+    textColor: '#F2F2F2',
+    cornerRadiusPercent: 19,
+    position: 'bottom_right',
+    sizePercent: 40,
+    marginPercent: 3,
+    opacity: 0.5
+  };
 
   it('clamps a valid export logo and passes it to the exporter', async () => {
     const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
@@ -872,11 +886,20 @@ describe('watermark at the IPC boundary', () => {
       ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, enabled: 'yes' } })
     ).rejects.toThrow('[UNKNOWN] watermark.enabled must be a boolean.');
     await expect(
-      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, variant: 'big' } })
-    ).rejects.toThrow('[UNKNOWN] watermark.variant must be one of icon, icon_text.');
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, content: 'big' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.content must be one of mark_text, mark, text.');
     await expect(
       ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, position: 'center' } })
     ).rejects.toThrow('[UNKNOWN] watermark.position must be one of');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, text: 5 } })
+    ).rejects.toThrow('[UNKNOWN] watermark.text must be a string.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, backgroundColor: 'red' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.backgroundColor must be a #rrggbb colour.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, background: 'some' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.background must be one of all, mark, none.');
     await expect(
       ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, sizePercent: '7' } })
     ).rejects.toThrow('[UNKNOWN] watermark.sizePercent must be a finite number.');
