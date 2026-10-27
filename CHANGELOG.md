@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Logo watermark: the T badge (or T + tajtliša) is drawn into the exported MP4 and the preview, in the corner you choose.
+  On by default; turn it off in Settings > Export, or for a single export with the "Add logo" checkbox.
+
 ## [0.6.1] - 2026-10-25
 
 ### Fixed

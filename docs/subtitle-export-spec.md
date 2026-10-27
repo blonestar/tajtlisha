@@ -141,6 +141,23 @@ Trenutna implementacija ima project export servis koji:
 - pomera subtitle timing tako da exportovani timeline pocinje od `00:00:00`,
 - koristi isti `SubtitleStyle` ugovor za burned-in MP4 export.
 
+## Logo watermark
+
+Logo (`src/shared/types/watermark.ts`, `src/shared/watermark-geometry.ts`) se
+crta u burned-in MP4 i u preview-u. Podrazumevano je ukljucen; moze se iskljuciti
+u Settings i za pojedinacan izvoz (checkbox "Add logo" u Export dijalogu).
+
+- Varijante: `icon` (samo T znak, kvadrat) i `icon_text` (T + "tajtliša").
+- Pozicija: jedan od cetiri ugla. Margina je `M` od dve najblize ivice.
+- Velicina: visina logoa `S` je procenat krace strane videa (3..15%, podrazumevano 7%).
+  Margina `M` je procenat iste strane (0..10%, podrazumevano 3%).
+- Neprozirnost: 0.2..1 (podrazumevano 0.9). Primenjuje se po obliku, kao u ASS exportu.
+- Geometrija je u jednom modulu (`computeWatermarkLayout`); preview i export ga koriste oba.
+- ASS export: pozadina je na layer 5, T i wordmark na layer 6, oba traju od 0 do kraja
+  trimovanog timeline-a. Logo se pojavljuje i kad nema nijednog titla.
+- Oblici se crtaju kao ASS vektorski crteži (`\p3`) sa `\an7\pos` po bounding box-u svakog oblika.
+- Ako logo nije ukljucen, ASS nema Watermark stil ni dogadjaje.
+
 ## Word highlight
 
 Karaoke highlight boji rec koja se trenutno izgovara. Ima dva rezima: `word` boji samo aktivnu rec, a `progressive` boji sve reci do aktivne. Boja je `highlightColor` (#rrggbb, podrazumevano `#ffd400`).
