@@ -2,6 +2,9 @@ import { AppError } from '../../shared/errors';
 import { assFontSize, clamp, computeSubtitleGeometry } from '../../shared/subtitle-geometry';
 import type { CaptionWord } from '../../shared/types/project';
 import type { SubtitleStyle } from '../../shared/types/style';
+import type { WatermarkSettings } from '../../shared/types/watermark';
+import { type WatermarkLayout, computeWatermarkLayout } from '../../shared/watermark-geometry';
+import { WORDMARK } from '../../shared/watermark-wordmark.generated';
 import {
   type CaptionTextPart,
   type ResolvedWordHighlight,
@@ -23,6 +26,13 @@ export type AssCaption = {
    * timing decides. Used only when word highlight is on.
    */
   activeWordIndex?: number;
+  /**
+   * Unclipped caption range on this timeline, when a trim cut the caption.
+   * Word timing is worked out over it, so the highlight matches the preview.
+   * Missing means startMs/endMs.
+   */
+  timingStartMs?: number;
+  timingEndMs?: number;
 };
 
 export type BuildAssDocumentInput = {
@@ -30,6 +40,8 @@ export type BuildAssDocumentInput = {
   style: SubtitleStyle;
   videoWidth: number;
   videoHeight: number;
+  /** Logo layer. Off or missing = no logo. The logo is drawn for the whole `endMs`, even with no captions. */
+  watermark?: { settings: WatermarkSettings; endMs: number };
 };
 
 const ASS_STYLE_FORMAT =
@@ -37,8 +49,38 @@ const ASS_STYLE_FORMAT =
 
 const ASS_EVENT_FORMAT = 'Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
 
+/** Unstyled text style for the logo drawings: no outline, no shadow, top-left anchor (overridden per event). */
+const WATERMARK_STYLE_LINE = [
+  'Watermark',
+  'Noto Sans',
+  '20',
+  '&H00FFFFFF',
+  '&H000000FF',
+  '&H00000000',
+  '&H00000000',
+  '0',
+  '0',
+  '0',
+  '0',
+  '100',
+  '100',
+  '0',
+  '0',
+  '1',
+  '0',
+  '0',
+  '7',
+  '0',
+  '0',
+  '0',
+  '1'
+].join(',');
+
 /** Shadow alpha used when the text has a drop shadow (ASS alpha: 00 opaque, FF transparent). */
 const SHADOW_ALPHA = '60';
+
+/** Default with no box, outline or shadow: the text layer drawn over the box layer. */
+const HIGHLIGHT_TEXT_STYLE = 'HighlightText';
 
 /**
  * Builds an ASS document whose PlayRes equals the video size. Every pixel value
@@ -83,15 +125,24 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
   ];
 
   const highlight = resolveWordHighlight(style);
-  const events = input.captions
+  // With a box, libass draws one box per colour run, and translucent boxes of
+  // neighbouring runs overlap into dark seams. So the box gets its own layer
+  // (text invisible, one run) and the coloured text is drawn above it without a box.
+  const layeredBox = highlight.mode !== 'off' && boxed;
+  const textStyleLine = layeredBox ? [HIGHLIGHT_TEXT_STYLE, ...styleLine.slice(1, 15), '1', '0', '0', ...styleLine.slice(18)] : null;
+
+  const logo = input.watermark ? computeWatermarkLayout(input.watermark.settings, width, height) : null;
+
+  const captionEvents = input.captions
     .filter((caption) => caption.text.replace(/\r/g, '').trim().length > 0)
     .flatMap((caption) =>
       highlight.mode === 'off'
         ? [
             `Dialogue: 0,${formatAssTimestamp(caption.startMs)},${formatAssTimestamp(caption.endMs)},Default,,0,0,0,,${escapeAssText(caption.text)}`
           ]
-        : highlightDialogues(caption, highlight)
+        : highlightDialogues(caption, highlight, layeredBox)
     );
+  const events = [...captionEvents, ...(logo && input.watermark ? watermarkDialogues(logo, input.watermark.endMs) : [])];
 
   return [
     '[Script Info]',
@@ -107,6 +158,8 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
     '[V4+ Styles]',
     `Format: ${ASS_STYLE_FORMAT}`,
     `Style: ${styleLine.join(',')}`,
+    ...(textStyleLine ? [`Style: ${textStyleLine.join(',')}`] : []),
+    ...(logo ? [`Style: ${WATERMARK_STYLE_LINE}`] : []),
     '',
     '[Events]',
     `Format: ${ASS_EVENT_FORMAT}`,
@@ -116,10 +169,92 @@ export function buildAssDocument(input: BuildAssDocumentInput): string {
 }
 
 /**
+ * Logo as ASS vector drawings: background on layer 5, T badge and wordmark on
+ * layer 6. libass places a drawing by its bounding box, so each shape is drawn
+ * relative to its own bbox and `\pos` is that bbox's top-left corner (\an7).
+ * Coordinates are quarter pixels (\p3). Verified against libass.
+ */
+function watermarkDialogues(logo: WatermarkLayout, endMs: number): string[] {
+  const end = formatAssTimestamp(endMs);
+  const alpha = alphaByte(1 - logo.opacity);
+  const dialogue = (layer: number, x: number, y: number, colour: string, drawing: string): string =>
+    `Dialogue: ${layer},0:00:00.00,${end},Watermark,,0,0,0,,{\\an7\\pos(${x.toFixed(2)},${y.toFixed(2)})\\1c&H${bgrHex(colour)}&\\alpha&H${alpha}&\\p3}${drawing}`;
+
+  const { origin, width, height, radius, tRects, wordmark, colors } = logo;
+  const tLeft = Math.min(...tRects.map((rect) => rect.x));
+  const tTop = Math.min(...tRects.map((rect) => rect.y));
+
+  const events = [
+    dialogue(5, origin.x, origin.y, colors.background, roundedRectDrawing(width, height, radius)),
+    dialogue(
+      6,
+      tLeft,
+      tTop,
+      colors.tMark,
+      tRects
+        .map(
+          (rect) =>
+            `m ${quarterPixels(rect.x - tLeft)} ${quarterPixels(rect.y - tTop)} l ${quarterPixels(rect.x + rect.width - tLeft)} ${quarterPixels(rect.y - tTop)} ${quarterPixels(rect.x + rect.width - tLeft)} ${quarterPixels(rect.y + rect.height - tTop)} ${quarterPixels(rect.x - tLeft)} ${quarterPixels(rect.y + rect.height - tTop)}`
+        )
+        .join(' ')
+    )
+  ];
+
+  if (wordmark) {
+    events.push(
+      dialogue(
+        6,
+        wordmark.offsetX + WORDMARK.minX * wordmark.scale,
+        wordmark.baselineY + WORDMARK.minY * wordmark.scale,
+        colors.wordmark,
+        wordmarkDrawing(wordmark.scale)
+      )
+    );
+  }
+  return events;
+}
+
+/** Rounded rectangle at 0,0 with cubic corners (control offset 0.5523 of the radius). */
+function roundedRectDrawing(w: number, h: number, r: number): string {
+  const c = r * (1 - 0.5523);
+  const q = quarterPixels;
+  return `m ${q(r)} 0 l ${q(w - r)} 0 b ${q(w - c)} 0 ${q(w)} ${q(c)} ${q(w)} ${q(r)} l ${q(w)} ${q(h - r)} b ${q(w)} ${q(h - c)} ${q(w - c)} ${q(h)} ${q(w - r)} ${q(h)} l ${q(r)} ${q(h)} b ${q(c)} ${q(h)} 0 ${q(h - c)} 0 ${q(h - r)} l 0 ${q(r)} b 0 ${q(c)} ${q(c)} 0 ${q(r)} 0`;
+}
+
+/**
+ * Wordmark outlines from WORDMARK.path, moved so their bbox starts at 0,0 and
+ * scaled. SVG M/L/C become ASS m/l/b; Z is dropped because ASS closes contours itself.
+ */
+function wordmarkDrawing(scale: number): string {
+  const commands: string[] = [];
+  for (const match of WORDMARK.path.matchAll(/([MLCZ])([^MLCZ]*)/g)) {
+    const command = match[1];
+    if (command === 'Z') continue;
+
+    const numbers = match[2].trim().split(/[\s,]+/).map(Number);
+    const arity = command === 'C' ? 6 : 2;
+    for (let i = 0; i + arity <= numbers.length; i += arity) {
+      const points: string[] = [];
+      for (let j = i; j < i + arity; j += 2) {
+        points.push(`${quarterPixels((numbers[j] - WORDMARK.minX) * scale)} ${quarterPixels((numbers[j + 1] - WORDMARK.minY) * scale)}`);
+      }
+      const kind = command === 'C' ? 'b' : command === 'M' && i === 0 ? 'm' : 'l';
+      commands.push(`${kind} ${points.join(' ')}`);
+    }
+  }
+  return commands.join(' ');
+}
+
+/** Drawing units are quarter pixels because the tags use \p3. */
+function quarterPixels(value: number): number {
+  return Math.round(value * 4);
+}
+
+/**
  * One Dialogue line per stretch with a constant lit word. The Default style
  * is shared, so only the highlighted word gets an inline colour override.
  */
-function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighlight): string[] {
+function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighlight, layeredBox: boolean): string[] {
   const text = caption.text.replace(/\r/g, '').trim();
   const parts = splitCaptionText(text);
   const startMs = Math.round(caption.startMs);
@@ -129,17 +264,27 @@ function highlightDialogues(caption: AssCaption, highlight: ResolvedWordHighligh
   const intervals =
     caption.activeWordIndex !== undefined
       ? [{ startMs, endMs, activeIndex: caption.activeWordIndex }]
-      : highlightIntervals(timeCaptionWords(text, startMs, endMs, caption.words).spans, startMs, endMs);
+      : highlightIntervals(
+          timeCaptionWords(text, caption.timingStartMs ?? startMs, caption.timingEndMs ?? endMs, caption.words).spans,
+          startMs,
+          endMs
+        );
 
-  return intervals.flatMap((interval) => {
+  const textLayer = layeredBox ? `1` : `0`;
+  const textStyle = layeredBox ? HIGHLIGHT_TEXT_STYLE : 'Default';
+  const dialogues = intervals.flatMap((interval) => {
     const start = formatAssTimestamp(interval.startMs);
     const end = formatAssTimestamp(interval.endMs);
     // Centisecond rounding can collapse a very short interval to nothing; skip it instead of writing an empty event.
     if (start === end) return [];
 
     const body = highlightedText(parts, highlight.mode, interval.activeIndex, colour);
-    return [`Dialogue: 0,${start},${end},Default,,0,0,0,,${body}`];
+    return [`Dialogue: ${textLayer},${start},${end},${textStyle},,0,0,0,,${body}`];
   });
+
+  if (!layeredBox || dialogues.length === 0) return dialogues;
+  const box = `Dialogue: 0,${formatAssTimestamp(startMs)},${formatAssTimestamp(endMs)},Default,,0,0,0,,{\\1a&HFF&}${escapeAssText(text)}`;
+  return [box, ...dialogues];
 }
 
 function highlightedText(parts: CaptionTextPart[], mode: ResolvedWordHighlight['mode'], activeIndex: number, colour: string): string {

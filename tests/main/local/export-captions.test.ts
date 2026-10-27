@@ -33,6 +33,24 @@ describe('export captions with word timing', () => {
     ]);
   });
 
+  it('keeps the full caption range and unclamped words when the trim cuts the caption', () => {
+    const [exported] = toExportCaptions(
+      [caption({ startMs: 0, endMs: 4000, words: [{ text: 'Hello', startMs: 200, endMs: 600 }] })],
+      { startMs: 1000, endMs: 3000 }
+    );
+
+    expect(exported).toMatchObject({ startMs: 0, endMs: 2000, timingStartMs: -1000, timingEndMs: 3000 });
+    expect(exported.words).toEqual([{ text: 'Hello', startMs: -800, endMs: -400 }]);
+    expect(captionCuesFor([exported], 'translation')[0]).toMatchObject({ timingStartMs: -1000, timingEndMs: 3000 });
+  });
+
+  it('sets no timing range on captions the trim does not cut', () => {
+    const [exported] = toExportCaptions([caption()], { startMs: 0, endMs: 5000 });
+
+    expect(exported).not.toHaveProperty('timingStartMs');
+    expect(exported).not.toHaveProperty('timingEndMs');
+  });
+
   it('leaves words absent on captions without word timing', () => {
     const [exported] = toExportCaptions([caption()], { startMs: 0, endMs: 5000 });
 

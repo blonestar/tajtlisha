@@ -30,6 +30,9 @@ export type ExportDialogModel = {
   setBaseName: (value: string) => void;
   outputs: ExportOutputs;
   setOutputs: (outputs: ExportOutputs) => void;
+  /** Per-export logo choice. Starts from settings.watermark.enabled each time the dialog opens. */
+  includeLogo: boolean;
+  setIncludeLogo: (value: boolean) => void;
   sourceLanguage: string;
   targetLanguage: string;
   blockingIssueCount: number;
@@ -71,6 +74,7 @@ export function useExportDialog({
   const [outputFolder, setOutputFolder] = useState<string | null>(null);
   const [baseName, setBaseName] = useState('');
   const [outputs, setOutputs] = useState<ExportOutputs>({ originalSrt: true, translationSrt: true, video: 'none' });
+  const [includeLogo, setIncludeLogo] = useState(settings.watermark.enabled);
   const [preparedFor, setPreparedFor] = useState<string | null>(null);
   const [result, setResult] = useState<ProjectExportResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,6 +88,7 @@ export function useExportDialog({
       setOutputs(defaultExportOutputs(settingsRef.current));
       setPreparedFor(source.inputPath);
     }
+    setIncludeLogo(settingsRef.current.watermark.enabled);
     setResult(null);
     setErrorMessage(null);
     setOpen(true);
@@ -118,6 +123,7 @@ export function useExportDialog({
           sourceLanguage: sourceLanguageCode(current),
           targetLanguage: current.targetLanguage,
           style: current.style,
+          watermark: { ...settingsRef.current.watermark, enabled: includeLogo },
           outputs,
           overwritePolicy: settingsRef.current.exportDefaults.overwritePolicy
         }),
@@ -134,7 +140,7 @@ export function useExportDialog({
       const detail = truncateDetail(outcome.detail);
       setErrorMessage(detail ? `${t(appErrorKey(outcome.code))} (${detail})` : t(appErrorKey(outcome.code)));
     }
-  }, [api, baseName, job, outputFolder, outputs, t]);
+  }, [api, baseName, includeLogo, job, outputFolder, outputs, t]);
 
   const showInFolder = useCallback(
     (path: string) => {
@@ -163,6 +169,8 @@ export function useExportDialog({
     setBaseName,
     outputs,
     setOutputs,
+    includeLogo,
+    setIncludeLogo,
     sourceLanguage: sourceLanguageCode(project),
     targetLanguage: project.targetLanguage,
     blockingIssueCount: blocking,

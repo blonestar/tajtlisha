@@ -179,7 +179,8 @@ export class ProjectExportService {
         captions: captionCuesFor(captions, field),
         style: request.style,
         videoWidth: size.width,
-        videoHeight: size.height
+        videoHeight: size.height,
+        watermark: request.watermark ? { settings: request.watermark, endMs: durationMs } : undefined
       });
       await writeFile(assPath, assDocument, 'utf8');
 

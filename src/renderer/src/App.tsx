@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { useEffect, useMemo } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT } from '../../shared/summary';
+import { DEFAULT_WATERMARK } from '../../shared/watermark-geometry';
 import type { AppSettings } from '../../shared/types/settings';
 import { createI18n, resolveUiLanguage } from './i18n';
 import { useAppRuntime } from './hooks/useAppRuntime';
@@ -42,7 +43,8 @@ const EMPTY_SETTINGS: AppSettings = {
     systemPrompt: DEFAULT_SUMMARY_PROMPT,
     modelByProvider: {},
     reasoningEffort: 'default'
-  }
+  },
+  watermark: { ...DEFAULT_WATERMARK }
 };
 
 /**

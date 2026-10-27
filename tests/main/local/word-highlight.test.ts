@@ -5,6 +5,7 @@ import {
   countCaptionWords,
   highlightIntervals,
   isWordHighlighted,
+  matchedCaptionWords,
   resolveWordHighlight,
   shiftCaptionWords,
   splitCaptionText,
@@ -108,6 +109,12 @@ describe('word highlight', () => {
     ]);
     expect(highlightIntervals([{ startMs: 0, endMs: 10 }], 0, 500)).toEqual([{ startMs: 0, endMs: 500, activeIndex: 0 }]);
     expect(highlightIntervals([], 0, 500)).toEqual([{ startMs: 0, endMs: 500, activeIndex: -1 }]);
+  });
+
+  it('keeps only the timed words that still match the text', () => {
+    const timed = words(['two', 300, 600], ['one', 0, 300], ['three', 600, 900]);
+    expect(matchedCaptionWords('One, three', timed)).toEqual(words(['one', 0, 300], ['three', 600, 900]));
+    expect(matchedCaptionWords('', timed)).toEqual([]);
   });
 
   it('shifts words without going below zero', () => {

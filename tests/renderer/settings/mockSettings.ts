@@ -40,7 +40,8 @@ export const mockSettings: AppSettings = {
     systemPrompt: 'Summarize the clip.',
     modelByProvider: {},
     reasoningEffort: 'default'
-  }
+  },
+  watermark: { enabled: true, variant: 'icon_text', position: 'top_left', sizePercent: 7, marginPercent: 3, opacity: 0.9 }
 };
 
 export const mockProviderStatuses: ProviderStatus[] = [

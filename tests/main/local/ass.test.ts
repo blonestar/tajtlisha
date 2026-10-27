@@ -261,6 +261,58 @@ describe('ASS word highlight', () => {
     expect(dialogueLines(doc)).toEqual([`Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,Hello ${HIGHLIGHT}big${RESET}`]);
   });
 
+  it('times words over the full caption when the trim cut it, matching the preview', () => {
+    // Source caption 0-4000 ms "one two", trim from 1000 ms: "two" starts at source 2000 ms = export 1000 ms.
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 3000, text: 'one two', timingStartMs: -1000, timingEndMs: 3000 }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(dialogueLines(doc)).toEqual([
+      `Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,${HIGHLIGHT}one${RESET} two`,
+      `Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,one ${HIGHLIGHT}two${RESET}`
+    ]);
+  });
+
+  it('draws the box once per caption under a box-less text layer, so colour runs leave no seams', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world', words: timedWords }],
+      style: { ...SUBTITLE_PRESETS.box, wordHighlight: 'word' },
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    const styles = doc.split('\n').filter((line) => line.startsWith('Style: '));
+    expect(styles).toHaveLength(2);
+    const defaultFields = styles[0].split(',');
+    const textFields = styles[1].split(',');
+    expect(textFields[0]).toBe('Style: HighlightText');
+    // BorderStyle, Outline, Shadow: no box behind the text layer; everything else as Default.
+    expect(textFields.slice(15, 18)).toEqual(['1', '0', '0']);
+    expect(textFields.slice(1, 15)).toEqual(defaultFields.slice(1, 15));
+    expect(textFields.slice(18)).toEqual(defaultFields.slice(18));
+
+    expect(dialogueLines(doc)).toEqual([
+      'Dialogue: 0,0:00:00.00,0:00:01.20,Default,,0,0,0,,{\\1a&HFF&}Hello big world',
+      `Dialogue: 1,0:00:00.00,0:00:00.40,HighlightText,,0,0,0,,${HIGHLIGHT}Hello${RESET} big world`,
+      `Dialogue: 1,0:00:00.40,0:00:00.80,HighlightText,,0,0,0,,Hello ${HIGHLIGHT}big${RESET} world`,
+      `Dialogue: 1,0:00:00.80,0:00:01.20,HighlightText,,0,0,0,,Hello big ${HIGHLIGHT}world${RESET}`
+    ]);
+  });
+
+  it('keeps a single style when highlight is on without a box', () => {
+    const doc = buildAssDocument({
+      captions: [{ startMs: 0, endMs: 1200, text: 'Hello big world', words: timedWords }],
+      style: wordStyle('word'),
+      videoWidth: 720,
+      videoHeight: 1280
+    });
+
+    expect(doc.split('\n').filter((line) => line.startsWith('Style: '))).toHaveLength(1);
+  });
+
   it('uses the highlight colour from the style, in ASS colour order', () => {
     const doc = buildAssDocument({
       captions: [{ startMs: 0, endMs: 1000, text: 'Hi there', activeWordIndex: 0 }],

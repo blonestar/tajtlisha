@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppError } from '../../shared/errors';
 import type { SubtitleStyle } from '../../shared/types/style';
+import type { WatermarkSettings } from '../../shared/types/watermark';
 import { FfmpegService } from '../ffmpeg/ffmpeg-service';
 import { buildAssDocument } from './ass';
 import { escapeFilterValue, formatSeconds, throwIfCanceled } from './ffmpeg-args';
@@ -30,6 +31,8 @@ export type PreviewFrameRequest = {
   style: SubtitleStyle;
   /** Word lit in the frame when word highlight is on. -1 or missing means none; see activeWordIndex(). */
   activeWordIndex?: number;
+  /** Logo in the frame. Missing or enabled: false = no logo. */
+  watermark?: WatermarkSettings;
 };
 
 export type PreviewFrameContext = {
@@ -74,7 +77,8 @@ export async function renderPreviewFrame(
         captions: [{ startMs: 0, endMs: PREVIEW_CAPTION_MS, text: request.text, activeWordIndex: request.activeWordIndex }],
         style: request.style,
         videoWidth: size.width,
-        videoHeight: size.height
+        videoHeight: size.height,
+        watermark: request.watermark ? { settings: request.watermark, endMs: PREVIEW_CAPTION_MS } : undefined
       }),
       'utf8'
     );

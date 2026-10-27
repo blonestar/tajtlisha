@@ -1,5 +1,7 @@
 import type { AiProviderId } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
+import { WATERMARK_POSITIONS, WATERMARK_VARIANTS, type WatermarkSettings } from '../../shared/types/watermark';
+import { clampWatermark } from '../../shared/watermark-geometry';
 
 /**
  * Boundary checks for renderer payloads. Messages name the field only, never
@@ -68,4 +70,24 @@ export function requireTimeRange(value: unknown, field: string): { startMs: numb
     throw invalidInput(field, 'a range with 0 <= startMs < endMs');
   }
   return { startMs, endMs };
+}
+
+export function requireBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw invalidInput(field, 'a boolean');
+  }
+  return value;
+}
+
+/** Wrong types are rejected; numbers are clamped to the shared ranges, the same as the settings store. */
+export function requireWatermark(value: unknown, field: string): WatermarkSettings {
+  const input = requireRecord(value, field);
+  return clampWatermark({
+    enabled: requireBoolean(input.enabled, `${field}.enabled`),
+    variant: requireOneOf(input.variant, WATERMARK_VARIANTS, `${field}.variant`),
+    position: requireOneOf(input.position, WATERMARK_POSITIONS, `${field}.position`),
+    sizePercent: requireFiniteNumber(input.sizePercent, `${field}.sizePercent`),
+    marginPercent: requireFiniteNumber(input.marginPercent, `${field}.marginPercent`),
+    opacity: requireFiniteNumber(input.opacity, `${field}.opacity`)
+  });
 }
