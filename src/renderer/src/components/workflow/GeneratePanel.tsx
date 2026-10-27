@@ -1,13 +1,17 @@
 import type { ReactElement } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right.js';
 import CircleCheck from 'lucide-react/dist/esm/icons/circle-check.js';
 import AudioLines from 'lucide-react/dist/esm/icons/audio-lines.js';
+import NotebookPen from 'lucide-react/dist/esm/icons/notebook-pen.js';
 import ScrollText from 'lucide-react/dist/esm/icons/scroll-text.js';
 import Eye from 'lucide-react/dist/esm/icons/eye.js';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.js';
 import TriangleAlert from 'lucide-react/dist/esm/icons/triangle-alert.js';
-import { PROJECT_LANGUAGES } from '../../../../shared/types/project';import './workflow.css';
+import { PROJECT_LANGUAGES } from '../../../../shared/types/project';
+import { VideoContextDialog } from './VideoContextDialog';
+import './workflow.css';
 
 
 export type GenerateProviderInfo = {
@@ -34,6 +38,10 @@ export type GeneratePanelProps = {
   /** Caption rows inside the trim range that have text. Summary needs at least one. */
   summarizableRows?: number;
   hasSummary?: boolean;
+  /** What the clip is about. '' = none. Shown on the Video context button and sent with transcription and translation. */
+  videoContext: string;
+  /** Saves the video context. '' clears it. */
+  onVideoContextChange(text: string): void;
   onSourceLanguageChange(code: string | 'auto'): void;
   onTargetLanguageChange(code: string): void;
   onTranscribe(): void;
@@ -44,6 +52,14 @@ export type GeneratePanelProps = {
 };
 
 type Reason = { key: string; values?: Record<string, string> };
+
+/** Longest part of the context shown in the button tooltip. */
+const CONTEXT_PREVIEW_CHARS = 120;
+
+function contextPreview(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > CONTEXT_PREVIEW_CHARS ? `${flat.slice(0, CONTEXT_PREVIEW_CHARS)}...` : flat;
+}
 
 /** First reason that blocks an action, or null when it can run. */
 function transcribeBlock(props: GeneratePanelProps): Reason | null {
@@ -102,6 +118,9 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
     timingSource,
     summaryEnabled = false,
     hasSummary = false,
+    hasSource,
+    videoContext,
+    onVideoContextChange,
     onSourceLanguageChange,
     onTargetLanguageChange,
     onTranscribe,
@@ -114,6 +133,11 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
   const transcribeReason = transcribeBlock(props);
   const translateReason = translateBlock(props);
   const summarizeReason = summarizeBlock(props);
+  const [contextOpen, setContextOpen] = useState(false);
+  const hasContext = videoContext.trim() !== '';
+  const contextTitle = hasContext
+    ? t('captions.context.buttonSetTitle', { text: contextPreview(videoContext) })
+    : t('captions.context.buttonEmptyTitle');
   const translateLabel =
     rowsNeedingTranslation > 0
       ? t('captions.generate.translateCount', { count: rowsNeedingTranslation })
@@ -188,6 +212,20 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
 
       <div className="generate-actions">
         <span className="muted">{t('captions.count', { count: captionCount })}</span>
+        <div className="generate-action">
+          <button
+            type="button"
+            className={hasContext ? 'btn generate-context-set' : 'btn'}
+            disabled={!hasSource}
+            title={contextTitle}
+            aria-haspopup="dialog"
+            onClick={() => setContextOpen(true)}
+          >
+            <NotebookPen aria-hidden="true" size={14} />
+            {t('captions.context.button')}
+            {hasContext && <span className="generate-context-dot" aria-hidden="true" />}
+          </button>
+        </div>
         {timingSource === 'speech_detection' && (
           <span
             className="badge badge-warning"
@@ -252,6 +290,13 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
           </div>
         )}
       </div>
+
+      <VideoContextDialog
+        open={contextOpen}
+        onOpenChange={setContextOpen}
+        value={videoContext}
+        onSave={onVideoContextChange}
+      />
     </div>
   );
 }

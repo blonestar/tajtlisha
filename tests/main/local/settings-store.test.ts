@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { SecretFieldError, SettingsStore } from '../../../src/main/settings';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../src/shared/summary';
+import { MAX_AI_INSTRUCTIONS_CHARS } from '../../../src/shared/ai-instructions';
 
 describe('SettingsStore', () => {
   it('merges partial settings onto defaults and persists them', async () => {
@@ -232,6 +233,127 @@ describe('SettingsStore', () => {
           reasoningEffort: 'default'
         });
       });
+    });
+  });
+});
+
+describe('SettingsStore AI connector correction and instructions', () => {
+  async function withSettingsFile<T>(fileContent: unknown, run: (store: SettingsStore) => Promise<T>): Promise<T> {
+    const dir = await mkdtemp(join(tmpdir(), 'tajtlisha-settings-'));
+    const filePath = join(dir, 'settings.json');
+    try {
+      if (fileContent !== undefined) {
+        await writeFile(filePath, JSON.stringify(fileContent), 'utf8');
+      }
+      return await run(new SettingsStore({ filePath }));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('defaults to no transcript correction and no instructions', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      const { correctTranscript, transcriptCorrectionInstructions, translationInstructions } = (await store.get()).aiConnector;
+
+      expect(correctTranscript).toBe(false);
+      expect(transcriptCorrectionInstructions).toBe('');
+      expect(translationInstructions).toBe('');
+    });
+  });
+
+  it('keeps the new fields when a file predates them', async () => {
+    await withSettingsFile({ aiConnector: { activeProviderId: 'openai', maxCharsPerLine: 40 } }, async (store) => {
+      const settings = await store.get();
+
+      expect(settings.aiConnector.maxCharsPerLine).toBe(40);
+      expect(settings.aiConnector).toMatchObject({ correctTranscript: false, transcriptCorrectionInstructions: '', translationInstructions: '' });
+    });
+  });
+
+  it('treats correctTranscript as on only when it is the boolean true', async () => {
+    for (const correctTranscript of ['true', 1, 'yes', null, {}]) {
+      await withSettingsFile({ aiConnector: { correctTranscript } }, async (store) => {
+        expect((await store.get()).aiConnector.correctTranscript).toBe(false);
+      });
+    }
+    await withSettingsFile({ aiConnector: { correctTranscript: true } }, async (store) => {
+      expect((await store.get()).aiConnector.correctTranscript).toBe(true);
+    });
+  });
+
+  it('replaces non-string instructions with an empty string', async () => {
+    for (const value of [42, null, ['Keep names.'], { text: 'Keep names.' }, true]) {
+      await withSettingsFile(
+        { aiConnector: { transcriptCorrectionInstructions: value, translationInstructions: value } },
+        async (store) => {
+          const { transcriptCorrectionInstructions, translationInstructions } = (await store.get()).aiConnector;
+
+          expect(transcriptCorrectionInstructions).toBe('');
+          expect(translationInstructions).toBe('');
+        }
+      );
+    }
+  });
+
+  it('stores whitespace-only instructions as an empty string', async () => {
+    await withSettingsFile(
+      { aiConnector: { transcriptCorrectionInstructions: '   \n\t', translationInstructions: '  \r\n ' } },
+      async (store) => {
+        const { transcriptCorrectionInstructions, translationInstructions } = (await store.get()).aiConnector;
+
+        expect(transcriptCorrectionInstructions).toBe('');
+        expect(translationInstructions).toBe('');
+      }
+    );
+  });
+
+  it('keeps instructions as the user wrote them, and cuts them to the limit', async () => {
+    const notes = '  Name: Bojan. Keep "Tajtlisha" as is.  ';
+    await withSettingsFile(
+      { aiConnector: { transcriptCorrectionInstructions: notes, translationInstructions: 'a'.repeat(MAX_AI_INSTRUCTIONS_CHARS + 500) } },
+      async (store) => {
+        const settings = (await store.get()).aiConnector;
+
+        expect(settings.transcriptCorrectionInstructions).toBe(notes);
+        expect(settings.translationInstructions).toHaveLength(MAX_AI_INSTRUCTIONS_CHARS);
+      }
+    );
+  });
+
+  it('persists patches to the new fields and clears instructions with an empty string', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      const updated = await store.update({
+        aiConnector: {
+          correctTranscript: true,
+          transcriptCorrectionInstructions: 'Fix product names.',
+          translationInstructions: 'Use formal address.'
+        } as never
+      });
+
+      expect(updated.aiConnector).toMatchObject({
+        correctTranscript: true,
+        transcriptCorrectionInstructions: 'Fix product names.',
+        translationInstructions: 'Use formal address.'
+      });
+      expect((await store.get()).aiConnector).toMatchObject({
+        correctTranscript: true,
+        transcriptCorrectionInstructions: 'Fix product names.',
+        translationInstructions: 'Use formal address.'
+      });
+
+      const cleared = await store.update({
+        aiConnector: { transcriptCorrectionInstructions: '', translationInstructions: '   ' } as never
+      });
+      expect(cleared.aiConnector).toMatchObject({ transcriptCorrectionInstructions: '', translationInstructions: '' });
+      expect(cleared.aiConnector.correctTranscript).toBe(true);
+    });
+  });
+
+  it('does not treat the instruction fields as secrets', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      await expect(
+        store.update({ aiConnector: { transcriptCorrectionInstructions: 'Use the API key format from the docs.' } } as never)
+      ).resolves.toMatchObject({ aiConnector: { transcriptCorrectionInstructions: 'Use the API key format from the docs.' } });
     });
   });
 });

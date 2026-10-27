@@ -40,6 +40,12 @@ export function sourceLanguageCode(project: ProjectDocument): string {
 }
 
 /** How translations are polished, from the AI connector settings. */
+/** The project's video context for a request, trimmed. Undefined when blank, so the field is left out. */
+export function videoContextFor(project: ProjectDocument): string | undefined {
+  const text = project.videoContext?.trim();
+  return text ? text : undefined;
+}
+
 export function polishFor(settings: AppSettings): PolishMode {
   if (settings.aiConnector.socialCaptionPolish) return 'social_caption';
   if (settings.aiConnector.conservativePolish) return 'conservative';

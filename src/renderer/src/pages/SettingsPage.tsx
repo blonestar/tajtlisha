@@ -1,6 +1,8 @@
-import Bot from 'lucide-react/dist/esm/icons/bot.js';
+import AudioLines from 'lucide-react/dist/esm/icons/audio-lines.js';
 import FolderOpen from 'lucide-react/dist/esm/icons/folder-open.js';
 import Info from 'lucide-react/dist/esm/icons/info.js';
+import Languages from 'lucide-react/dist/esm/icons/languages.js';
+import Plug from 'lucide-react/dist/esm/icons/plug.js';
 import ScrollText from 'lucide-react/dist/esm/icons/scroll-text.js';
 import Settings from 'lucide-react/dist/esm/icons/settings.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
@@ -10,10 +12,12 @@ import { useTranslation } from 'react-i18next';
 import type { AiProviderCapabilities, AiProviderId, AuthMode, ProviderModelDescriptor, ProviderStatus, TestConnectionResult } from '../../../shared/types/ai';
 import type { AppSettings, UiLanguage } from '../../../shared/types/settings';
 import { AboutSection } from '../components/settings/AboutSection';
-import { AiSection } from '../components/settings/AiSection';
+import { ConnectorsSection } from '../components/settings/ConnectorsSection';
 import { ExportSection } from '../components/settings/ExportSection';
 import { GeneralSection } from '../components/settings/GeneralSection';
 import { SummarySettings } from '../components/settings/SummarySettings';
+import { TranscriptionSettings } from '../components/settings/TranscriptionSettings';
+import { TranslationSettings } from '../components/settings/TranslationSettings';
 import '../components/settings/settings.css';
 
 type SettingsPageProps = {
@@ -30,11 +34,13 @@ type SettingsPageProps = {
   onClose?: () => void;
 };
 
-type SettingsSectionId = 'general' | 'ai' | 'summary' | 'export' | 'about';
+type SettingsSectionId = 'general' | 'connectors' | 'transcription' | 'translation' | 'summary' | 'export' | 'about';
 
 const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
   { id: 'general', icon: Settings },
-  { id: 'ai', icon: Bot },
+  { id: 'connectors', icon: Plug },
+  { id: 'transcription', icon: AudioLines },
+  { id: 'translation', icon: Languages },
   { id: 'summary', icon: ScrollText },
   { id: 'export', icon: FolderOpen },
   { id: 'about', icon: Info }
@@ -88,8 +94,8 @@ export function SettingsPage({
             {section === 'general' ? (
               <GeneralSection settings={settings} onLanguageChange={onLanguageChange} onSettingsChange={onSettingsChange} />
             ) : null}
-            {section === 'ai' ? (
-              <AiSection
+            {section === 'connectors' ? (
+              <ConnectorsSection
                 settings={settings}
                 providers={providers}
                 onSettingsChange={onSettingsChange}
@@ -99,6 +105,12 @@ export function SettingsPage({
                 onTestProvider={onTestProvider}
                 onListModels={onListModels}
               />
+            ) : null}
+            {section === 'transcription' ? (
+              <TranscriptionSettings settings={settings} onSettingsChange={onSettingsChange} />
+            ) : null}
+            {section === 'translation' ? (
+              <TranslationSettings settings={settings} onSettingsChange={onSettingsChange} />
             ) : null}
             {section === 'summary' ? (
               <SummarySettings

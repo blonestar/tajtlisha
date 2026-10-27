@@ -27,6 +27,8 @@ export type ProviderTranscribeRequest = {
   modelId?: string;
   /** Project language code; undefined = auto-detect. */
   language?: string;
+  /** Context text that steers recognition (names, terms). Providers without prompt support ignore it. */
+  prompt?: string;
   signal?: AbortSignal;
 };
 
@@ -55,6 +57,10 @@ type ProviderTextBaseRequest = {
   modelId?: string;
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
+  /** User instructions added after the built-in prompt rules. Undefined or '' = none. */
+  customInstructions?: string;
+  /** What the video is about, from the project. Undefined or '' = none. */
+  videoContext?: string;
   signal?: AbortSignal;
 };
 
@@ -63,7 +69,8 @@ export type ProviderTranslateRequest = ProviderTextBaseRequest & {
   targetLanguage: string;
 };
 
-export type ProviderPolishMode = 'conservative' | 'social_caption';
+/** 'transcript_correction' fixes speech recognition errors in the original text. */
+export type ProviderPolishMode = 'conservative' | 'social_caption' | 'transcript_correction';
 
 export type ProviderPolishRequest = ProviderTextBaseRequest & {
   language: string;

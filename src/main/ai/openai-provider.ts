@@ -98,6 +98,7 @@ export class OpenAiProvider extends BaseAiProvider {
     const form = buildOpenAiTranscriptionForm({
       modelId,
       language: request.language,
+      prompt: request.prompt,
       audio,
       fileName: basename(request.audioPath)
     });
@@ -220,6 +221,8 @@ export class OpenAiProvider extends BaseAiProvider {
 export function buildOpenAiTranscriptionForm(input: {
   modelId: string;
   language?: string;
+  /** Recognition hint (whisper-1 and the GPT transcribe models accept it). Blank = not sent. */
+  prompt?: string;
   audio: Blob;
   fileName: string;
 }): FormData {
@@ -229,6 +232,11 @@ export function buildOpenAiTranscriptionForm(input: {
   const language = transcriptionLanguageCode(input.language);
   if (language) {
     form.set('language', language);
+  }
+
+  const prompt = input.prompt?.trim();
+  if (prompt) {
+    form.set('prompt', prompt);
   }
 
   if (openAiTimestamps(input.modelId) === 'word') {

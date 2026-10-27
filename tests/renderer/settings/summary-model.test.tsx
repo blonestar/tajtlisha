@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AiProviderCapabilities, ProviderModelDescriptor, ProviderStatus } from '../../../src/shared/types/ai';
 import type { AppSettings } from '../../../src/shared/types/settings';
-import { AiSection } from '../../../src/renderer/src/components/settings/AiSection';
+import { ConnectorsSection } from '../../../src/renderer/src/components/settings/ConnectorsSection';
 import { SummarySettings } from '../../../src/renderer/src/components/settings/SummarySettings';
 import { mockProviderStatuses, mockSettings } from './mockSettings';
 import { renderWithI18n } from '../renderWithI18n';
@@ -56,9 +56,9 @@ function renderSummaryTab(options: {
 }
 
 describe('Summary tab model row', () => {
-  it('is not part of the AI section any more', () => {
+  it('is not part of the Connectors section any more', () => {
     renderWithI18n(
-      <AiSection settings={settingsWith({ enabled: true })} providers={mockProviderStatuses} onListModels={listModelsSpy()} />
+      <ConnectorsSection settings={settingsWith({ enabled: true })} providers={mockProviderStatuses} onListModels={listModelsSpy()} />
     );
 
     expect(screen.queryByLabelText('Summary model')).not.toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('Summary tab model row', () => {
     });
 
     expect(screen.getByLabelText('Summary model')).toBeDisabled();
-    expect(screen.getByText('Connect the active AI provider in the AI section to choose a model.')).toBeInTheDocument();
+    expect(screen.getByText('Connect the active AI provider in the Connectors section to choose a model.')).toBeInTheDocument();
   });
 
   it('is disabled with a hint when the provider cannot summarize', () => {

@@ -254,6 +254,8 @@ export function EditorPage({
             summaryEnabled={settings.summary.enabled}
             summarizableRows={summaryTranscript(project).length}
             hasSummary={workspace.summary !== null}
+            videoContext={project.videoContext ?? ''}
+            onVideoContextChange={(videoContext) => dispatch({ type: 'project/setVideoContext', videoContext })}
             onSummarize={workspace.summarize}
             onShowSummary={workspace.openSummary}
             onOpenSettings={onOpenSettings}

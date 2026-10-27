@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../../shared/summary';
 import {
@@ -10,6 +10,7 @@ import {
   type ProviderStatus
 } from '../../../../shared/types/ai';
 import type { AppSettings, SummarySettings as SummarySettingsValue } from '../../../../shared/types/settings';
+import { useCommitOnUnmount } from './hooks';
 import { SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
 type SummarySettingsProps = {
@@ -248,16 +249,4 @@ function SummaryPromptRow({ systemPrompt, onCommit }: SummaryPromptRowProps): Re
       </div>
     </SettingsRow>
   );
-}
-
-/**
- * Calls `flush` with the latest draft when the component unmounts. The callback
- * is read at unmount time, so it sees the latest props.
- */
-function useCommitOnUnmount(draft: string, flush: (draft: string) => void): void {
-  const latest = useRef({ draft, flush });
-  useLayoutEffect(() => {
-    latest.current = { draft, flush };
-  });
-  useEffect(() => () => latest.current.flush(latest.current.draft), []);
 }

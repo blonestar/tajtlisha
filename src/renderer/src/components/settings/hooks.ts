@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FfmpegStatus } from '../../../../shared/types/media';
 import type { UpdateState } from '../../../../shared/types/updates';
 
@@ -124,4 +124,17 @@ export function useFfmpegStatus(): {
   }, [check]);
 
   return { status, loading, error, check };
+}
+
+/**
+ * Calls `flush` with the latest draft when the component unmounts. The callback
+ * is read at unmount time, so it sees the latest props. Used for text fields
+ * that commit on blur, because Esc closes Settings without a blur.
+ */
+export function useCommitOnUnmount(draft: string, flush: (draft: string) => void): void {
+  const latest = useRef({ draft, flush });
+  useLayoutEffect(() => {
+    latest.current = { draft, flush };
+  });
+  useEffect(() => () => latest.current.flush(latest.current.draft), []);
 }

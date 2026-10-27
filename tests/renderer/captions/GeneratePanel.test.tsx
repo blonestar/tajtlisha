@@ -1,4 +1,4 @@
-import { fireEvent, screen, cleanup } from '@testing-library/react';
+import { fireEvent, screen, cleanup, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   GeneratePanel,
@@ -19,6 +19,8 @@ function props(overrides: Partial<GeneratePanelProps> = {}): GeneratePanelProps 
   return {
     hasSource: true,
     hasAudio: true,
+    videoContext: '',
+    onVideoContextChange: vi.fn(),
     provider: connectedProvider,
     sourceLanguage: 'auto',
     targetLanguage: 'sr-Latn',
@@ -244,5 +246,125 @@ describe('GeneratePanel', () => {
       expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
       expect(screen.getAllByText('Wait for the current job to finish').length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe('GeneratePanel video context', () => {
+  const contextProps = (overrides: Partial<GeneratePanelProps> = {}) => props(overrides);
+
+  it('is disabled only when there is no video', () => {
+    renderWithI18n(<GeneratePanel {...contextProps({ hasSource: false, hasAudio: false })} />);
+
+    expect(screen.getByRole('button', { name: 'Video context' })).toBeDisabled();
+  });
+
+  it('is enabled while a job runs', () => {
+    renderWithI18n(<GeneratePanel {...contextProps({ busy: true })} />);
+
+    expect(screen.getByRole('button', { name: 'Video context' })).toBeEnabled();
+  });
+
+  it('shows an accent state and the start of the text when a context is set', () => {
+    const text = `Parking attendants in Jakarta. ${'Extra detail. '.repeat(20)}`;
+    const { container } = renderWithI18n(<GeneratePanel {...contextProps({ videoContext: text })} />);
+
+    const button = screen.getByRole('button', { name: 'Video context' });
+    expect(button).toHaveClass('generate-context-set');
+    expect(button.getAttribute('title')).toMatch(/^Video context: Parking attendants in Jakarta\. Extra detail/);
+    expect(button.getAttribute('title')?.endsWith('...')).toBe(true);
+    expect(container.querySelector('.generate-context-dot')).not.toBeNull();
+  });
+
+  it('has no accent state and a hint tooltip when empty', () => {
+    const { container } = renderWithI18n(<GeneratePanel {...contextProps()} />);
+
+    const button = screen.getByRole('button', { name: 'Video context' });
+    expect(button).not.toHaveClass('generate-context-set');
+    expect(button).toHaveAttribute('title', 'Describe what the video is about');
+    expect(container.querySelector('.generate-context-dot')).toBeNull();
+  });
+
+  it('opens a dialog with the explanation, placeholder and counter', () => {
+    renderWithI18n(<GeneratePanel {...contextProps()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent('AI uses it to recognize words during transcription, correction and translation.');
+    expect(dialog).toHaveTextContent('It is never copied into the captions.');
+    expect(screen.getByRole('textbox', { name: 'Video context text' })).toHaveAttribute(
+      'placeholder',
+      'Example: Street in Jakarta, Indonesia. A parking attendant (tukang parkir) guides drivers and collects parking fees.'
+    );
+    expect(screen.getByRole('textbox', { name: 'Video context text' })).toHaveAttribute('maxlength', '2000');
+    expect(screen.getByText('0 / 2000')).toBeInTheDocument();
+  });
+
+  it('counts characters while typing', () => {
+    renderWithI18n(<GeneratePanel {...contextProps()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Video context text' }), { target: { value: 'Parking' } });
+
+    expect(screen.getByText('7 / 2000')).toBeInTheDocument();
+  });
+
+  it('saves the typed text through the handler and closes', async () => {
+    const onVideoContextChange = vi.fn();
+    renderWithI18n(<GeneratePanel {...contextProps({ onVideoContextChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Video context text' }), {
+      target: { value: 'Parking attendants in Jakarta' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onVideoContextChange).toHaveBeenCalledTimes(1);
+    expect(onVideoContextChange).toHaveBeenCalledWith('Parking attendants in Jakarta');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('Cancel discards the draft and the next open shows the stored text', async () => {
+    const onVideoContextChange = vi.fn();
+    renderWithI18n(<GeneratePanel {...contextProps({ videoContext: 'Stored text', onVideoContextChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Video context text' }), { target: { value: 'Discarded' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onVideoContextChange).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+    expect(screen.getByRole('textbox', { name: 'Video context text' })).toHaveValue('Stored text');
+  });
+
+  it('Esc discards the draft like Cancel', async () => {
+    const onVideoContextChange = vi.fn();
+    renderWithI18n(<GeneratePanel {...contextProps({ onVideoContextChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+
+    const textarea = screen.getByRole('textbox', { name: 'Video context text' });
+    fireEvent.change(textarea, { target: { value: 'Discarded' } });
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(onVideoContextChange).not.toHaveBeenCalled();
+  });
+
+  it('offers Clear only when a context is stored, and clearing saves blank text', async () => {
+    const onVideoContextChange = vi.fn();
+    const { unmount } = renderWithI18n(<GeneratePanel {...contextProps({ onVideoContextChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+    expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    unmount();
+
+    renderWithI18n(<GeneratePanel {...contextProps({ videoContext: 'Stored text', onVideoContextChange })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Video context' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    expect(onVideoContextChange).toHaveBeenCalledWith('');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });

@@ -19,6 +19,7 @@ export type JobStage =
   | 'transcribing'
   | 'translating'
   | 'polishing'
+  | 'correcting'
   | 'summarizing'
   | 'rendering_video'
   | 'writing_srt';
@@ -43,7 +44,28 @@ export type TranscribeClipRequest = {
   language?: string;
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
+  /** When set, an AI pass corrects the transcript text after transcription. Timing is kept. */
+  correction?: TranscriptCorrectionRequest;
+  /**
+   * The project's video context. Used by the correction pass, and as a
+   * transcription prompt when `language` is set. At most MAX_VIDEO_CONTEXT_CHARS.
+   */
+  videoContext?: string;
 };
+
+export type TranscriptCorrectionRequest = {
+  /** Text model id; undefined = provider default text model. */
+  modelId?: string;
+  /** User instructions; '' = none. At most MAX_AI_INSTRUCTIONS_CHARS. */
+  instructions: string;
+};
+
+/**
+ * 'applied': the correction ran on every caption. 'failed': it failed and the
+ * raw transcript was kept (cancel still cancels the whole job). Absent when no
+ * correction was requested.
+ */
+export type TranscriptCorrectionOutcome = 'applied' | 'failed';
 
 export type TranscribeClipResult = {
   /** Detected or requested language code ('und' when unknown). */
@@ -51,6 +73,7 @@ export type TranscribeClipResult = {
   /** Source-absolute timings; translation is always ''. */
   captions: CaptionRow[];
   timingSource: CaptionTimingSource;
+  correction?: TranscriptCorrectionOutcome;
 };
 
 export type PolishMode = 'none' | 'conservative' | 'social_caption';
@@ -63,6 +86,10 @@ export type TranslateCaptionsRequest = {
   targetLanguage: string;
   captions: Array<{ id: string; text: string }>;
   polish: PolishMode;
+  /** User instructions for translation and its polish pass. Undefined or '' = none. */
+  instructions?: string;
+  /** The project's video context. Undefined or '' = none. At most MAX_VIDEO_CONTEXT_CHARS. */
+  videoContext?: string;
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
 };
