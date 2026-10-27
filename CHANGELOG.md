@@ -11,6 +11,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
   On by default. Its own Settings > Logo tab sets the letters, the text (up to 30 characters), content, background, colours, corner roundness, position, size, margin and opacity, with a live preview. Turn it off there, or for a single export with the "Add logo" checkbox.
 - Languages: Arabic, Hindi, Indonesian, Thai, Vietnamese, Chinese (Simplified), Japanese and Korean for the spoken
   language and the translation.
+- AI correction after transcription (Settings > Transcription, off by default): a second AI pass fixes misheard
+  words, names and punctuation, using your own correction instructions. Caption timing and word timing are kept; if
+  the correction fails, the raw transcript is kept and the result says so.
+- Translation instructions (Settings > Translation): your own rules for the translation and its polish pass.
+- Video context: a button next to Transcribe opens a short description of the clip (topic, place, names, terms),
+  stored in the project. It guides transcription when the spoken language is known, and the AI correction and
+  translation always.
+
+### Changed
+- AI settings are split into Connectors, Transcription and Translation tabs.
 
 ### Fixed
 - When the system language is Serbo-Croatian (`sh`), file dialogs and warnings are now in Serbian Latin like the rest
