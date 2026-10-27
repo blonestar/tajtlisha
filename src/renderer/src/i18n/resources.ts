@@ -25,7 +25,9 @@ const baseResources = {
         sections: 'Settings sections',
         nav: {
           general: 'General',
-          ai: 'AI',
+          connectors: 'Connectors',
+          transcription: 'Transcription',
+          translation: 'Translation',
           summary: 'Summary',
           export: 'Export',
           logo: 'Logo',
@@ -81,7 +83,6 @@ const baseResources = {
           }
         },
         captions: {
-          heading: 'Captions',
           detectLanguage: 'Auto-detect spoken language',
           detectHint: 'Detect the spoken language before transcribing. When off, the project’s source language is used.',
           maxChars: 'Max characters per line',
@@ -98,11 +99,26 @@ const baseResources = {
             social: 'Shorter, more natural wording for social media captions.'
           }
         },
+        transcription: {
+          correct: 'AI correction after transcription',
+          correctHint: 'After transcription, AI goes over the text and fixes errors. It uses the text model chosen under Connectors and keeps the timing.',
+          correctionInstructions: 'Correction instructions',
+          correctionInstructionsHint: 'Added to the built-in correction rules. Say what to keep, avoid or write differently. Used only when AI correction is on. Changes are saved when you leave the field.',
+          correctionPlaceholder: "Example: The speaker's name is Marko Petrović. Write 'AI', never 'artificial intelligence'. Do not censor swear words."
+        },
+        translation: {
+          instructions: 'Translation instructions',
+          instructionsHint: 'Added to the built-in translation rules. The polish pass uses them too. Changes are saved when you leave the field.',
+          instructionsPlaceholder: "Example: Use informal 'ti'. Keep brand names in English."
+        },
+        instructions: {
+          counter: '{{count}} / {{max}} characters'
+        },
         summary: {
           enable: 'Show Summarize in the editor',
           enableHint: 'Shows or hides the Summarize button in the editor. The transcript is sent to the AI provider only when you press it.',
           modelProvider: 'Uses the active AI provider: {{provider}}.',
-          modelUnavailable: 'Connect the active AI provider in the AI section to choose a model.',
+          modelUnavailable: 'Connect the active AI provider in the Connectors section to choose a model.',
           modelUnsupported: '{{provider}} cannot summarize text.',
           prompt: 'System prompt',
           promptHint: 'Tells the model what to take from the transcript. Changes are saved when you leave the field.',
@@ -239,7 +255,9 @@ const baseResources = {
         sections: 'Odeljci podešavanja',
         nav: {
           general: 'Opšte',
-          ai: 'AI',
+          connectors: 'Konektori',
+          transcription: 'Transkripcija',
+          translation: 'Prevod',
           summary: 'Sažetak',
           export: 'Izvoz',
           logo: 'Logo',
@@ -295,7 +313,6 @@ const baseResources = {
           }
         },
         captions: {
-          heading: 'Titlovi',
           detectLanguage: 'Automatski prepoznaj jezik govora',
           detectHint: 'Prepoznaje jezik govora pre transkripcije. Kada je isključeno, koristi se izvorni jezik projekta.',
           maxChars: 'Najviše znakova po redu',
@@ -312,11 +329,26 @@ const baseResources = {
             social: 'Kraći i prirodniji tekst za titlove na društvenim mrežama.'
           }
         },
+        transcription: {
+          correct: 'AI ispravka posle transkripcije',
+          correctHint: 'Posle transkripcije AI prolazi kroz tekst i ispravlja greške. Koristi model za tekst izabran u odeljku Konektori i zadržava vreme titlova.',
+          correctionInstructions: 'Uputstva za ispravku',
+          correctionInstructionsHint: 'Dodaje se ugrađenim pravilima za ispravku. Napiši šta da se zadrži, izbegava ili piše drugačije. Koristi se samo kada je AI ispravka uključena. Izmene se čuvaju kada napustiš polje.',
+          correctionPlaceholder: 'Primer: Govornik se zove Marko Petrović. Piši „AI”, nikad „veštačka inteligencija”. Ne cenzuriši psovke.'
+        },
+        translation: {
+          instructions: 'Uputstva za prevod',
+          instructionsHint: 'Dodaje se ugrađenim pravilima za prevod, a koristi ih i dorada teksta. Izmene se čuvaju kada napustiš polje.',
+          instructionsPlaceholder: 'Primer: Koristi neformalno „ti”. Nazive brendova ostavi na engleskom.'
+        },
+        instructions: {
+          counter: '{{count}} / {{max}} karaktera'
+        },
         summary: {
           enable: 'Prikaži Sažmi u editoru',
           enableHint: 'Prikazuje ili skriva dugme Sažmi u editoru. Transkript se šalje AI provajderu tek kada ga pritisneš.',
           modelProvider: 'Koristi aktivni AI provajder: {{provider}}.',
-          modelUnavailable: 'Poveži aktivni AI provajder u odeljku AI da bi izabrao model.',
+          modelUnavailable: 'Poveži aktivni AI provajder u odeljku Konektori da bi izabrao model.',
           modelUnsupported: '{{provider}} ne može da sažima tekst.',
           prompt: 'Sistemska uputstva',
           promptHint: 'Govori modelu šta da izdvoji iz transkripta. Izmene se čuvaju kada napustiš polje.',
@@ -454,7 +486,9 @@ const baseResources = {
         sections: 'Одељци подешавања',
         nav: {
           general: 'Опште',
-          ai: 'AI',
+          connectors: 'Конектори',
+          transcription: 'Транскрипција',
+          translation: 'Превод',
           summary: 'Сажетак',
           export: 'Извоз',
           logo: 'Лого',
@@ -510,7 +544,6 @@ const baseResources = {
           }
         },
         captions: {
-          heading: 'Титлови',
           detectLanguage: 'Аутоматски препознај језик говора',
           detectHint: 'Препознаје језик говора пре транскрипције. Када је искључено, користи се изворни језик пројекта.',
           maxChars: 'Највише знакова по реду',
@@ -527,11 +560,26 @@ const baseResources = {
             social: 'Краћи и природнији текст за титлове на друштвеним мрежама.'
           }
         },
+        transcription: {
+          correct: 'AI исправка после транскрипције',
+          correctHint: 'После транскрипције AI пролази кроз текст и исправља грешке. Користи модел за текст изабран у одељку Конектори и задржава време титлова.',
+          correctionInstructions: 'Упутства за исправку',
+          correctionInstructionsHint: 'Додаје се уграђеним правилима за исправку. Напиши шта да се задржи, избегава или пише другачије. Користи се само када је AI исправка укључена. Измене се чувају када напустиш поље.',
+          correctionPlaceholder: 'Пример: Говорник се зове Марко Петровић. Пиши „AI”, никад „вештачка интелигенција”. Не цензуриши псовке.'
+        },
+        translation: {
+          instructions: 'Упутства за превод',
+          instructionsHint: 'Додаје се уграђеним правилима за превод, а користи их и дорада текста. Измене се чувају када напустиш поље.',
+          instructionsPlaceholder: 'Пример: Користи неформално „ти”. Називе брендова остави на енглеском.'
+        },
+        instructions: {
+          counter: '{{count}} / {{max}} карактера'
+        },
         summary: {
           enable: 'Прикажи Сажми у едитору',
           enableHint: 'Приказује или скрива дугме Сажми у едитору. Транскрипт се шаље AI провајдеру тек када га притиснеш.',
           modelProvider: 'Користи активни AI провајдер: {{provider}}.',
-          modelUnavailable: 'Повежи активни AI провајдер у одељку AI да би изабрао модел.',
+          modelUnavailable: 'Повежи активни AI провајдер у одељку Конектори да би изабрао модел.',
           modelUnsupported: '{{provider}} не може да сажима текст.',
           prompt: 'Системска упутства',
           promptHint: 'Говори моделу шта да издвоји из транскрипта. Измене се чувају када напустиш поље.',

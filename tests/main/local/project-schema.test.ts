@@ -156,3 +156,47 @@ describe('validateProjectDocument', () => {
     expect(() => validateProjectDocument([])).toThrow('[UNKNOWN] invalid project: project');
   });
 });
+
+describe('validateProjectDocument video context', () => {
+  it('keeps a non-blank video context unchanged', () => {
+    const doc = validateProjectDocument(validDocument({ videoContext: 'Ljubav na kraju, epizoda o Beogradu.' }));
+
+    expect(doc.videoContext).toBe('Ljubav na kraju, epizoda o Beogradu.');
+  });
+
+  it('keeps the video context through a JSON round trip', () => {
+    const doc = validateProjectDocument(validDocument({ videoContext: 'Names: Ana Petrović, Bojan.' }));
+
+    expect(validateProjectDocument(JSON.parse(JSON.stringify(doc)))).toEqual(doc);
+  });
+
+  it('accepts a video context at exactly the 2000 character limit', () => {
+    const longest = 'a'.repeat(2000);
+
+    expect(validateProjectDocument(validDocument({ videoContext: longest })).videoContext).toBe(longest);
+  });
+
+  it('drops an empty or whitespace-only video context instead of storing it', () => {
+    for (const videoContext of ['', '   ', '\n\t  \r\n']) {
+      const doc = validateProjectDocument(validDocument({ videoContext }));
+
+      expect(doc).not.toHaveProperty('videoContext');
+    }
+  });
+
+  it('leaves the video context absent when the document has none', () => {
+    const doc = validateProjectDocument(validDocument());
+
+    expect(doc).not.toHaveProperty('videoContext');
+  });
+
+  it.each([
+    ['longer than 2000 characters', { videoContext: 'a'.repeat(2001) }],
+    ['a number', { videoContext: 42 }],
+    ['null', { videoContext: null }],
+    ['an array', { videoContext: ['Ana'] }],
+    ['an object', { videoContext: { text: 'Ana' } }]
+  ])('rejects a video context that is %s', (_label, overrides) => {
+    expect(() => validateProjectDocument(validDocument(overrides))).toThrow('[UNKNOWN] invalid project: project.videoContext');
+  });
+});

@@ -94,6 +94,7 @@ export const captionsStrings = {
       transcribing: 'Transcribing',
       translating: 'Translating',
       polishing: 'Polishing text',
+      correcting: 'Correcting transcript',
       rendering_video: 'Rendering video',
       writing_srt: 'Writing SRT',
       summarizing: 'Summarizing'
@@ -149,6 +150,22 @@ export const captionsStrings = {
         noTranscript: 'No caption text inside the trim range',
         cannotSummarize: '{{provider}} cannot summarize'
       }
+    },
+    context: {
+      button: 'Video context',
+      buttonSetTitle: 'Video context: {{text}}',
+      buttonEmptyTitle: 'Describe what the video is about',
+      dialogTitle: 'Video context',
+      description:
+        'Describe what the video is about: topic, place, people, names and terms. AI uses it to recognize words during transcription, correction and translation. It is never copied into the captions.',
+      languageHint: 'Transcription uses it as a hint only when the spoken language is known: pick it in the toolbar, or transcribe once to detect it.',
+      placeholder:
+        'Example: Street in Jakarta, Indonesia. A parking attendant (tukang parkir) guides drivers and collects parking fees.',
+      textLabel: 'Video context text',
+      counter: '{{count}} / {{max}}',
+      save: 'Save',
+      cancel: 'Cancel',
+      clear: 'Clear'
     },
     summary: {
       title: 'Video summary',
@@ -313,6 +330,7 @@ export const captionsStrings = {
       transcribing: 'Transkripcija',
       translating: 'Prevođenje',
       polishing: 'Dorada teksta',
+      correcting: 'Ispravka transkripta',
       rendering_video: 'Renderovanje videa',
       writing_srt: 'Pisanje SRT-a',
       summarizing: 'Sažimanje'
@@ -368,6 +386,22 @@ export const captionsStrings = {
         noTranscript: 'Nema teksta titlova u opsegu isečka',
         cannotSummarize: '{{provider}} ne može da sažima'
       }
+    },
+    context: {
+      button: 'Kontekst videa',
+      buttonSetTitle: 'Kontekst videa: {{text}}',
+      buttonEmptyTitle: 'Opiši o čemu je video',
+      dialogTitle: 'Kontekst videa',
+      description:
+        'Opiši o čemu je video: tema, mesto, ljudi, imena i pojmovi. AI ih koristi da prepozna reči pri transkripciji, ispravci i prevodu. Nikad se ne kopira u titlove.',
+      languageHint: 'Transkripcija ga koristi kao pomoć tek kad je poznat govorni jezik: izaberi ga u traci ili prvo transkribuj.',
+      placeholder:
+        'Primer: Ulica u Džakarti, Indonezija. Čuvar parkinga (tukang parkir) navodi vozače i naplaćuje parking.',
+      textLabel: 'Tekst konteksta videa',
+      counter: '{{count}} / {{max}}',
+      save: 'Sačuvaj',
+      cancel: 'Otkaži',
+      clear: 'Obriši'
     },
     summary: {
       title: 'Sažetak videa',
@@ -532,6 +566,7 @@ export const captionsStrings = {
       transcribing: 'Транскрипција',
       translating: 'Превођење',
       polishing: 'Дорада текста',
+      correcting: 'Исправка транскрипта',
       rendering_video: 'Рендеровање видеа',
       writing_srt: 'Писање SRT-а',
       summarizing: 'Сажимање'
@@ -587,6 +622,22 @@ export const captionsStrings = {
         noTranscript: 'Нема текста титлова у опсегу исечка',
         cannotSummarize: '{{provider}} не може да сажима'
       }
+    },
+    context: {
+      button: 'Контекст видеа',
+      buttonSetTitle: 'Контекст видеа: {{text}}',
+      buttonEmptyTitle: 'Опиши о чему је видео',
+      dialogTitle: 'Контекст видеа',
+      description:
+        'Опиши о чему је видео: тема, место, људи, имена и појмови. AI их користи да препозна речи при транскрипцији, исправци и преводу. Никад се не копира у титлове.',
+      languageHint: 'Транскрипција га користи као помоћ тек кад је познат говорни језик: изабери га у траци или прво транскрибуј.',
+      placeholder:
+        'Пример: Улица у Џакарти, Индонезија. Чувар паркинга (туканг паркир) наводи возаче и наплаћује паркинг.',
+      textLabel: 'Текст контекста видеа',
+      counter: '{{count}} / {{max}}',
+      save: 'Сачувај',
+      cancel: 'Откажи',
+      clear: 'Обриши'
     },
     summary: {
       title: 'Сажетак видеа',

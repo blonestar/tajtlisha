@@ -23,6 +23,12 @@ export type AiConnectorSettings = {
   socialCaptionPolish: boolean;
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
+  /** Runs an AI correction pass on the transcript right after transcription. */
+  correctTranscript: boolean;
+  /** User instructions added to the correction prompt. '' = none. At most MAX_AI_INSTRUCTIONS_CHARS. */
+  transcriptCorrectionInstructions: string;
+  /** User instructions added to the translation (and translation polish) prompt. '' = none. */
+  translationInstructions: string;
 };
 
 /**

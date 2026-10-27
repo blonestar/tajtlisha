@@ -26,20 +26,20 @@ describe('SettingsPage navigation', () => {
     expect(screen.queryByLabelText('Interface language')).not.toBeInTheDocument();
   });
 
-  it('shows the AI section with its provider and caption options', () => {
+  it('shows the Connectors section with its provider cards, and no caption options', () => {
     renderWithI18n(<SettingsPage settings={mockSettings} providers={mockProviderStatuses} onLanguageChange={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
 
-    expect(screen.getByRole('heading', { level: 2, name: 'AI' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Connectors' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /OpenAI/ })).toBeInTheDocument();
-    expect(screen.getByRole('switch', { name: 'Auto-detect spoken language' })).toBeChecked();
+    expect(screen.queryByRole('switch', { name: 'Auto-detect spoken language' })).not.toBeInTheDocument();
   });
 
-  it('has its own Summary section, separate from AI', () => {
+  it('has its own Summary section, separate from Connectors', () => {
     renderWithI18n(<SettingsPage settings={mockSettings} providers={mockProviderStatuses} onLanguageChange={vi.fn()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
     expect(screen.queryByRole('switch', { name: 'Show Summarize in the editor' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Summary' }));

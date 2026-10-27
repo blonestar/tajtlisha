@@ -34,7 +34,10 @@ export const mockSettings: AppSettings = {
     conservativePolish: true,
     socialCaptionPolish: false,
     maxCharsPerLine: 42,
-    maxLinesPerCaption: 2
+    maxLinesPerCaption: 2,
+    correctTranscript: false,
+    transcriptCorrectionInstructions: '',
+    translationInstructions: ''
   },
   summary: {
     enabled: false,

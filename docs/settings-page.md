@@ -61,7 +61,9 @@ Pravila:
 
 ## AI connector
 
-AI connector je posebna sekcija Settings stranice i centralno mesto za sve AI opcije.
+AI opcije su u UI-u podeljene u tabove: Connectors (provider-i, kljucevi, modeli), Transcription
+(jezik, raspored titlova, AI ispravka transkripta) i Translation (dorada prevoda, uputstva za prevod).
+Summary je zaseban tab.
 
 ### Provider izbor
 
@@ -116,6 +118,15 @@ Opcije:
 - max lines per caption,
 - keep original meaning,
 - preserve timing during translation.
+
+### Korisnicka uputstva (tabovi Transcription i Translation)
+
+- AI ispravka posle transkripcije (podrazumevano iskljucena): drugi prolaz modela za tekst ispravlja pogresno
+  cute reci, imena, interpunkciju; timing i word timing ostaju isti. Ako ispravka ne uspe, zadrzava se sirovi
+  transkript i korisnik dobija poruku; cancel i dalje prekida ceo posao.
+- Uputstva za ispravku i uputstva za prevod (do 4000 znakova, prazno = nema): dodaju se posle ugradjenih pravila
+  u bloku `<user_instructions>`; pravila o id-jevima, broju stavki i JSON formatu imaju prednost.
+- Uputstva za prevod koristi i dorada (polish) prevoda.
 
 ### Sazetak videa (zaseban tab "Summary")
 

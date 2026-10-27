@@ -83,6 +83,7 @@ export const shellStrings = {
     },
     result: {
       transcribed: 'Created {{count}} captions.',
+      correctionFailed: 'Created {{count}} captions. The AI correction failed, so the original transcript was kept.',
       translated: 'Translated {{count}} captions.',
       translatedSkipped: 'Translated {{count}}. Skipped {{skipped}} because their text changed during translation.',
       targetChanged: 'The target language changed while translating. The result was not applied.',
@@ -205,6 +206,7 @@ export const shellStrings = {
     },
     result: {
       transcribed: 'Napravljeno titlova: {{count}}.',
+      correctionFailed: 'Napravljeno titlova: {{count}}. AI ispravka nije uspela, pa je zadržan originalni transkript.',
       translated: 'Prevedeno titlova: {{count}}.',
       translatedSkipped: 'Prevedeno: {{count}}. Preskočeno: {{skipped}}, jer je tekst u međuvremenu promenjen.',
       targetChanged: 'Ciljni jezik je promenjen dok je prevod radio. Rezultat nije primenjen.',
@@ -327,6 +329,7 @@ export const shellStrings = {
     },
     result: {
       transcribed: 'Направљено титлова: {{count}}.',
+      correctionFailed: 'Направљено титлова: {{count}}. AI исправка није успела, па је задржан оригинални транскрипт.',
       translated: 'Преведено титлова: {{count}}.',
       translatedSkipped: 'Преведено: {{count}}. Прескочено: {{skipped}}, јер је текст у међувремену промењен.',
       targetChanged: 'Циљни језик је промењен док је превод радио. Резултат није примењен.',

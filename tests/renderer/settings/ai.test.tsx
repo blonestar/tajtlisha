@@ -24,12 +24,17 @@ function listModels(): (providerId: string, capability: keyof ProviderStatus['ca
   return async (_providerId, capability) => (capability === 'transcription' ? transcriptionModels : textModels);
 }
 
-function openAiSection(props: Partial<Parameters<typeof SettingsPage>[0]>): void {
+/** Renders Settings and opens one of its tabs by its nav label. */
+function openSettingsTab(tab: string, props: Partial<Parameters<typeof SettingsPage>[0]>): void {
   renderWithI18n(<SettingsPage settings={mockSettings} onLanguageChange={vi.fn()} {...props} />);
-  fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+  fireEvent.click(screen.getByRole('button', { name: tab }));
 }
 
-describe('AI section connection', () => {
+function openAiSection(props: Partial<Parameters<typeof SettingsPage>[0]>): void {
+  openSettingsTab('Connectors', props);
+}
+
+describe('Connectors connection', () => {
   it('connects with the typed key and clears the input so the secret is not kept', async () => {
     const onConnectProvider = vi.fn().mockResolvedValue(undefined);
     openAiSection({ providers: disconnectedOpenAi, onConnectProvider });
@@ -95,7 +100,7 @@ describe('AI section connection', () => {
   });
 });
 
-describe('AI section models', () => {
+describe('Connectors models', () => {
   it('shows a word timing badge for a word-timed transcription model', async () => {
     renderWithI18n(
       <SettingsPage
@@ -108,7 +113,7 @@ describe('AI section models', () => {
         onListModels={listModels()}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
 
     expect(await screen.findByText('Word timing')).toBeInTheDocument();
     expect(screen.getByText(/OpenAI retires it on 2027-02-26/)).toBeInTheDocument();
@@ -129,7 +134,7 @@ describe('AI section models', () => {
         onListModels={listModels()}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'AI' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
 
     expect(await screen.findByText('No timing - approximate')).toBeInTheDocument();
     expect(screen.queryByText('Word timing')).not.toBeInTheDocument();
@@ -172,10 +177,10 @@ describe('AI section models', () => {
   });
 });
 
-describe('AI section captions', () => {
+describe('Translation tab polish', () => {
   it('maps the polish segmented control onto the two polish flags', () => {
     const onSettingsChange = vi.fn();
-    openAiSection({ providers: mockProviderStatuses, onSettingsChange, onListModels: listModels() });
+    openSettingsTab('Translation', { providers: mockProviderStatuses, onSettingsChange });
 
     fireEvent.click(screen.getByRole('button', { name: 'Social captions' }));
     expect(onSettingsChange).toHaveBeenLastCalledWith({
@@ -194,15 +199,17 @@ describe('AI section captions', () => {
   });
 
   it('shows the selected polish mode as pressed', () => {
-    openAiSection({ providers: mockProviderStatuses, onListModels: listModels() });
+    openSettingsTab('Translation', { providers: mockProviderStatuses });
 
     expect(screen.getByRole('button', { name: 'Light' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Social captions' })).toHaveAttribute('aria-pressed', 'false');
   });
+});
 
+describe('Transcription tab captions', () => {
   it('patches the max characters per line from the slider', () => {
     const onSettingsChange = vi.fn();
-    openAiSection({ providers: mockProviderStatuses, onSettingsChange, onListModels: listModels() });
+    openSettingsTab('Transcription', { providers: mockProviderStatuses, onSettingsChange });
 
     expect(screen.getByText('42 characters')).toBeInTheDocument();
     const slider = screen.getByLabelText('Max characters per line');
@@ -218,7 +225,7 @@ describe('AI section captions', () => {
 
   it('patches the max lines per caption from the segmented control', () => {
     const onSettingsChange = vi.fn();
-    openAiSection({ providers: mockProviderStatuses, onSettingsChange, onListModels: listModels() });
+    openSettingsTab('Transcription', { providers: mockProviderStatuses, onSettingsChange });
 
     fireEvent.click(screen.getByRole('button', { name: '1' }));
 
@@ -229,7 +236,7 @@ describe('AI section captions', () => {
 
   it('patches the auto-detect language switch', () => {
     const onSettingsChange = vi.fn();
-    openAiSection({ providers: mockProviderStatuses, onSettingsChange, onListModels: listModels() });
+    openSettingsTab('Transcription', { providers: mockProviderStatuses, onSettingsChange });
 
     fireEvent.click(screen.getByRole('switch', { name: 'Auto-detect spoken language' }));
 

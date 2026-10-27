@@ -1,4 +1,11 @@
-import type { PolishMode, SummarizeTranscriptRequest, TranscribeClipRequest, TranslateCaptionsRequest } from '../../shared/types/jobs';
+import type {
+  PolishMode,
+  SummarizeTranscriptRequest,
+  TranscribeClipRequest,
+  TranscriptCorrectionRequest,
+  TranslateCaptionsRequest
+} from '../../shared/types/jobs';
+import { MAX_AI_INSTRUCTIONS_CHARS, MAX_VIDEO_CONTEXT_CHARS } from '../../shared/ai-instructions';
 import { REASONING_EFFORTS, type ReasoningEffort } from '../../shared/types/ai';
 import { IPC_CHANNELS } from '../../shared/types/ipc';
 import { MAX_SUMMARY_PROMPT_CHARS, MAX_SUMMARY_TRANSCRIPT_CHARS } from '../../shared/summary';
@@ -59,8 +66,38 @@ function toTranscribeRequest(payload: unknown): TranscribeClipRequest {
     modelId: optionalString(input.modelId, 'modelId'),
     language: optionalString(input.language, 'language'),
     maxCharsPerLine: requireFiniteNumber(input.maxCharsPerLine, 'maxCharsPerLine'),
-    maxLinesPerCaption: maxLinesPerCaption === 1 ? 1 : 2
+    maxLinesPerCaption: maxLinesPerCaption === 1 ? 1 : 2,
+    ...(input.correction === undefined ? {} : { correction: toCorrectionRequest(input.correction) }),
+    videoContext: videoContextText(input.videoContext)
   };
+}
+
+function toCorrectionRequest(value: unknown): TranscriptCorrectionRequest {
+  const input = requireRecord(value, 'correction');
+  return {
+    modelId: summaryModelId(input.modelId),
+    instructions: instructionsText(input.instructions, 'correction.instructions') ?? ''
+  };
+}
+
+/** Optional user instructions; undefined stays undefined, text is length-checked. */
+function instructionsText(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  const text = requireText(value, field);
+  if (text.length > MAX_AI_INSTRUCTIONS_CHARS) {
+    throw invalidInput(field, `at most ${MAX_AI_INSTRUCTIONS_CHARS} characters`);
+  }
+  return text;
+}
+
+/** Optional project video context; undefined stays undefined, text is length-checked. */
+function videoContextText(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  const text = requireText(value, 'videoContext');
+  if (text.length > MAX_VIDEO_CONTEXT_CHARS) {
+    throw invalidInput('videoContext', `at most ${MAX_VIDEO_CONTEXT_CHARS} characters`);
+  }
+  return text;
 }
 
 function toTranslateRequest(payload: unknown): TranslateCaptionsRequest {
@@ -77,6 +114,8 @@ function toTranslateRequest(payload: unknown): TranslateCaptionsRequest {
       return { id: requireString(row.id, `captions[${index}].id`), text: requireText(row.text, `captions[${index}].text`) };
     }),
     polish: toPolishMode(input.polish),
+    instructions: instructionsText(input.instructions, 'instructions'),
+    videoContext: videoContextText(input.videoContext),
     maxCharsPerLine: requireFiniteNumber(input.maxCharsPerLine, 'maxCharsPerLine'),
     maxLinesPerCaption: maxLinesPerCaption === 1 ? 1 : 2
   };

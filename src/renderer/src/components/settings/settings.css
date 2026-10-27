@@ -155,6 +155,18 @@
 .settings-sheet .settings-prompt-footer {
   justify-content: space-between;
 }
+/* Transcription and translation instructions: same shape as the summary prompt, counter under the field. */
+.settings-sheet .settings-instructions {
+  height: auto;
+  min-height: 5rem;
+  padding: var(--space-2);
+  resize: vertical;
+  width: 100%;
+}
+.settings-sheet .settings-instructions-counter {
+  align-self: flex-end;
+  font-size: var(--text-sm);
+}
 .settings-sheet .settings-segmented button {
   height: 28px;
   padding: 0 var(--space-3);
