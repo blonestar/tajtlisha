@@ -100,12 +100,14 @@ export function EditorPage({
   }, [wordHighlightMode, activeCaption, captionText, project.previewTrack]);
   const activeWordIndex = litWordIndex(wordSpans, playhead.timeMs);
 
-  // An exact frame belongs to one file. Drop it when the file changes.
+  // An exact frame belongs to one file and one logo setup (the logo is burned
+  // into it). Drop it, and any render in flight, when either changes.
+  const watermarkKey = JSON.stringify(settings.watermark);
   useEffect(() => {
     exactRequestRef.current += 1;
     setExact(null);
     setExactBusy(false);
-  }, [inputPath]);
+  }, [inputPath, watermarkKey]);
 
   const provider = workspace.provider;
   const pendingTranslations = rowsNeedingTranslation(project).filter(
