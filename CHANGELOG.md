@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Changed
+- Editor layout is flatter: panels run edge to edge and are split by thin lines instead of framed boxes.
+- The AI toolbar keeps everything on the left and wraps group by group, so the provider status no longer slides
+  under the buttons in a narrow window.
+- Caption table is more compact: start and end time take two lines (the duration sits under the caption number),
+  caption text and times look like plain text until hovered or clicked, and the Status column is gone. Issues are
+  shown under the field they belong to; an empty translation shows as a red placeholder in its field.
+- Row actions (insert, split, merge, delete) are a small 2x2 icon group that appears on hover.
+
+### Fixed
+- Caption text fields no longer show a scrollbar because they were 2 px too short.
+- Caption row buttons now use the app button style instead of the plain system look.
+
 ## [0.7.0] - 2026-10-27
 
 ### Added
