@@ -93,6 +93,22 @@ describe('OpenAI transcription request building', () => {
   it('falls back to und when neither the request nor the response names a language', () => {
     expect(parseOpenAiTranscription({ text: 'hi' }, { modelId: 'gpt-transcribe' }).language).toBe('und');
   });
+
+  it('maps Asian languages detected by Whisper to ISO codes', () => {
+    const detected = (name: string): string =>
+      parseOpenAiTranscription({ language: name, text: 'x' }, { modelId: 'whisper-1' }).language;
+
+    expect(detected('indonesian')).toBe('id');
+    expect(detected('Japanese')).toBe('ja');
+    expect(detected('chinese')).toBe('zh');
+    expect(detected('korean')).toBe('ko');
+    expect(detected('thai')).toBe('th');
+    expect(detected('hindi')).toBe('hi');
+    expect(detected('malay')).toBe('ms');
+    expect(detected('javanese')).toBe('jv');
+    expect(detected('serbian')).toBe('sr-Latn');
+    expect(detected('klingon')).toBe('und');
+  });
 });
 
 describe('OpenAI provider requests', () => {
