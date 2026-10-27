@@ -290,7 +290,7 @@ describe('watermark settings', () => {
 
         expect(settings.watermark).toEqual({
           enabled: false,
-          content: 'mark_text',
+          content: 'mark',
           markText: 'T',
           text: 'tajtliša',
           background: 'all',

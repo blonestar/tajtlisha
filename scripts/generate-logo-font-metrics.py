@@ -20,8 +20,6 @@ ROOT = Path(__file__).resolve().parent.parent
 FONT = ROOT / "resources" / "fonts" / "NotoSans-Bold.ttf"
 OUT = ROOT / "src" / "shared" / "logo-font-metrics.generated.ts"
 
-# Basic Latin, Latin-1, Latin Extended-A (s/c/z with caron, d with stroke), Cyrillic, common punctuation.
-RANGES = [(0x20, 0x7E), (0xA0, 0x17F), (0x400, 0x45F), (0x2010, 0x2026)]
 
 
 def main() -> None:
@@ -30,12 +28,20 @@ def main() -> None:
     hmtx = font["hmtx"]
     os2 = font["OS/2"]
 
-    entries = []
-    for start, end in RANGES:
-        for code in range(start, end + 1):
-            name = cmap.get(code)
-            if name is not None:
-                entries.append(f"{code}:{hmtx[name][0]}")
+    # Every character the font has, packed as runs of consecutive code points:
+    # 'start:adv,adv,...' joined by ';'. Characters outside the table are not
+    # supported in logo text (they would fall back to another font).
+    runs: list[tuple[int, list[int]]] = []
+    for code in sorted(cmap):
+        if code < 0x20:
+            continue
+        advance = hmtx[cmap[code]][0]
+        if runs and runs[-1][0] + len(runs[-1][1]) == code:
+            runs[-1][1].append(advance)
+        else:
+            runs.append((code, [advance]))
+    entries = [f"{start}:{','.join(str(a) for a in advances)}" for start, advances in runs]
+    count = sum(len(advances) for _, advances in runs)
 
     fallback = hmtx[cmap[ord("n")]][0]
     lines = [
@@ -49,15 +55,15 @@ def main() -> None:
         f"  winDescent: {os2.usWinDescent},",
         f"  capHeight: {os2.sCapHeight},",
         f"  xHeight: {os2.sxHeight},",
-        "  /** Advance used for characters missing from `advances` (the advance of 'n'). */",
+        "  /** Advance used for characters missing from `advances` (the advance of 'n'); normalized logo text has none. */",
         f"  fallbackAdvance: {fallback},",
-        "  /** Unicode code point -> advance width, packed as 'code:advance' pairs. */",
-        f"  advances: '{' '.join(entries)}'",
+        "  /** Every character of the font: runs of consecutive code points, 'start:adv,adv,...' joined by ';'. */",
+        f"  advances: '{';'.join(entries)}'",
         "} as const;",
         "",
     ]
     OUT.write_text("\n".join(lines), encoding="ascii")
-    print(f"wrote {OUT.relative_to(ROOT)} ({len(entries)} characters)")
+    print(f"wrote {OUT.relative_to(ROOT)} ({count} characters)")
 
 
 if __name__ == "__main__":

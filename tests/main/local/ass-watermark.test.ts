@@ -148,12 +148,11 @@ describe('ASS watermark layer', () => {
     expect(events.some((event) => event.endsWith('}tajtliša'))).toBe(true);
   });
 
-  it('escapes ASS-special characters in the custom text', () => {
+  it('drops ASS markup characters from the custom text, so the export draws the measured text', () => {
     const events = watermarkEvents(withLogo({ markText: 'A{B', text: 'Moj {kanal}\\nova' }));
 
-    expect(events[1]).toMatch(/\}A\(B$/);
-    expect(events[2]).toMatch(/\}Moj \(kanal\)⧵nova$/);
-    expect(events[2]).not.toContain('{kanal}');
+    expect(events[1]).toMatch(/\}AB$/);
+    expect(events[2]).toMatch(/\}Moj kanalnova$/);
   });
 
   it('keeps the Serbian letters of the custom text and lets the caption events sit alongside', () => {

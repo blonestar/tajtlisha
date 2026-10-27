@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { measureLogoText } from '../../../src/shared/logo-font-metrics';
 import {
   DEFAULT_WATERMARK,
+  cleanWatermarkText,
   computeWatermarkLayout,
   normalizeWatermark
 } from '../../../src/shared/watermark-geometry';
@@ -151,8 +152,59 @@ describe('measureLogoText', () => {
   });
 
   it('uses the fallback advance for characters missing from the table', () => {
-    // U+1F600 is not in the table; the fallback is the advance of 'n' (650 units).
+    // U+1F600 is not in the font; the fallback is the advance of 'n' (650 units). Cleaned logo text never has one.
     expect(measureLogoText('\u{1F600}', 1000)).toBeCloseTo(650, 6);
+  });
+
+  it('covers the whole font, including Greek, with zero-width combining marks', () => {
+    expect(measureLogoText('\u03A9', 1000)).toBeCloseTo(757, 6);
+    expect(measureLogoText('\u0301', 1000)).toBe(0);
+  });
+});
+
+describe('cleanWatermarkText', () => {
+  it('composes a letter and a combining accent into one character, so both renderers measure it the same', () => {
+    expect(cleanWatermarkText('e\u0301e\u0301', 30)).toBe('\u00E9\u00E9');
+    expect(measureLogoText(cleanWatermarkText('e\u0301'.repeat(4), 30), 100)).toBeCloseTo(measureLogoText('\u00E9'.repeat(4), 100), 6);
+  });
+
+  it('removes ASS markup characters, so the export draws exactly the measured text', () => {
+    expect(cleanWatermarkText('{ABC}', 30)).toBe('ABC');
+    expect(cleanWatermarkText('a\\Nb\\h', 30)).toBe('aNbh');
+  });
+
+  it('removes characters the bundled font does not have, and control characters', () => {
+    expect(cleanWatermarkText('Hi \u{1F600}', 30)).toBe('Hi');
+    expect(cleanWatermarkText('a\tb\u0000c', 30)).toBe('abc');
+    expect(cleanWatermarkText('\u03A9 \u0416', 30)).toBe('\u03A9 \u0416');
+  });
+});
+
+describe('fit to frame', () => {
+  it('shrinks a logo wider than the space between the margins so it stays inside the frame', () => {
+    const layout = computeWatermarkLayout(
+      { ...DEFAULT_WATERMARK, content: 'text', position: 'top_right', text: 'W'.repeat(30) },
+      1080,
+      1920
+    );
+    expect(layout).not.toBeNull();
+    expect(layout!.origin.x).toBeCloseTo(32.4, 6);
+    expect(layout!.width).toBeCloseTo(1080 - 2 * 32.4, 6);
+    expect(layout!.height).toBeLessThan(75.6);
+    expect(layout!.text!.x + measureLogoText(layout!.text!.text, layout!.text!.em)).toBeLessThan(1080 - 32.4);
+  });
+
+  it('keeps a bottom logo one margin above the bottom edge after shrinking', () => {
+    const layout = computeWatermarkLayout(
+      { ...DEFAULT_WATERMARK, position: 'bottom_center', text: 'W'.repeat(30) },
+      1080,
+      1920
+    )!;
+    expect(layout.origin.y + layout.height).toBeCloseTo(1920 - 32.4, 6);
+  });
+
+  it('leaves a logo that fits unchanged', () => {
+    expect(computeWatermarkLayout(DEFAULT_WATERMARK, 1080, 1920)!.height).toBeCloseTo(75.6, 6);
   });
 });
 
@@ -164,13 +216,17 @@ describe('normalizeWatermark', () => {
     expect(normalizeWatermark([])).toEqual(DEFAULT_WATERMARK);
   });
 
-  it('gives the new fields their defaults for an old object with variant', () => {
+  it('migrates the old variant field: icon is the badge alone, icon_text the badge with text', () => {
     expect(normalizeWatermark({ enabled: false, variant: 'icon', position: 'bottom_left', sizePercent: 10 })).toEqual({
       ...DEFAULT_WATERMARK,
+      content: 'mark',
       enabled: false,
       position: 'bottom_left',
       sizePercent: 10
     });
+    // The settings store merges the defaults first, so content is already set when variant is read.
+    expect(normalizeWatermark({ ...DEFAULT_WATERMARK, variant: 'icon' }).content).toBe('mark');
+    expect(normalizeWatermark({ variant: 'icon_text' }).content).toBe('mark_text');
   });
 
   it('keeps valid values and falls back per field for invalid ones', () => {
@@ -232,8 +288,8 @@ describe('normalizeWatermark', () => {
     const long = 'a'.repeat(40);
     expect(normalizeWatermark({ text: long }).text).toBe('a'.repeat(30));
     expect(normalizeWatermark({ markText: 'ABCDE' }).markText).toBe('ABC');
-    // Code points, not UTF-16 units: an astral character counts once.
-    expect(normalizeWatermark({ markText: '\u{1F600}\u{1F600}\u{1F600}\u{1F600}' }).markText).toBe('\u{1F600}'.repeat(3));
+    // Characters, not UTF-16 units; letters with diacritics count once.
+    expect(normalizeWatermark({ markText: 'ŠĐŽČ' }).markText).toBe('ŠĐŽ');
   });
 
   it('trims the text and removes line breaks', () => {

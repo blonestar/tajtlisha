@@ -150,6 +150,12 @@ u Settings > Logo i za pojedinacan izvoz (checkbox "Add logo" u Export dijalogu)
 - Sadrzaj: `mark_text` (znak + tekst, podrazumevano), `mark` (samo znak) ili `text` (samo tekst).
   Znak su do 3 znaka u kucici (podrazumevano `T`), tekst je do 30 znakova (podrazumevano `tajtliša`).
   Prazan znak ili prazan tekst se ne crta. Ako nema ni jednog ni drugog, logo se ne crta.
+- Ciscenje teksta (`cleanWatermarkText`, isto za settings, IPC i UI): NFC (slovo + kombinovani akcenat
+  postaje jedan znak), bez kontrolnih znakova, bez `{`, `}` i `\` (libass ih cita kao tagove), samo
+  znakovi koje ugradjeni font ima (ostali bi se crtali fallback fontom nepoznate sirine), trim, limit u
+  kodnim tackama. Tako preview i export crtaju i mere isti tekst.
+- Logo siri od prostora izmedju bocnih margina se srazmerno smanjuje da stane u kadar.
+- Stari settings sa `variant` se migriraju: `icon` -> `mark`, `icon_text` -> `mark_text`.
 - Pozadina: `all` (iza svega), `mark` (samo iza kucice) ili `none`. Boje su `backgroundColor`, `markColor` i `textColor` (`#rrggbb`).
 - Tekst je pravi tekst u Noto Sans Bold (ugradjen u `resources/fonts`). Sirine dolaze iz
   `src/shared/logo-font-metrics.generated.ts` preko `measureLogoText(text, emPx)`: zbir advance-a po

@@ -54,6 +54,8 @@ export function LogoSection({ settings, onSettingsChange }: LogoSectionProps): R
   const { t } = useTranslation();
   const logo = settings.watermark;
   const off = !logo.enabled;
+  // Bumped by Reset so the text fields drop their drafts even when the cleaned value did not change.
+  const [resetCount, setResetCount] = useState(0);
 
   function updateLogo(patch: Partial<WatermarkSettings>): void {
     onSettingsChange?.({ watermark: { ...logo, ...patch } });
@@ -83,6 +85,7 @@ export function LogoSection({ settings, onSettingsChange }: LogoSectionProps): R
 
       {logo.content !== 'text' ? (
         <TextFieldRow
+          key={`mark-${resetCount}`}
           id="settings-logo-mark-text"
           label={t('settings.logo.markText')}
           hint={t('settings.logo.markTextHint')}
@@ -95,6 +98,7 @@ export function LogoSection({ settings, onSettingsChange }: LogoSectionProps): R
 
       {logo.content !== 'mark' ? (
         <TextFieldRow
+          key={`text-${resetCount}`}
           id="settings-logo-text"
           label={t('settings.logo.text')}
           hint={t('settings.logo.textHint')}
@@ -197,7 +201,10 @@ export function LogoSection({ settings, onSettingsChange }: LogoSectionProps): R
           type="button"
           className="btn btn-ghost"
           disabled={off}
-          onClick={() => onSettingsChange?.({ watermark: { ...DEFAULT_WATERMARK } })}
+          onClick={() => {
+            setResetCount((count) => count + 1);
+            onSettingsChange?.({ watermark: { ...DEFAULT_WATERMARK } });
+          }}
         >
           {t('settings.logo.reset')}
         </button>
@@ -234,13 +241,19 @@ function TextFieldRow({ id, label, hint, value, maxChars, disabled, onCommit }: 
         id={id}
         className="input logo-text-input"
         type="text"
-        maxLength={maxChars}
         value={draft}
         disabled={disabled}
         onChange={(event) => {
-          setDraft(event.currentTarget.value);
-          onCommit(cleanWatermarkText(event.currentTarget.value, maxChars));
+          // The limit counts code points of the cleaned text (maxLength would count UTF-16 units).
+          // Within it the raw draft is kept, so a space typed between words stays; past it the cleaned, cut text is shown.
+          const raw = event.currentTarget.value;
+          const tooLong = Array.from(cleanWatermarkText(raw, Number.POSITIVE_INFINITY)).length > maxChars;
+          const typed = tooLong ? cleanWatermarkText(raw, maxChars) : raw;
+          setDraft(typed);
+          onCommit(cleanWatermarkText(typed, maxChars));
         }}
+        // Show what is actually used once the user leaves the field (dropped characters, trimmed spaces).
+        onBlur={() => setDraft(cleanWatermarkText(draft, maxChars))}
       />
     </SettingsRow>
   );

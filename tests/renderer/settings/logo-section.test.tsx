@@ -123,11 +123,32 @@ describe('settings: Logo tab', () => {
     expect(input).toHaveValue('Moj k');
   });
 
-  it('limits the badge letters to 3 characters and the text to 30', () => {
-    openLogo(mockSettings);
+  it('limits the badge letters to 3 characters and the text to 30, counting code points', () => {
+    const onSettingsChange = openLogo(mockSettings);
+    const badge = screen.getByLabelText('Badge letters') as HTMLInputElement;
+    const text = screen.getByLabelText('Text') as HTMLInputElement;
 
-    expect(screen.getByLabelText('Badge letters')).toHaveAttribute('maxlength', '3');
-    expect(screen.getByLabelText('Text')).toHaveAttribute('maxlength', '30');
+    // No maxLength: it counts UTF-16 units, while the limit counts characters.
+    expect(badge).not.toHaveAttribute('maxlength');
+    fireEvent.change(badge, { target: { value: 'ŠĐŽ' } });
+    expect(badge).toHaveValue('ŠĐŽ');
+    fireEvent.change(badge, { target: { value: 'ŠĐŽX' } });
+    expect(badge).toHaveValue('ŠĐŽ');
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ watermark: { ...DEFAULT_WATERMARK, markText: 'ŠĐŽ' } });
+
+    fireEvent.change(text, { target: { value: 'a'.repeat(31) } });
+    expect(text).toHaveValue('a'.repeat(30));
+  });
+
+  it('drops characters the logo cannot draw and shows the cleaned text when leaving the field', () => {
+    const onSettingsChange = openLogo(mockSettings);
+    const text = screen.getByLabelText('Text') as HTMLInputElement;
+
+    fireEvent.change(text, { target: { value: '{Moj} \\N kanal \u{1F600} ' } });
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ watermark: { ...DEFAULT_WATERMARK, text: 'Moj N kanal' } });
+
+    fireEvent.blur(text);
+    expect(text).toHaveValue('Moj N kanal');
   });
 
   it('follows a text change that comes from outside this field', () => {
@@ -223,5 +244,16 @@ describe('settings: Logo tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
 
     expect(onSettingsChange).toHaveBeenCalledWith({ watermark: { ...DEFAULT_WATERMARK } });
+  });
+
+  it('clears a typed draft on reset even when its cleaned value already equals the default', () => {
+    openLogo(mockSettings);
+    const text = screen.getByLabelText('Text') as HTMLInputElement;
+
+    fireEvent.change(text, { target: { value: ' tajtliša ' } });
+    expect(text).toHaveValue(' tajtliša ');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }));
+
+    expect(screen.getByLabelText('Text')).toHaveValue('tajtliša');
   });
 });

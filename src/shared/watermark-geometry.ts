@@ -1,5 +1,5 @@
 import { LOGO_FONT_METRICS } from './logo-font-metrics.generated';
-import { measureLogoText } from './logo-font-metrics';
+import { isLogoCharSupported, measureLogoText } from './logo-font-metrics';
 import { clamp } from './subtitle-geometry';
 import {
   WATERMARK_BACKGROUNDS,
@@ -93,7 +93,7 @@ export function normalizeWatermark(value: unknown): WatermarkSettings {
 
   return {
     enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_WATERMARK.enabled,
-    content: oneOf(WATERMARK_CONTENTS, input.content, DEFAULT_WATERMARK.content),
+    content: legacyContent(input.variant) ?? oneOf(WATERMARK_CONTENTS, input.content, DEFAULT_WATERMARK.content),
     markText: textOr(input.markText, WATERMARK_TEXT_LIMITS.markText, DEFAULT_WATERMARK.markText),
     text: textOr(input.text, WATERMARK_TEXT_LIMITS.text, DEFAULT_WATERMARK.text),
     background: oneOf(WATERMARK_BACKGROUNDS, input.background, DEFAULT_WATERMARK.background),
@@ -135,6 +135,27 @@ export function computeWatermarkLayout(settings: WatermarkSettings, frameWidth: 
   const showText = logo.content !== 'mark' && logo.text !== '';
   if (!showMark && !showText) return null;
 
+  // Everything scales with the logo height, so a logo wider than the space
+  // between the side margins is shrunk to fit exactly.
+  const available = width - 2 * margin;
+  const fullWidth = measureLayout(logo, logoHeight, showMark, showText).logoWidth;
+  const fitted = fullWidth > available && available > 0 ? (logoHeight * available) / fullWidth : logoHeight;
+  return placeLayout(logo, fitted, margin, width, height, showMark, showText);
+}
+
+type LocalLayout = {
+  logoWidth: number;
+  cellWidth: number;
+  letterX: number;
+  markBaseline: number;
+  textX: number;
+  textBaseline: number;
+  markEm: number;
+  textEm: number;
+};
+
+/** Layout relative to the logo's top-left corner for a logo height. */
+function measureLayout(logo: WatermarkSettings, logoHeight: number, showMark: boolean, showText: boolean): LocalLayout {
   const markEm = MARK_EM * logoHeight;
   const textEm = TEXT_EM * logoHeight;
   const pad = PAD * logoHeight;
@@ -150,6 +171,24 @@ export function computeWatermarkLayout(settings: WatermarkSettings, frameWidth: 
   const textBaseline = showMark ? markBaseline : (logoHeight + capRatio * textEm) / 2;
 
   const logoWidth = showMark && showText ? textX + textWidth + pad : showMark ? cellWidth : pad + textWidth + pad;
+  return { logoWidth, cellWidth, letterX, markBaseline, textX, textBaseline, markEm, textEm };
+}
+
+function placeLayout(
+  logo: WatermarkSettings,
+  logoHeight: number,
+  margin: number,
+  width: number,
+  height: number,
+  showMark: boolean,
+  showText: boolean
+): WatermarkLayout {
+  const { logoWidth, cellWidth, letterX, markBaseline, textX, textBaseline, markEm, textEm } = measureLayout(
+    logo,
+    logoHeight,
+    showMark,
+    showText
+  );
 
   const left = logo.position.endsWith('left');
   const right = logo.position.endsWith('right');
@@ -198,12 +237,27 @@ export function computeWatermarkLayout(settings: WatermarkSettings, frameWidth: 
   };
 }
 
-/** Removes line breaks, trims and keeps at most `maxChars` code points. */
+/**
+ * Logo text as both renderers can draw it identically: NFC (so a letter plus a
+ * combining accent becomes one character), no control characters, no ASS
+ * markup characters ({ } and backslash, which libass would read as tags), only characters
+ * of the bundled font, trimmed, at most `maxChars` code points.
+ */
 export function cleanWatermarkText(value: string, maxChars: number): string {
-  return Array.from(value.replace(/[\r\n]+/g, '').trim())
+  const kept = Array.from(value.normalize('NFC')).filter(
+    (char) => !/[\p{Cc}{}\\]/u.test(char) && isLogoCharSupported(char)
+  );
+  return Array.from(kept.join('').trim())
     .slice(0, maxChars)
     .join('')
     .trimEnd();
+}
+
+/** Settings saved before the content field had `variant`: 'icon' was the badge alone. */
+function legacyContent(variant: unknown): WatermarkSettings['content'] | undefined {
+  if (variant === 'icon') return 'mark';
+  if (variant === 'icon_text') return 'mark_text';
+  return undefined;
 }
 
 function textOr(value: unknown, maxChars: number, fallback: string): string {
