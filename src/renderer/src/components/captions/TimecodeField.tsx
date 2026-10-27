@@ -68,10 +68,9 @@ export function TimecodeField({
 
   return (
     <div className="caption-time-field">
-      <span className="caption-time-label">{label}</span>
       <button
         type="button"
-        className="btn-icon btn-sm caption-nudge"
+        className="btn btn-ghost btn-icon btn-sm caption-nudge"
         title={earlierLabel}
         aria-label={earlierLabel}
         onClick={() => onNudge(-NUDGE_STEP_MS)}
@@ -81,6 +80,7 @@ export function TimecodeField({
       <input
         className="input input-mono caption-time-input"
         aria-label={label}
+        title={label}
         data-column="time"
         inputMode="decimal"
         spellCheck={false}
@@ -91,7 +91,7 @@ export function TimecodeField({
       />
       <button
         type="button"
-        className="btn-icon btn-sm caption-nudge"
+        className="btn btn-ghost btn-icon btn-sm caption-nudge"
         title={laterLabel}
         aria-label={laterLabel}
         onClick={() => onNudge(NUDGE_STEP_MS)}

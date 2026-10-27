@@ -225,7 +225,6 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
       </div>
 
       <div className="generate-actions">
-        <span className="muted">{t('captions.count', { count: captionCount })}</span>
         <div className="generate-action">
           <button
             type="button"

@@ -87,7 +87,6 @@
 
 .video-preview-transport {
   align-items: center;
-  border-top: 1px solid var(--border);
   display: flex;
   gap: var(--space-2);
   min-width: 0;
@@ -110,7 +109,6 @@
 /* ---- Trim bar ---- */
 
 .trim-bar {
-  border-top: 1px solid var(--border);
   display: grid;
   gap: var(--space-2);
   min-width: 0;
@@ -278,8 +276,7 @@
   grid-template-columns: 96px minmax(0, 1fr);
 }
 .style-group {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-left: 2px solid var(--border);
   display: grid;
   gap: var(--space-2) var(--space-3);
   grid-column: 1 / -1;

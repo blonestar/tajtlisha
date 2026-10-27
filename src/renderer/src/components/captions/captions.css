@@ -13,7 +13,7 @@
 }
 
 .caption-table thead th {
-  background: var(--surface-1);
+  background: var(--bg);
   border-bottom: 1px solid var(--border-strong);
   color: var(--text-muted);
   font-size: var(--text-xs);
@@ -29,6 +29,11 @@
   margin-right: var(--space-2);
 }
 
+/* Header counts read as plain text, not pills. */
+.caption-table thead .badge {
+  background: transparent;
+  padding: 0;
+}
 .caption-head-count {
   color: var(--text-faint);
   font-weight: 400;
@@ -47,24 +52,21 @@
 }
 
 .caption-col-index {
-  width: 40px;
+  width: 52px;
 }
 .caption-col-time {
-  width: 230px;
+  width: 160px;
 }
 .caption-col-text {
-  min-width: 180px;
-}
-.caption-col-status {
-  width: 170px;
+  min-width: 160px;
 }
 .caption-col-actions {
-  width: 132px;
+  width: 64px;
 }
 
 .caption-index {
   color: var(--text-faint);
-  display: inline-block;
+  display: block;
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   padding-top: var(--space-1);
@@ -75,10 +77,10 @@
   cursor: pointer;
 }
 .caption-row:hover td {
-  background: var(--surface-2);
+  background: var(--surface-1);
 }
 .caption-row.is-selected td {
-  background: var(--surface-3);
+  background: var(--surface-2);
 }
 .caption-row.is-active td:first-child {
   box-shadow: inset 3px 0 0 var(--accent);
@@ -87,27 +89,51 @@
   color: var(--accent);
 }
 
-/* Time cell */
+/* Time cell: start above end, nudge buttons on either side appear on hover. */
 .caption-time-field {
   align-items: center;
   display: flex;
-  gap: var(--space-1);
-  margin-bottom: var(--space-1);
+  gap: 2px;
 }
-.caption-time-label {
-  color: var(--text-faint);
-  font-size: var(--text-xs);
-  width: 32px;
+.caption-time-field + .caption-time-field {
+  margin-top: 2px;
 }
 .caption-time-input {
-  height: 26px;
+  height: 24px;
   padding: 0 var(--space-1);
   text-align: center;
   width: 92px;
 }
+/* Times read as plain text until the row is hovered or the field is edited. */
+.caption-time-input.input {
+  background: transparent;
+  border-color: transparent;
+}
+.caption-row:hover .caption-time-input,
+.caption-row.is-selected .caption-time-input {
+  border-color: var(--border);
+}
+.caption-time-input.input:hover {
+  border-color: var(--border-strong);
+}
+.caption-time-input.input:focus {
+  background: var(--bg);
+  border-color: var(--accent);
+  outline: none;
+}
+.caption-time-field .btn-icon.btn-sm {
+  height: 22px;
+  width: 22px;
+}
+.caption-time-field .caption-nudge:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
 .caption-duration {
   color: var(--text-faint);
+  display: block;
   font-size: var(--text-xs);
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 .caption-nudge {
@@ -120,10 +146,41 @@
   opacity: 1;
 }
 
-/* Text cells */
-.caption-col-text .textarea {
+/* Text cells look like plain text; the field frame shows on hover and while editing. */
+.caption-col-text .caption-text {
+  background: transparent;
+  border-color: transparent;
   font-size: var(--text-md);
+  overflow: hidden;
+  transition:
+    background-color 0.1s ease,
+    border-color 0.1s ease;
   width: 100%;
+}
+.caption-col-text .caption-text::placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.caption-row:hover .caption-text,
+.caption-row.is-selected .caption-text {
+  border-color: var(--border);
+}
+.caption-col-text .caption-text:hover {
+  border-color: var(--border-strong);
+}
+.caption-col-text .caption-text:focus {
+  background: var(--bg);
+  border-color: var(--accent);
+  outline: none;
+}
+/* Empty text that blocks export: dashed outline and a red placeholder, no separate badge. */
+.caption-col-text .caption-text.is-missing {
+  border-color: var(--danger-soft);
+  border-style: dashed;
+}
+.caption-col-text .caption-text.is-missing::placeholder {
+  color: var(--danger);
+  opacity: 0.75;
 }
 .caption-line-warnings {
   color: var(--warning);
@@ -133,19 +190,35 @@
   padding: 0;
 }
 
-/* Status badges */
+/* Issue badges sit under the cell they belong to. */
 .caption-badges {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.caption-badges .badge {
+  font-weight: 600;
+  white-space: normal;
 }
 
-/* Row actions: hidden until the row is hovered, selected or focused */
+/* Row actions: a 2x2 icon grid, hidden until the row is hovered, selected or focused. */
 .caption-row-actions {
-  display: flex;
+  display: grid;
   gap: 2px;
+  grid-template-columns: repeat(2, 24px);
   opacity: 0;
   transition: opacity 0.1s ease;
+}
+.caption-row-actions .btn-icon {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.caption-row-actions .btn-icon:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text);
 }
 .caption-row:hover .caption-row-actions,
 .caption-row.is-selected .caption-row-actions,
@@ -171,6 +244,15 @@
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
   padding: var(--space-1) var(--space-2);
+}
+.caption-shift-bar .btn {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.caption-shift-bar .btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 .caption-shift-label {
   color: var(--text-muted);

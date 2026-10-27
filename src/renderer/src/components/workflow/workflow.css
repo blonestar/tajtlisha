@@ -1,13 +1,14 @@
 /* AI generate toolbar, job bar and export dialog. */
 
-/* Generate toolbar: one dense row, wraps on narrow windows. */
+/* Generate toolbar: everything starts at the left and wraps group by group on narrow panes. */
 .generate-panel {
   align-items: flex-end;
   background: var(--surface-1);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3) var(--space-4);
+  gap: var(--space-2) var(--space-4);
+  justify-content: flex-start;
   padding: var(--space-2) var(--space-3);
 }
 
@@ -24,18 +25,17 @@
 }
 .generate-arrow {
   color: var(--text-faint);
+  flex: none;
   margin-bottom: 7px;
 }
 
+/* Provider: one line, as tall as the controls so it lines up with them. */
 .generate-provider {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
-  min-width: 0;
-}
-.generate-provider > .field-label {
-  margin-right: var(--space-1);
+  min-height: var(--control-height);
+  white-space: nowrap;
 }
 .generate-provider-name {
   align-items: center;
@@ -47,15 +47,8 @@
 .generate-actions {
   align-items: flex-start;
   display: flex;
-  flex: 1;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  justify-content: flex-end;
-  min-width: 0;
-}
-.generate-actions > .muted {
-  align-self: center;
-  white-space: nowrap;
+  gap: var(--space-2);
 }
 .generate-action {
   display: grid;
@@ -402,4 +395,25 @@
   gap: var(--space-2);
   justify-content: flex-end;
   padding: var(--space-3) var(--space-4);
+}
+
+/* Status next to the provider is plain colored text, not a pill. */
+.generate-provider .badge {
+  background: transparent;
+  padding: 0;
+}
+/* Secondary actions are filled, without an outline; the primary action keeps the accent fill. */
+.generate-actions .btn:not(.btn-primary) {
+  background: var(--surface-3);
+  border-color: transparent;
+}
+.generate-actions .btn:not(.btn-primary):hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.generate-actions .btn.generate-context-set {
+  border-color: var(--accent);
+}
+
+.generate-actions > .badge {
+  align-self: center;
 }

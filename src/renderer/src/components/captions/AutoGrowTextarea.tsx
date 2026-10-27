@@ -19,8 +19,10 @@ export function AutoGrowTextarea({
     const element = ref.current;
     if (!element) return;
 
+    // scrollHeight excludes the border; without it the box is 2px short and shows a scrollbar.
     element.style.height = 'auto';
-    element.style.height = `${element.scrollHeight}px`;
+    const border = element.offsetHeight - element.clientHeight;
+    element.style.height = `${element.scrollHeight + border}px`;
   }, [value]);
 
   return (
