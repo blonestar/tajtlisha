@@ -78,7 +78,15 @@ export const captionsStrings = {
       ru: 'Russian',
       uk: 'Ukrainian',
       pl: 'Polish',
-      tr: 'Turkish'
+      tr: 'Turkish',
+      ar: 'Arabic',
+      hi: 'Hindi',
+      id: 'Indonesian',
+      th: 'Thai',
+      vi: 'Vietnamese',
+      zh: 'Chinese (Simplified)',
+      ja: 'Japanese',
+      ko: 'Korean'
     },
     stages: {
       extracting_audio: 'Extracting audio',
@@ -289,7 +297,15 @@ export const captionsStrings = {
       ru: 'Ruski',
       uk: 'Ukrajinski',
       pl: 'Poljski',
-      tr: 'Turski'
+      tr: 'Turski',
+      ar: 'Arapski',
+      hi: 'Hindi',
+      id: 'Indonežanski',
+      th: 'Tajlandski',
+      vi: 'Vijetnamski',
+      zh: 'Kineski (pojednostavljeni)',
+      ja: 'Japanski',
+      ko: 'Korejski'
     },
     stages: {
       extracting_audio: 'Izdvajanje zvuka',
@@ -500,7 +516,15 @@ export const captionsStrings = {
       ru: 'Руски',
       uk: 'Украјински',
       pl: 'Пољски',
-      tr: 'Турски'
+      tr: 'Турски',
+      ar: 'Арапски',
+      hi: 'Хинди',
+      id: 'Индонежански',
+      th: 'Тајландски',
+      vi: 'Вијетнамски',
+      zh: 'Кинески (поједностављени)',
+      ja: 'Јапански',
+      ko: 'Корејски'
     },
     stages: {
       extracting_audio: 'Издвајање звука',

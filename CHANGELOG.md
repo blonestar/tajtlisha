@@ -9,10 +9,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ### Added
 - Logo watermark: a badge with letters (T by default) and a text (tajtliša by default) is drawn into the exported MP4 and the preview, in the corner you choose.
   On by default. Its own Settings > Logo tab sets the letters, the text (up to 30 characters), content, background, colours, corner roundness, position, size, margin and opacity, with a live preview. Turn it off there, or for a single export with the "Add logo" checkbox.
+- Languages: Arabic, Hindi, Indonesian, Thai, Vietnamese, Chinese (Simplified), Japanese and Korean for the spoken
+  language and the translation.
 
 ### Fixed
 - When the system language is Serbo-Croatian (`sh`), file dialogs and warnings are now in Serbian Latin like the rest
   of the app, instead of English.
+- A language Whisper detects is now shown after transcription, also when it is not in the list (for example Malay),
+  instead of "Detect automatically". Before, only the listed languages were recognized.
+- Chinese, Japanese and Thai captions are no longer split by spaces between every character; their words are
+  joined as written, and ideographs count as double width when lines wrap.
 
 ## [0.6.1] - 2026-10-25
 

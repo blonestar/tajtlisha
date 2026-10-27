@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import CircleAlert from 'lucide-react/dist/esm/icons/circle-alert.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
-import { PROJECT_LANGUAGES, type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
+import { type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
 import type { AppSettings } from '../../../shared/types/settings';
 import { activeWordIndex as litWordIndex, resolveWordHighlight, timeCaptionWords } from '../../../shared/word-highlight';
@@ -224,10 +224,8 @@ export function EditorPage({
     hasIssue: (issues[caption.id] ?? []).some((issue) => isBlockingCaptionIssue(issue.code))
   }));
 
-  const languageValue = (code: string | undefined): string => {
-    if (!code || code === UNKNOWN_LANGUAGE) return 'auto';
-    return (PROJECT_LANGUAGES as readonly string[]).includes(code) ? code : 'auto';
-  };
+  // A detected language outside PROJECT_LANGUAGES is kept; the panel shows it as an extra option.
+  const languageValue = (code: string | undefined): string => (!code || code === UNKNOWN_LANGUAGE ? 'auto' : code);
 
   // Until the workspace is measured, the CSS fallback template applies.
   const workspaceColumns = layout.measured

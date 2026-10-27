@@ -93,7 +93,8 @@ export class SubtitleWorkflowService {
       const options: CaptionBuildOptions = {
         maxCharsPerLine: request.maxCharsPerLine,
         maxLinesPerCaption: request.maxLinesPerCaption,
-        clipDurationMs
+        clipDurationMs,
+        language: transcription.language
       };
       const layout = await this.layoutCaptions(transcription, audioPath, options, clipDurationMs, context);
       const captions = toSourceCaptions(layout.drafts, request.trim);
