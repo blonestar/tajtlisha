@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-27
+
 ### Added
 - Logo watermark: a badge with letters (T by default) and a text (tajtliša by default) is drawn into the exported MP4 and the preview, in the corner you choose.
   On by default. Its own Settings > Logo tab sets the letters, the text (up to 30 characters), content, background, colours, corner roundness, position, size, margin and opacity, with a live preview. Turn it off there, or for a single export with the "Add logo" checkbox.
@@ -157,7 +159,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...develop
+[0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/blonestar/tajtlisha/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/blonestar/tajtlisha/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/blonestar/tajtlisha/compare/v0.5.0...v0.5.1
