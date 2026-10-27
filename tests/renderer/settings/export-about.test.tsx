@@ -98,6 +98,7 @@ describe('about section', () => {
     onDownload?: () => void;
     onInstall?: () => void;
     onCheck?: () => void;
+    onOpenRepository?: () => void;
   }): Record<string, unknown> {
     const state = options.state ?? updateState({ status: 'idle' });
     const ffmpeg = options.ffmpeg ?? fullFfmpegStatus;
@@ -108,7 +109,10 @@ describe('about section', () => {
           platform: options.info?.platform ?? 'linux',
           isPackaged: options.info?.isPackaged ?? true
         }),
-        setZoomFactor: () => undefined
+        setZoomFactor: () => undefined,
+        openRepository: async () => {
+          options.onOpenRepository?.();
+        }
       },
       updates: {
         getState: async () => state,
@@ -142,6 +146,17 @@ describe('about section', () => {
 
     expect(await screen.findByText('0.2.0')).toBeInTheDocument();
     expect(screen.getByText('Linux')).toBeInTheDocument();
+  });
+
+  it('shows the author and opens the repository through the app bridge', async () => {
+    const onOpenRepository = vi.fn();
+    installFakeApi(aboutApi({ onOpenRepository }));
+    openSection('About');
+
+    expect(await screen.findByText('Bojan')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /github\.com\/blonestar\/tajtlisha/ }));
+
+    await waitFor(() => expect(onOpenRepository).toHaveBeenCalledTimes(1));
   });
 
   it('offers Download when an update is available and shows the release notes', async () => {

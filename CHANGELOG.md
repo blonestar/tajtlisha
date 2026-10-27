@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Settings > About shows the author and a link that opens the source repository in the system browser.
+
 ## [0.7.1] - 2026-10-27
 
 ### Changed
