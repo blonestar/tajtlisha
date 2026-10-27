@@ -198,7 +198,8 @@ export function EditorPage({
         videoHeight: source.height,
         text: captionText ?? '',
         style: project.style,
-        activeWordIndex: litWordIndex(wordSpans, atMs)
+        activeWordIndex: litWordIndex(wordSpans, atMs),
+        watermark: settings.watermark
       });
       if (requestId === exactRequestRef.current) setExact({ dataUrl, atMs });
     } catch {
@@ -342,6 +343,7 @@ export function EditorPage({
             captionText={captionText}
             style={project.style}
             activeWordIndex={activeWordIndex}
+            watermark={settings.watermark}
             onTimeUpdate={playhead.report}
             onPlayingChange={noop}
             onPlaybackError={workspace.reportPlaybackError}

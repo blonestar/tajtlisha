@@ -4,12 +4,21 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ExportOverwritePolicy } from '../../../../shared/types/export';
 import type { AppSettings, ExportSettings } from '../../../../shared/types/settings';
-import { SegmentedControl, SettingsRow } from './SettingsPrimitives';
+import type { WatermarkPosition, WatermarkSettings, WatermarkVariant } from '../../../../shared/types/watermark';
+import { WATERMARK_RANGES } from '../../../../shared/watermark-geometry';
+import { SegmentedControl, SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
 type ExportSectionProps = {
   settings: AppSettings;
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
 };
+
+const positionOptions: { value: WatermarkPosition; labelKey: string }[] = [
+  { value: 'top_left', labelKey: 'settings.export.logoPositionTopLeft' },
+  { value: 'top_right', labelKey: 'settings.export.logoPositionTopRight' },
+  { value: 'bottom_left', labelKey: 'settings.export.logoPositionBottomLeft' },
+  { value: 'bottom_right', labelKey: 'settings.export.logoPositionBottomRight' }
+];
 
 const overwriteOptions: { value: ExportOverwritePolicy; labelKey: string }[] = [
   { value: 'ask', labelKey: 'settings.export.overwriteAsk' },
@@ -21,10 +30,15 @@ export function ExportSection({ settings, onSettingsChange }: ExportSectionProps
   const { t } = useTranslation();
   const exportDefaults = settings.exportDefaults;
   const outputFolder = settings.defaultOutputFolder ?? '';
+  const watermark = settings.watermark;
   const [folderFailed, setFolderFailed] = useState(false);
 
   function updateExportDefaults(patch: Partial<ExportSettings>): void {
     onSettingsChange?.({ exportDefaults: { ...exportDefaults, ...patch } });
+  }
+
+  function updateWatermark(patch: Partial<WatermarkSettings>): void {
+    onSettingsChange?.({ watermark: { ...watermark, ...patch } });
   }
 
   async function chooseOutputFolder(): Promise<void> {
@@ -101,6 +115,71 @@ export function ExportSection({ settings, onSettingsChange }: ExportSectionProps
           ]}
           onChange={(defaultBurnedInTrack) => updateExportDefaults({ defaultBurnedInTrack })}
         />
+      </SettingsRow>
+
+      <SettingsRow label={t('settings.export.logo')} htmlFor="settings-logo-enabled" hint={t('settings.export.logoHint')}>
+        <SettingsSwitch id="settings-logo-enabled" checked={watermark.enabled} onChange={(enabled) => updateWatermark({ enabled })} />
+      </SettingsRow>
+
+      <SettingsRow label={t('settings.export.logoVariant')} labelId="settings-logo-variant">
+        <SegmentedControl<WatermarkVariant>
+          labelledBy="settings-logo-variant"
+          value={watermark.variant}
+          disabled={!watermark.enabled}
+          options={[
+            { value: 'icon', label: t('settings.export.logoVariantIcon') },
+            { value: 'icon_text', label: t('settings.export.logoVariantIconText') }
+          ]}
+          onChange={(variant) => updateWatermark({ variant })}
+        />
+      </SettingsRow>
+
+      <SettingsRow label={t('settings.export.logoPosition')} labelId="settings-logo-position">
+        <SegmentedControl<WatermarkPosition>
+          labelledBy="settings-logo-position"
+          value={watermark.position}
+          disabled={!watermark.enabled}
+          options={positionOptions.map((option) => ({ value: option.value, label: t(option.labelKey) }))}
+          onChange={(position) => updateWatermark({ position })}
+        />
+      </SettingsRow>
+
+      <SettingsRow label={t('settings.export.logoSize')} htmlFor="settings-logo-size">
+        <div className="settings-inline">
+          <input
+            id="settings-logo-size"
+            className="settings-range"
+            type="range"
+            min={WATERMARK_RANGES.sizePercent.min}
+            max={WATERMARK_RANGES.sizePercent.max}
+            step={1}
+            value={watermark.sizePercent}
+            disabled={!watermark.enabled}
+            onChange={(event) => updateWatermark({ sizePercent: Number(event.currentTarget.value) })}
+          />
+          <output htmlFor="settings-logo-size" className="settings-range-value">
+            {t('settings.export.logoPercentValue', { value: watermark.sizePercent })}
+          </output>
+        </div>
+      </SettingsRow>
+
+      <SettingsRow label={t('settings.export.logoOpacity')} htmlFor="settings-logo-opacity">
+        <div className="settings-inline">
+          <input
+            id="settings-logo-opacity"
+            className="settings-range"
+            type="range"
+            min={WATERMARK_RANGES.opacity.min}
+            max={WATERMARK_RANGES.opacity.max}
+            step={0.05}
+            value={watermark.opacity}
+            disabled={!watermark.enabled}
+            onChange={(event) => updateWatermark({ opacity: Number(event.currentTarget.value) })}
+          />
+          <output htmlFor="settings-logo-opacity" className="settings-range-value">
+            {t('settings.export.logoPercentValue', { value: Math.round(watermark.opacity * 100) })}
+          </output>
+        </div>
       </SettingsRow>
 
       <SettingsRow label={t('settings.export.overwrite')} labelId="settings-overwrite" hint={t('settings.export.overwriteHint')}>

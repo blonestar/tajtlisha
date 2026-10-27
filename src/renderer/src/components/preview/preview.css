@@ -56,6 +56,16 @@
   display: inline;
 }
 
+/* Logo layer: same frame-sized box as the subtitles, above them, like the ASS layers. */
+.watermark-overlay {
+  height: 100%;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+}
+
 /* Exact frame: a rendered still of the frame, shown in the same box. */
 .exact-frame-image {
   display: block;

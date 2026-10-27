@@ -14,6 +14,8 @@ export type ExportDialogProps = {
   onBaseNameChange(value: string): void;
   outputs: ExportOutputs;
   onOutputsChange(outputs: ExportOutputs): void;
+  includeLogo: boolean;
+  onIncludeLogoChange(value: boolean): void;
   sourceLanguage: string;
   targetLanguage: string;
   blockingIssueCount: number;
@@ -51,6 +53,8 @@ export function ExportDialog({
   onBaseNameChange,
   outputs,
   onOutputsChange,
+  includeLogo,
+  onIncludeLogoChange,
   sourceLanguage,
   targetLanguage,
   blockingIssueCount,
@@ -139,6 +143,15 @@ export function ExportDialog({
                   </button>
                 ))}
               </div>
+              <label className="export-check">
+                <input
+                  type="checkbox"
+                  checked={includeLogo}
+                  disabled={busy || outputs.video === 'none'}
+                  onChange={(event) => onIncludeLogoChange(event.target.checked)}
+                />
+                <span>{t('captions.export.logo')}</span>
+              </label>
             </div>
 
             <div className="export-group">
