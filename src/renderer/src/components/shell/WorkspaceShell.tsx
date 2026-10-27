@@ -228,6 +228,8 @@ export function WorkspaceShell({ runtime }: WorkspaceShellProps): ReactElement {
         onBaseNameChange={exportModel.setBaseName}
         outputs={exportModel.outputs}
         onOutputsChange={exportModel.setOutputs}
+        includeLogo={exportModel.includeLogo}
+        onIncludeLogoChange={exportModel.setIncludeLogo}
         sourceLanguage={exportModel.sourceLanguage}
         targetLanguage={exportModel.targetLanguage}
         blockingIssueCount={exportModel.blockingIssueCount}

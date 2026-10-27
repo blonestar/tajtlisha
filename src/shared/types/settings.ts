@@ -1,5 +1,6 @@
 import type { AiProviderId, AuthMode, ReasoningEffort } from './ai';
 import type { ExportOverwritePolicy } from './export';
+import type { WatermarkSettings } from './watermark';
 
 export type UiLanguage = 'system' | 'en' | 'sr-Latn' | 'sr-Cyrl';
 
@@ -51,4 +52,6 @@ export type AppSettings = {
   exportDefaults: ExportSettings;
   aiConnector: AiConnectorSettings;
   summary: SummarySettings;
+  /** Logo drawn into the exported MP4 and shown in the preview. */
+  watermark: WatermarkSettings;
 };

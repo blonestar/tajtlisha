@@ -235,3 +235,89 @@ describe('SettingsStore', () => {
     });
   });
 });
+
+describe('watermark settings', () => {
+  async function withSettingsFile<T>(fileContent: unknown, run: (store: SettingsStore) => Promise<T>): Promise<T> {
+    const dir = await mkdtemp(join(tmpdir(), 'tajtlisha-watermark-'));
+    const filePath = join(dir, 'settings.json');
+    try {
+      if (fileContent !== undefined) {
+        await writeFile(filePath, JSON.stringify(fileContent), 'utf8');
+      }
+      return await run(new SettingsStore({ filePath }));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('has the logo on by default, as the T and wordmark badge in the top-left corner', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      const settings = await store.get();
+
+      expect(settings.watermark).toEqual({
+        enabled: true,
+        variant: 'icon_text',
+        position: 'top_left',
+        sizePercent: 7,
+        marginPercent: 3,
+        opacity: 0.9
+      });
+    });
+  });
+
+  it('gives a file written before the logo existed the default watermark settings', async () => {
+    await withSettingsFile({ uiLanguage: 'en', exportDefaults: { overwritePolicy: 'overwrite' } }, async (store) => {
+      const settings = await store.get();
+
+      expect(settings.watermark.enabled).toBe(true);
+      expect(settings.watermark.variant).toBe('icon_text');
+      expect(settings.exportDefaults.overwritePolicy).toBe('overwrite');
+    });
+  });
+
+  it('normalizes invalid hand-edited values to defaults and clamps numbers to their ranges', async () => {
+    await withSettingsFile(
+      { watermark: { enabled: 'no', variant: 'big', position: 'center', sizePercent: 99, marginPercent: -4, opacity: 0.05 } },
+      async (store) => {
+        const settings = await store.get();
+
+        expect(settings.watermark).toEqual({
+          enabled: true,
+          variant: 'icon_text',
+          position: 'top_left',
+          sizePercent: 15,
+          marginPercent: 0,
+          opacity: 0.2
+        });
+      }
+    );
+  });
+
+  it('falls back to the default for a non-finite number', async () => {
+    await withSettingsFile({ watermark: { sizePercent: null, opacity: 'high' } }, async (store) => {
+      const settings = await store.get();
+
+      expect(settings.watermark.sizePercent).toBe(7);
+      expect(settings.watermark.opacity).toBe(0.9);
+    });
+  });
+
+  it('persists a watermark patch and clamps it on the way in', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      const updated = await store.update({
+        watermark: { enabled: false, variant: 'icon', position: 'bottom_right', sizePercent: 40, marginPercent: 3, opacity: 0.5 }
+      });
+
+      expect(updated.watermark).toEqual({
+        enabled: false,
+        variant: 'icon',
+        position: 'bottom_right',
+        sizePercent: 15,
+        marginPercent: 3,
+        opacity: 0.5
+      });
+      expect((await store.get()).watermark).toEqual(updated.watermark);
+    });
+  });
+});
+

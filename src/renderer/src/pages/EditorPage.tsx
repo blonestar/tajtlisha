@@ -100,12 +100,14 @@ export function EditorPage({
   }, [wordHighlightMode, activeCaption, captionText, project.previewTrack]);
   const activeWordIndex = litWordIndex(wordSpans, playhead.timeMs);
 
-  // An exact frame belongs to one file. Drop it when the file changes.
+  // An exact frame belongs to one file and one logo setup (the logo is burned
+  // into it). Drop it, and any render in flight, when either changes.
+  const watermarkKey = JSON.stringify(settings.watermark);
   useEffect(() => {
     exactRequestRef.current += 1;
     setExact(null);
     setExactBusy(false);
-  }, [inputPath]);
+  }, [inputPath, watermarkKey]);
 
   const provider = workspace.provider;
   const pendingTranslations = rowsNeedingTranslation(project).filter(
@@ -198,7 +200,8 @@ export function EditorPage({
         videoHeight: source.height,
         text: captionText ?? '',
         style: project.style,
-        activeWordIndex: litWordIndex(wordSpans, atMs)
+        activeWordIndex: litWordIndex(wordSpans, atMs),
+        watermark: settings.watermark
       });
       if (requestId === exactRequestRef.current) setExact({ dataUrl, atMs });
     } catch {
@@ -342,6 +345,7 @@ export function EditorPage({
             captionText={captionText}
             style={project.style}
             activeWordIndex={activeWordIndex}
+            watermark={settings.watermark}
             onTimeUpdate={playhead.report}
             onPlayingChange={noop}
             onPlaybackError={workspace.reportPlaybackError}

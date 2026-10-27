@@ -167,6 +167,18 @@ Opcije:
   - overwrite,
   - create copy.
 
+### Logo
+
+- switch "Logo on video" (podrazumevano ukljucen),
+- stil: `T` ili `T + tajtliša` (brend se uvek pise latinicom, i u srpskoj cirilici),
+- ugao: gore levo, gore desno, dole levo, dole desno (podrazumevano gore levo),
+- velicina: 3..15% krace strane videa (podrazumevano 7%),
+- neprozirnost: 20..100% (podrazumevano 90%).
+
+Kada je logo iskljucen, kontrole za stil, ugao, velicinu i neprozirnost su onemogucene.
+Margina (3%) nije u UI-ju i koristi podrazumevanu vrednost. Logo nije tajna, pa ide u
+obican settings store.
+
 ## Advanced / diagnostics
 
 Opcije:

@@ -63,12 +63,13 @@ const MAIN_STRINGS: Record<MainLanguage, MainStrings> = {
 
 /**
  * Resolves the UI language for main. 'system' follows the OS locale: Serbian,
- * Croatian and Bosnian map to Latin unless the locale names Cyrillic; anything
- * else falls back to English.
+ * Croatian, Bosnian and Serbo-Croatian (sh) map to Latin unless the locale
+ * names Cyrillic; anything else falls back to English. Keep this in step with
+ * resolveSystemLanguage in src/renderer/src/i18n/index.ts.
  */
 export function resolveMainLanguage(uiLanguage: UiLanguage, systemLocale: string): MainLanguage {
   if (uiLanguage !== 'system') return uiLanguage;
-  if (/^(sr|hr|bs)([-_@.]|$)/i.test(systemLocale)) {
+  if (/^(sr|hr|bs|sh)([-_@.]|$)/i.test(systemLocale)) {
     return /cyrl/i.test(systemLocale) ? 'sr-Cyrl' : 'sr-Latn';
   }
   return 'en';

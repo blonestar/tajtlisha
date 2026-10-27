@@ -40,6 +40,7 @@ type SegmentedControlProps<T extends string | number> = {
   value: T;
   options: SegmentedOption<T>[];
   onChange: (value: T) => void;
+  disabled?: boolean;
 };
 
 /** Mutually exclusive choice with two to four options, labelled by a row title. */
@@ -47,7 +48,8 @@ export function SegmentedControl<T extends string | number>({
   labelledBy,
   value,
   options,
-  onChange
+  onChange,
+  disabled = false
 }: SegmentedControlProps<T>): ReactElement {
   return (
     <div className="segmented settings-segmented" role="group" aria-labelledby={labelledBy}>
@@ -56,6 +58,7 @@ export function SegmentedControl<T extends string | number>({
           key={String(option.value)}
           type="button"
           aria-pressed={option.value === value}
+          disabled={disabled}
           onClick={() => onChange(option.value)}
         >
           {option.label}

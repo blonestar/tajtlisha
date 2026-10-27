@@ -1,6 +1,7 @@
 import type { AiProviderId, ReasoningEffort } from './ai';
 import type { CaptionRow, TrimRange } from './project';
 import type { SubtitleStyle } from './style';
+import type { WatermarkSettings } from './watermark';
 
 /**
  * Long-running operations (AI, ffmpeg) are identified by a renderer-generated
@@ -117,6 +118,8 @@ export type ProjectExportRequest = {
   sourceLanguage: string;
   targetLanguage: string;
   style: SubtitleStyle;
+  /** Logo drawn into the MP4 when a video is rendered. Missing or enabled: false = no logo. */
+  watermark?: WatermarkSettings;
   outputs: ExportOutputs;
   /**
    * 'ask': when outputs exist, MAIN shows a native dialog (Replace / Create
