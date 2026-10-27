@@ -378,11 +378,9 @@
   min-width: 0;
   width: 100%;
 }
-@media (max-width: 1279px) {
-  /* The AI actions get their own row so they never sit on top of the provider badge. */
-  .editor-generate .generate-actions {
-    flex: 1 1 100%;
-  }
+/* The editor runs edge to edge; panels are split by lines, not framed boxes. */
+.app-main:has(.editor-workspace) {
+  padding: 0;
 }
 
 /* Splitters. The hit area is the full 12 px track; the visible line is 1 px in the middle. */
@@ -456,21 +454,14 @@ body.is-resizing-row video {
   min-width: 0;
 }
 
-.editor-generate {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  flex: none;
-  overflow: hidden;
+.editor-column-main {
+  gap: 0;
 }
-.editor-generate .generate-panel {
-  border-bottom: 0;
+.editor-generate {
+  flex: none;
 }
 
 .editor-captions {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -488,6 +479,7 @@ body.is-resizing-row video {
   display: flex;
   flex: none;
   gap: var(--space-2);
+  margin: var(--space-2) var(--space-3);
 }
 .editor-notice > span {
   min-width: 0;
@@ -508,9 +500,6 @@ body.is-resizing-row video {
 }
 
 .editor-preview {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
   display: grid;
   flex: 1 1 0;
   min-height: 220px;
@@ -524,9 +513,7 @@ body.is-resizing-row video {
   flex: none;
 }
 .editor-column-side > .style-drawer {
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-top: 1px solid var(--border);
   flex: none;
   max-height: 46%;
   min-height: 0;
@@ -543,53 +530,11 @@ body.is-resizing-row video {
 .editor-column-side {
   overflow-x: hidden;
   overflow-y: auto;
+  padding: var(--space-2) var(--space-3) 0;
 }
 /* Negative margins pull the splitter into the column's 8 px gaps, so the space between the panels stays 12 px. */
 .editor-column-side > .split-handle-horizontal {
   margin: calc(var(--space-2) * -1) 0;
-}
-
-/* Caption table: tighter columns so all six fit beside the preview at 1100 px. */
-.editor-captions .caption-table th,
-.editor-captions .caption-table td {
-  padding-left: var(--space-1);
-  padding-right: var(--space-1);
-}
-.editor-captions .caption-col-index {
-  width: 30px;
-}
-.editor-captions .caption-col-time {
-  width: 158px;
-}
-.editor-captions .caption-col-text {
-  min-width: 150px;
-}
-.editor-captions .caption-col-status {
-  width: 112px;
-}
-.editor-captions .caption-badges .badge {
-  line-height: 1.3;
-  max-width: 100%;
-  white-space: normal;
-}
-.editor-captions .caption-col-actions {
-  width: 60px;
-}
-.editor-captions .caption-row-actions {
-  flex-wrap: wrap;
-  width: 52px;
-}
-.editor-captions .caption-time-label {
-  flex: none;
-  min-width: 40px;
-  white-space: nowrap;
-  width: auto;
-}
-.editor-captions .caption-time-input {
-  width: 76px;
-}
-.editor-generate .generate-actions > .muted {
-  display: none;
 }
 
 /* The preview timecode stays on one line in the narrow preview column. */

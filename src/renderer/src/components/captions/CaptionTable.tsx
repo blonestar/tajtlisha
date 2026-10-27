@@ -46,6 +46,15 @@ export type CaptionTableProps = {
 
 const CONTROL_SELECTOR = 'input, textarea, button, select';
 
+/** Table cell an issue belongs to. Text issues sit under their field, the rest under the times. */
+type IssueCell = 'time' | TextColumn;
+
+function issueCell(code: string, showTranslation: boolean): IssueCell {
+  if (code === 'empty_original') return 'original';
+  if (code === 'empty_translation') return showTranslation ? 'translation' : 'time';
+  return 'time';
+}
+
 function overlongLines(text: string, maxChars: number): Array<{ line: number; length: number }> {
   return text.split('\n').flatMap((line, index) =>
     line.length > maxChars ? [{ line: index + 1, length: line.length }] : []
@@ -174,9 +183,6 @@ export function CaptionTable({
                 )}
               </th>
             )}
-            <th className="caption-col-status" scope="col">
-              {t('captions.columns.status')}
-            </th>
             <th className="caption-col-actions" scope="col">
               <span className="visually-hidden">{t('captions.columns.actions')}</span>
             </th>
@@ -187,10 +193,34 @@ export function CaptionTable({
             const isActive = caption.id === activeCaptionId;
             const isSelected = caption.id === selectedCaptionId;
             const isLast = index === captions.length - 1;
-            const captionIssues = (issues[caption.id] ?? []).filter(
-              (issue) => issue.code !== 'stale_translation'
-            );
             const isStale = staleIds.has(caption.id);
+            const originalLong = overlongLines(caption.original, maxCharsPerLine);
+            const translationLong = overlongLines(caption.translation, maxCharsPerLine);
+            // Per-field line warnings already say which line is too long, so the summary badge
+            // only shows when those warnings are not visible.
+            const lineWarningsShown =
+              originalLong.length > 0 || (showTranslation && translationLong.length > 0);
+            const captionIssues = (issues[caption.id] ?? []).filter(
+              (issue) =>
+                issue.code !== 'stale_translation' && !(issue.code === 'line_too_long' && lineWarningsShown)
+            );
+            const issuesIn = (cell: IssueCell) =>
+              captionIssues.filter((issue) => issueCell(issue.code, showTranslation) === cell);
+            const hasIssue = (code: string) => captionIssues.some((issue) => issue.code === code);
+            const renderBadges = (cellIssues: CaptionIssue[], extra?: ReactNode) =>
+              cellIssues.length > 0 || extra ? (
+                <div className="caption-badges">
+                  {extra}
+                  {cellIssues.map((issue, issueIndex) => (
+                    <span
+                      key={`${issue.code}-${issueIndex}`}
+                      className={`badge ${isBlockingIssue(issue.code) ? 'badge-danger' : 'badge-warning'}`}
+                    >
+                      {t(issueLabelKey(issue.code), { ms: issue.overlapMs ?? 0 })}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
             const rowClass = [
               'caption-row',
               isActive ? 'is-active' : '',
@@ -198,9 +228,6 @@ export function CaptionTable({
             ]
               .filter(Boolean)
               .join(' ');
-
-            const originalLong = overlongLines(caption.original, maxCharsPerLine);
-            const translationLong = overlongLines(caption.translation, maxCharsPerLine);
 
             return (
               <tr
@@ -213,6 +240,9 @@ export function CaptionTable({
               >
                 <td className="caption-col-index">
                   <span className="caption-index">{index + 1}</span>
+                  <span className="caption-duration">
+                    {t('captions.time.duration', { seconds: formatSeconds(caption.endMs - caption.startMs) })}
+                  </span>
                 </td>
                 <td className="caption-col-time">
                   <TimecodeField
@@ -233,18 +263,24 @@ export function CaptionTable({
                     onCommit={(endMs) => onUpdate(caption.id, { endMs })}
                     onNudge={(deltaMs) => onNudge(caption.id, deltaMs, 'end')}
                   />
-                  <span className="caption-duration">
-                    {t('captions.time.duration', { seconds: formatSeconds(caption.endMs - caption.startMs) })}
-                  </span>
+                  {renderBadges(
+                    issuesIn('time'),
+                    isStale && !showTranslation ? (
+                      <span className="badge badge-warning">{t('captions.stale')}</span>
+                    ) : undefined
+                  )}
                 </td>
                 <td className="caption-col-text">
                   <AutoGrowTextarea
                     aria-label={originalLabel}
                     data-column="original"
+                    className={hasIssue('empty_original') ? 'caption-text is-missing' : 'caption-text'}
+                    placeholder={t('captions.issues.empty_original')}
                     value={caption.original}
                     onValueChange={(original) => onUpdate(caption.id, { original })}
                     onKeyDown={(event) => handleTextKeyDown(caption, 'original', event)}
                   />
+                  {renderBadges(issuesIn('original').filter((issue) => issue.code !== 'empty_original'))}
                   {originalLong.length > 0 && (
                     <ul className="caption-line-warnings">
                       {originalLong.map((line) => (
@@ -260,6 +296,8 @@ export function CaptionTable({
                     <AutoGrowTextarea
                       aria-label={translationLabel}
                       data-column="translation"
+                      className={hasIssue('empty_translation') ? 'caption-text is-missing' : 'caption-text'}
+                      placeholder={t('captions.issues.empty_translation')}
                       value={caption.translation}
                       onValueChange={(translation) => onUpdate(caption.id, { translation })}
                       onKeyDown={(event) => handleTextKeyDown(caption, 'translation', event)}
@@ -273,26 +311,17 @@ export function CaptionTable({
                         ))}
                       </ul>
                     )}
+                    {renderBadges(
+                      issuesIn('translation').filter((issue) => issue.code !== 'empty_translation'),
+                      isStale ? <span className="badge badge-warning">{t('captions.stale')}</span> : undefined
+                    )}
                   </td>
                 )}
-                <td className="caption-col-status">
-                  <div className="caption-badges">
-                    {isStale && <span className="badge badge-warning">{t('captions.stale')}</span>}
-                    {captionIssues.map((issue, issueIndex) => (
-                      <span
-                        key={`${issue.code}-${issueIndex}`}
-                        className={`badge ${isBlockingIssue(issue.code) ? 'badge-danger' : 'badge-warning'}`}
-                      >
-                        {t(issueLabelKey(issue.code), { ms: issue.overlapMs ?? 0 })}
-                      </span>
-                    ))}
-                  </div>
-                </td>
                 <td className="caption-col-actions">
                   <div className="caption-row-actions">
                     <button
                       type="button"
-                      className="btn-icon btn-sm"
+                      className="btn btn-icon btn-sm"
                       title={t('captions.actions.insertAfter')}
                       aria-label={t('captions.actions.insertAfter')}
                       onClick={() => onInsertAfter(caption.id)}
@@ -301,7 +330,7 @@ export function CaptionTable({
                     </button>
                     <button
                       type="button"
-                      className="btn-icon btn-sm"
+                      className="btn btn-icon btn-sm"
                       title={t('captions.actions.split')}
                       aria-label={t('captions.actions.split')}
                       onClick={() => onSplit(caption.id)}
@@ -310,7 +339,7 @@ export function CaptionTable({
                     </button>
                     <button
                       type="button"
-                      className="btn-icon btn-sm"
+                      className="btn btn-icon btn-sm"
                       title={t(isLast ? 'captions.actions.mergeUnavailable' : 'captions.actions.merge')}
                       aria-label={t('captions.actions.merge')}
                       disabled={isLast}
@@ -320,7 +349,7 @@ export function CaptionTable({
                     </button>
                     <button
                       type="button"
-                      className="btn-icon btn-sm btn-icon-danger"
+                      className="btn btn-icon btn-sm btn-icon-danger"
                       title={t('captions.actions.delete')}
                       aria-label={t('captions.actions.delete')}
                       onClick={() => onDelete(caption.id)}

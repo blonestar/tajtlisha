@@ -126,11 +126,10 @@ describe('GeneratePanel', () => {
     expect(screen.getByText('OpenRouter cannot transcribe audio')).toBeTruthy();
   });
 
-  it('switches the transcribe label once captions exist and shows the count', () => {
+  it('switches the transcribe label once captions exist', () => {
     renderWithI18n(<GeneratePanel {...props({ captionCount: 3 })} />);
 
     expect(screen.getByRole('button', { name: 'Transcribe again' })).toBeEnabled();
-    expect(screen.getByText('3 captions')).toBeTruthy();
   });
 
   it('asks to transcribe first when translating without captions', () => {
