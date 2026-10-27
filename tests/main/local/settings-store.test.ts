@@ -499,3 +499,36 @@ describe('SettingsStore AI connector correction and instructions', () => {
     });
   });
 });
+
+describe('auto-check updates setting', () => {
+  async function withSettingsFile<T>(fileContent: unknown, run: (store: SettingsStore) => Promise<T>): Promise<T> {
+    const dir = await mkdtemp(join(tmpdir(), 'tajtlisha-autocheck-'));
+    const filePath = join(dir, 'settings.json');
+    try {
+      if (fileContent !== undefined) {
+        await writeFile(filePath, JSON.stringify(fileContent), 'utf8');
+      }
+      return await run(new SettingsStore({ filePath }));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('is on by default', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      expect((await store.get()).autoCheckUpdates).toBe(true);
+    });
+  });
+
+  it('keeps a stored false', async () => {
+    await withSettingsFile({ autoCheckUpdates: false }, async (store) => {
+      expect((await store.get()).autoCheckUpdates).toBe(false);
+    });
+  });
+
+  it('normalizes a non-boolean junk value to on', async () => {
+    await withSettingsFile({ autoCheckUpdates: 'no' }, async (store) => {
+      expect((await store.get()).autoCheckUpdates).toBe(true);
+    });
+  });
+});

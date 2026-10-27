@@ -28,6 +28,14 @@ export const shellStrings = {
       failed: 'Save failed',
       retry: 'Retry save'
     },
+    update: {
+      available: 'Update {{version}}',
+      availableTitle: 'Version {{version}} is available. Click to download it.',
+      downloading: 'Downloading {{percent}}%',
+      restart: 'Restart to update',
+      restartTitle: 'Version {{version}} is downloaded. Click to restart and install it.',
+      retry: 'Retry update {{version}}'
+    },
     steps: {
       label: 'Workflow steps',
       import: 'Import',
@@ -151,6 +159,14 @@ export const shellStrings = {
       failed: 'Čuvanje nije uspelo',
       retry: 'Pokušaj ponovo'
     },
+    update: {
+      available: 'Ažuriraj na {{version}}',
+      availableTitle: 'Dostupna je verzija {{version}}. Kliknite da je preuzmete.',
+      downloading: 'Preuzimam {{percent}}%',
+      restart: 'Restartuj i ažuriraj',
+      restartTitle: 'Verzija {{version}} je preuzeta. Kliknite da se aplikacija restartuje i instalira je.',
+      retry: 'Ponovi ažuriranje {{version}}'
+    },
     steps: {
       label: 'Koraci rada',
       import: 'Uvoz',
@@ -273,6 +289,14 @@ export const shellStrings = {
       saving: 'Чување…',
       failed: 'Чување није успело',
       retry: 'Покушај поново'
+    },
+    update: {
+      available: 'Ажурирај на {{version}}',
+      availableTitle: 'Доступна је верзија {{version}}. Кликните да је преузмете.',
+      downloading: 'Преузимам {{percent}}%',
+      restart: 'Рестартуј и ажурирај',
+      restartTitle: 'Верзија {{version}} је преузета. Кликните да се апликација рестартује и инсталира је.',
+      retry: 'Понови ажурирање {{version}}'
     },
     steps: {
       label: 'Кораци рада',

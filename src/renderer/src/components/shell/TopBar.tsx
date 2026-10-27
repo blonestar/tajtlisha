@@ -8,6 +8,7 @@ import LoaderCircle from 'lucide-react/dist/esm/icons/loader-circle.js';
 import Redo2 from 'lucide-react/dist/esm/icons/redo-2.js';
 import Settings from 'lucide-react/dist/esm/icons/settings.js';
 import Undo2 from 'lucide-react/dist/esm/icons/undo-2.js';
+import { UpdateButton } from './UpdateButton';
 
 export type SaveState = { kind: 'saved' } | { kind: 'saving' } | { kind: 'error'; message: string };
 
@@ -94,6 +95,7 @@ export function TopBar({
       </div>
 
       <div className="topbar-actions">
+        <UpdateButton />
         <button
           type="button"
           className="btn btn-sm"

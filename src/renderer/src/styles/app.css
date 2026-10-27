@@ -173,6 +173,20 @@
   display: inline-flex;
   gap: 2px;
 }
+.btn-update {
+  white-space: nowrap;
+}
+.btn-update:not(.btn-primary) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-update.is-downloading:disabled {
+  cursor: progress;
+  opacity: 1;
+}
+.btn-update.is-downloading svg {
+  animation: spin 1.2s linear infinite;
+}
 
 /* ---- Workflow steps (34 px) ---- */
 

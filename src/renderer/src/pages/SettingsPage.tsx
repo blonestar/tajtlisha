@@ -125,7 +125,7 @@ export function SettingsPage({
             ) : null}
             {section === 'export' ? <ExportSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
             {section === 'logo' ? <LogoSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
-            {section === 'about' ? <AboutSection /> : null}
+            {section === 'about' ? <AboutSection settings={settings} onSettingsChange={onSettingsChange} /> : null}
           </div>
         </div>
       </div>

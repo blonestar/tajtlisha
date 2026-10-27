@@ -8,6 +8,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Added
 - Settings > About shows the author and a link that opens the source repository in the system browser.
+- Automatic update check at startup and every hour, with a "Check for updates automatically" switch in Settings > About (on by default).
+- Update button in the top bar when a new version is available: it downloads the update, then offers "Restart to update" to install it. A failed download can be retried from the same button.
 
 ## [0.7.1] - 2026-10-27
 
