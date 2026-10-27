@@ -19,6 +19,7 @@ const EMPTY_SETTINGS: AppSettings = {
   uiLanguage: 'system',
   autosaveEnabled: true,
   recentFilesEnabled: true,
+  autoCheckUpdates: true,
   neverModifyOriginalVideo: true,
   uiZoomPercent: 100,
   exportDefaults: {

@@ -57,8 +57,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
   reinstall it from the release page.
 - Windows: the NSIS installer updates itself. The update manifest is `latest.yml`, uploaded next to the installer.
 - Development runs (`pnpm dev`) never check for updates.
-- The app checks on startup and from Settings > About. Downloading and installing always need user action;
-  updates are never installed on quit (`autoInstallOnAppQuit` is false).
+- The app checks at startup and then every hour while `autoCheckUpdates` is on (Settings > About > Updates toggle; the
+  setting is read on each check, so no restart is needed). Checks also run from Settings > About. A check never
+  replaces a state that is already `available`, `downloading` or `downloaded`.
+- When an update is available, the top bar shows an update button: it downloads the update, then offers
+  "Restart to update", which installs it. If the download fails, the button offers a retry. Downloading and installing always need user action; updates are never
+  installed on quit (`autoInstallOnAppQuit` is false).
 
 ## Packaging commands
 

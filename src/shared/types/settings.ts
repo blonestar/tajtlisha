@@ -52,6 +52,8 @@ export type AppSettings = {
   workingFolder?: string;
   autosaveEnabled: boolean;
   recentFilesEnabled: boolean;
+  /** Checks GitHub for a new version at startup and every hour. Install still needs a user action. */
+  autoCheckUpdates: boolean;
   neverModifyOriginalVideo: true;
   /** Whole-UI page zoom in percent, one of UI_ZOOM_LEVELS. */
   uiZoomPercent: number;

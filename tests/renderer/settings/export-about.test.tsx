@@ -140,6 +140,34 @@ describe('about section', () => {
     };
   }
 
+  it('turns the automatic update check off through the switch without checking', async () => {
+    const onCheck = vi.fn();
+    installFakeApi(aboutApi({ onCheck }));
+    const onSettingsChange = vi.fn();
+    openSection('About', { onSettingsChange });
+
+    const toggle = await screen.findByRole('switch', { name: 'Check for updates automatically' });
+    expect(toggle).toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(onSettingsChange).toHaveBeenCalledWith({ autoCheckUpdates: false });
+    expect(onCheck).not.toHaveBeenCalled();
+  });
+
+  it('checks right away when the automatic update check is turned on', async () => {
+    const onCheck = vi.fn();
+    installFakeApi(aboutApi({ onCheck }));
+    const onSettingsChange = vi.fn();
+    openSection('About', { onSettingsChange, settings: { ...noFolderSettings, autoCheckUpdates: false } });
+
+    const toggle = await screen.findByRole('switch', { name: 'Check for updates automatically' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+
+    expect(onSettingsChange).toHaveBeenCalledWith({ autoCheckUpdates: true });
+    await waitFor(() => expect(onCheck).toHaveBeenCalledTimes(1));
+  });
+
   it('shows the version and a readable platform name', async () => {
     installFakeApi(aboutApi({}));
     openSection('About');

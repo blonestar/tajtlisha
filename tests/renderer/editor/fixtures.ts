@@ -49,6 +49,7 @@ export const SETTINGS: AppSettings = {
   defaultOutputFolder: '/exports',
   autosaveEnabled: true,
   recentFilesEnabled: true,
+  autoCheckUpdates: true,
   neverModifyOriginalVideo: true,
   uiZoomPercent: 100,
   exportDefaults: {

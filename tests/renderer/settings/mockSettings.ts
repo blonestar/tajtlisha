@@ -9,6 +9,7 @@ export const mockSettings: AppSettings = {
   workingFolder: '~/.local/share/tajtlisha/work',
   autosaveEnabled: true,
   recentFilesEnabled: true,
+  autoCheckUpdates: true,
   neverModifyOriginalVideo: true,
   uiZoomPercent: 100,
   exportDefaults: {
