@@ -27,36 +27,62 @@ describe('WatermarkOverlay', () => {
     expect(container.querySelector('svg')).toBeNull();
   });
 
-  it('draws the background, the T and the wordmark for icon_text, in frame pixels', () => {
+  it('draws the background rectangle and the badge and text as text, in frame pixels', () => {
     const { container } = renderWithI18n(<WatermarkOverlay watermark={DEFAULT_WATERMARK} frameWidth={360} frameHeight={640} />);
 
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('viewBox', '0 0 360 640');
     expect(svg).toHaveAttribute('aria-hidden', 'true');
 
-    const [background, crossbar, stem] = Array.from(container.querySelectorAll('rect'));
     // Frame 360x640: shorter side 360, S = 25.2 px, M = 10.8 px.
+    const background = container.querySelector('rect');
     expect(background).toHaveAttribute('fill', '#1D2025');
-    expect(background.getAttribute('x')).toBe('10.8');
-    expect(Number(background.getAttribute('height'))).toBeCloseTo(25.2);
-    expect(Number(background.getAttribute('rx'))).toBeCloseTo(0.1875 * 25.2);
+    expect(Number(background?.getAttribute('x'))).toBeCloseTo(10.8);
+    expect(Number(background?.getAttribute('height'))).toBeCloseTo(25.2);
+    expect(Number(background?.getAttribute('rx'))).toBeCloseTo(0.19 * 25.2);
     expect(background).toHaveAttribute('opacity', '0.9');
-    expect(crossbar).toHaveAttribute('fill', '#F2A93B');
-    expect(stem).toHaveAttribute('fill', '#F2A93B');
 
-    const wordmark = container.querySelector('path');
-    expect(wordmark).toHaveAttribute('fill', '#F2F2F2');
-    expect(wordmark?.getAttribute('transform')).toMatch(/^translate\(/);
-    expect(wordmark?.getAttribute('d')).toMatch(/^M/);
+    const [mark, text] = Array.from(container.querySelectorAll('text'));
+    expect(mark).toHaveTextContent('T');
+    expect(mark).toHaveAttribute('fill', '#F2A93B');
+    expect(mark).toHaveAttribute('font-size', String(0.7 * 25.2));
+    expect(text).toHaveTextContent('tajtliša');
+    expect(text).toHaveAttribute('fill', '#F2F2F2');
+    expect(text).toHaveAttribute('font-size', String(0.62 * 25.2));
+    expect(text).toHaveAttribute('font-family', 'Noto Sans');
+    expect(text).toHaveAttribute('font-weight', '700');
   });
 
-  it('draws only the badge for the icon variant', () => {
+  it('turns kerning off and keeps spaces in the text, as the export does', () => {
     const { container } = renderWithI18n(
-      <WatermarkOverlay watermark={{ ...DEFAULT_WATERMARK, variant: 'icon' }} frameWidth={360} frameHeight={640} />
+      <WatermarkOverlay watermark={{ ...DEFAULT_WATERMARK, text: 'Moj  kanal' }} frameWidth={360} frameHeight={640} />
     );
 
-    expect(container.querySelectorAll('rect')).toHaveLength(3);
-    expect(container.querySelector('path')).toBeNull();
+    const text = container.querySelectorAll('text')[1];
+    expect(text).toHaveAttribute('style', expect.stringContaining('font-kerning: none'));
+    expect(text).toHaveAttribute('style', expect.stringContaining('white-space: pre'));
+    expect(text?.textContent).toBe('Moj  kanal');
+  });
+
+  it('draws only the text for the text content, with no background for the none option', () => {
+    const { container } = renderWithI18n(
+      <WatermarkOverlay watermark={{ ...DEFAULT_WATERMARK, content: 'text', background: 'none' }} frameWidth={360} frameHeight={640} />
+    );
+
+    expect(container.querySelector('rect')).toBeNull();
+    expect(container.querySelectorAll('text')).toHaveLength(1);
+    expect(container.querySelector('text')).toHaveTextContent('tajtliša');
+  });
+
+  it('draws only the badge for the mark content, on a background behind the badge only', () => {
+    const { container } = renderWithI18n(
+      <WatermarkOverlay watermark={{ ...DEFAULT_WATERMARK, content: 'mark', background: 'mark' }} frameWidth={360} frameHeight={640} />
+    );
+
+    expect(container.querySelectorAll('text')).toHaveLength(1);
+    expect(container.querySelector('text')).toHaveTextContent('T');
+    // The badge cell is one logo height wide.
+    expect(Number(container.querySelector('rect')?.getAttribute('width'))).toBeCloseTo(25.2);
   });
 });
 

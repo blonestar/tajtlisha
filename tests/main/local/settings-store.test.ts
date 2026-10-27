@@ -250,13 +250,20 @@ describe('watermark settings', () => {
     }
   }
 
-  it('has the logo on by default, as the T and wordmark badge in the top-left corner', async () => {
+  it('has the logo on by default: the T and tajtliša text in the top-left corner', async () => {
     await withSettingsFile(undefined, async (store) => {
       const settings = await store.get();
 
       expect(settings.watermark).toEqual({
         enabled: true,
-        variant: 'icon_text',
+        content: 'mark_text',
+        markText: 'T',
+        text: 'tajtliša',
+        background: 'all',
+        backgroundColor: '#1D2025',
+        markColor: '#F2A93B',
+        textColor: '#F2F2F2',
+        cornerRadiusPercent: 19,
         position: 'top_left',
         sizePercent: 7,
         marginPercent: 3,
@@ -270,20 +277,64 @@ describe('watermark settings', () => {
       const settings = await store.get();
 
       expect(settings.watermark.enabled).toBe(true);
-      expect(settings.watermark.variant).toBe('icon_text');
+      expect(settings.watermark.content).toBe('mark_text');
       expect(settings.exportDefaults.overwritePolicy).toBe('overwrite');
     });
   });
 
-  it('normalizes invalid hand-edited values to defaults and clamps numbers to their ranges', async () => {
+  it('upgrades a settings file with the old variant field to the new fields, keeping the valid old values', async () => {
     await withSettingsFile(
-      { watermark: { enabled: 'no', variant: 'big', position: 'center', sizePercent: 99, marginPercent: -4, opacity: 0.05 } },
+      { watermark: { enabled: false, variant: 'icon', position: 'bottom_right', sizePercent: 9, marginPercent: 2, opacity: 0.6 } },
       async (store) => {
         const settings = await store.get();
 
         expect(settings.watermark).toEqual({
+          enabled: false,
+          content: 'mark_text',
+          markText: 'T',
+          text: 'tajtliša',
+          background: 'all',
+          backgroundColor: '#1D2025',
+          markColor: '#F2A93B',
+          textColor: '#F2F2F2',
+          cornerRadiusPercent: 19,
+          position: 'bottom_right',
+          sizePercent: 9,
+          marginPercent: 2,
+          opacity: 0.6
+        });
+      }
+    );
+  });
+
+  it('normalizes invalid hand-edited values to defaults and clamps numbers to their ranges', async () => {
+    await withSettingsFile(
+      {
+        watermark: {
+          enabled: 'no',
+          content: 'both',
+          markText: 'ABCDE',
+          text: 'x'.repeat(40),
+          background: 'boxed',
+          backgroundColor: 'red',
+          cornerRadiusPercent: 99,
+          position: 'center',
+          sizePercent: 99,
+          marginPercent: -4,
+          opacity: 0.05
+        }
+      },
+      async (store) => {
+        const settings = await store.get();
+
+        expect(settings.watermark).toMatchObject({
           enabled: true,
-          variant: 'icon_text',
+          content: 'mark_text',
+          markText: 'ABC',
+          text: 'x'.repeat(30),
+          background: 'all',
+          backgroundColor: '#1D2025',
+          cornerRadiusPercent: 50,
           position: 'top_left',
           sizePercent: 15,
           marginPercent: 0,
@@ -302,20 +353,26 @@ describe('watermark settings', () => {
     });
   });
 
-  it('persists a watermark patch and clamps it on the way in', async () => {
+  it('persists a watermark patch and normalizes it on the way in', async () => {
     await withSettingsFile(undefined, async (store) => {
-      const updated = await store.update({
-        watermark: { enabled: false, variant: 'icon', position: 'bottom_right', sizePercent: 40, marginPercent: 3, opacity: 0.5 }
-      });
-
-      expect(updated.watermark).toEqual({
+      const patch = {
         enabled: false,
-        variant: 'icon',
-        position: 'bottom_right',
-        sizePercent: 15,
+        content: 'text' as const,
+        markText: '',
+        text: '  Moj kanal\n',
+        background: 'none' as const,
+        backgroundColor: '#ABCDEF',
+        markColor: '#F2A93B',
+        textColor: '#F2F2F2',
+        cornerRadiusPercent: 19,
+        position: 'bottom_center' as const,
+        sizePercent: 40,
         marginPercent: 3,
         opacity: 0.5
-      });
+      };
+      const updated = await store.update({ watermark: patch });
+
+      expect(updated.watermark).toEqual({ ...patch, text: 'Moj kanal', sizePercent: 15 });
       expect((await store.get()).watermark).toEqual(updated.watermark);
     });
   });

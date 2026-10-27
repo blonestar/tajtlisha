@@ -432,3 +432,54 @@
     grid-template-columns: 170px minmax(0, 1fr);
   }
 }
+
+/* Logo: live preview, colour inputs, position grid, text fields */
+.settings-sheet .logo-preview {
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #5f6d7c 0%, #2e3742 55%, #161a20 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  width: 320px;
+}
+.settings-sheet .logo-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.settings-sheet .settings-color {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  height: 26px;
+  padding: 0;
+  width: 36px;
+}
+.settings-sheet .settings-color:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.settings-sheet .logo-text-input {
+  width: 240px;
+  max-width: 100%;
+}
+.settings-sheet .logo-position-grid {
+  display: grid;
+  gap: var(--space-1);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 320px;
+  max-width: 100%;
+}
+.settings-sheet .logo-position-option {
+  height: 28px;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+}
+.settings-sheet .logo-position-option[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}

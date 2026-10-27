@@ -1,7 +1,12 @@
 import type { AiProviderId } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
-import { WATERMARK_POSITIONS, WATERMARK_VARIANTS, type WatermarkSettings } from '../../shared/types/watermark';
-import { clampWatermark } from '../../shared/watermark-geometry';
+import {
+  WATERMARK_BACKGROUNDS,
+  WATERMARK_CONTENTS,
+  WATERMARK_POSITIONS,
+  type WatermarkSettings
+} from '../../shared/types/watermark';
+import { isWatermarkColor, normalizeWatermark } from '../../shared/watermark-geometry';
 
 /**
  * Boundary checks for renderer payloads. Messages name the field only, never
@@ -79,15 +84,32 @@ export function requireBoolean(value: unknown, field: string): boolean {
   return value;
 }
 
-/** Wrong types are rejected; numbers are clamped to the shared ranges, the same as the settings store. */
+/**
+ * Wrong types, unknown enum values and colours that are not #rrggbb are
+ * rejected. Accepted text is cleaned and numbers clamped by the shared
+ * normalizeWatermark, the same as the settings store.
+ */
 export function requireWatermark(value: unknown, field: string): WatermarkSettings {
   const input = requireRecord(value, field);
-  return clampWatermark({
-    enabled: requireBoolean(input.enabled, `${field}.enabled`),
-    variant: requireOneOf(input.variant, WATERMARK_VARIANTS, `${field}.variant`),
-    position: requireOneOf(input.position, WATERMARK_POSITIONS, `${field}.position`),
-    sizePercent: requireFiniteNumber(input.sizePercent, `${field}.sizePercent`),
-    marginPercent: requireFiniteNumber(input.marginPercent, `${field}.marginPercent`),
-    opacity: requireFiniteNumber(input.opacity, `${field}.opacity`)
-  });
+  requireBoolean(input.enabled, `${field}.enabled`);
+  requireOneOf(input.content, WATERMARK_CONTENTS, `${field}.content`);
+  requireText(input.markText, `${field}.markText`);
+  requireText(input.text, `${field}.text`);
+  requireOneOf(input.background, WATERMARK_BACKGROUNDS, `${field}.background`);
+  requireColor(input.backgroundColor, `${field}.backgroundColor`);
+  requireColor(input.markColor, `${field}.markColor`);
+  requireColor(input.textColor, `${field}.textColor`);
+  requireFiniteNumber(input.cornerRadiusPercent, `${field}.cornerRadiusPercent`);
+  requireOneOf(input.position, WATERMARK_POSITIONS, `${field}.position`);
+  requireFiniteNumber(input.sizePercent, `${field}.sizePercent`);
+  requireFiniteNumber(input.marginPercent, `${field}.marginPercent`);
+  requireFiniteNumber(input.opacity, `${field}.opacity`);
+  return normalizeWatermark(input);
+}
+
+function requireColor(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !isWatermarkColor(value)) {
+    throw invalidInput(field, 'a #rrggbb colour');
+  }
+  return value;
 }

@@ -1,6 +1,7 @@
 import type { ProviderStatus } from '../../../src/shared/types/ai';
 import type { AppSettings } from '../../../src/shared/types/settings';
 import type { SubtitleTrack } from '../../../src/shared/types/subtitles';
+import { DEFAULT_WATERMARK } from '../../../src/shared/watermark-geometry';
 
 export const mockSettings: AppSettings = {
   uiLanguage: 'en',
@@ -41,7 +42,7 @@ export const mockSettings: AppSettings = {
     modelByProvider: {},
     reasoningEffort: 'default'
   },
-  watermark: { enabled: true, variant: 'icon_text', position: 'top_left', sizePercent: 7, marginPercent: 3, opacity: 0.9 }
+  watermark: { ...DEFAULT_WATERMARK }
 };
 
 export const mockProviderStatuses: ProviderStatus[] = [

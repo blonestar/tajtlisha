@@ -1,23 +1,34 @@
+import { LOGO_FONT_METRICS } from './logo-font-metrics.generated';
+import { measureLogoText } from './logo-font-metrics';
 import { clamp } from './subtitle-geometry';
-import { WORDMARK } from './watermark-wordmark.generated';
 import {
+  WATERMARK_BACKGROUNDS,
+  WATERMARK_CONTENTS,
   WATERMARK_POSITIONS,
-  WATERMARK_VARIANTS,
   type WatermarkSettings
 } from './types/watermark';
 
 /**
- * Single source of truth for the logo watermark layout. The ASS export
+ * Single source of truth for the logo layout. The ASS export
  * (src/main/export/ass.ts) and the renderer preview (WatermarkOverlay) both
  * call computeWatermarkLayout with the frame size they draw into, so the logo
  * keeps the same proportions on screen and in the exported video.
  *
  * Everything is in frame pixels. `short` is the shorter side of the frame,
  * `S` is the logo height and `M` is the margin from the nearest edges.
+ * The badge letters and the text are real Noto Sans Bold text; their widths
+ * come from the generated metrics table.
  */
 export const DEFAULT_WATERMARK: WatermarkSettings = {
   enabled: true,
-  variant: 'icon_text',
+  content: 'mark_text',
+  markText: 'T',
+  text: 'tajtliša',
+  background: 'all',
+  backgroundColor: '#1D2025',
+  markColor: '#F2A93B',
+  textColor: '#F2F2F2',
+  cornerRadiusPercent: 19,
   position: 'top_left',
   sizePercent: 7,
   marginPercent: 3,
@@ -25,130 +36,186 @@ export const DEFAULT_WATERMARK: WatermarkSettings = {
 };
 
 export const WATERMARK_RANGES = {
+  cornerRadiusPercent: { min: 0, max: 50 },
   sizePercent: { min: 3, max: 15 },
   marginPercent: { min: 0, max: 10 },
   opacity: { min: 0.2, max: 1 }
 } as const;
 
-export const WATERMARK_COLORS = {
-  background: '#1D2025',
-  tMark: '#F2A93B',
-  wordmark: '#F2F2F2'
-} as const;
+/** Length limits in code points. An empty value is allowed and hides that part. */
+export const WATERMARK_TEXT_LIMITS = { markText: 3, text: 30 } as const;
 
-/** Background corner radius, in logo heights. */
-const BADGE_RADIUS = 0.1875;
-/** Wordmark origin in logo heights, measured from the logo's left edge. */
-const WORDMARK_LEFT = 0.8;
-/** Wordmark baseline in logo heights, measured from the logo's top edge. */
-const WORDMARK_BASELINE = 0.7988;
-/** Wordmark em size in logo heights. */
-const WORDMARK_EM = 0.62;
-/** Space right of the wordmark ink, in logo heights. */
-const WORDMARK_RIGHT_PAD = 0.31;
-/** T crossbar and stem, in logo heights, measured from the logo's top-left corner. */
-const T_CROSSBAR = { x0: 0.3105, y0: 0.2988, x1: 0.6895, y1: 0.3867 };
-const T_STEM = { x0: 0.4473, y0: 0.3867, x1: 0.5527, y1: 0.7988 };
+const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
-export type WatermarkRect = { x: number; y: number; width: number; height: number };
+/** Badge letter em size in logo heights. */
+const MARK_EM = 0.7;
+/** Text em size in logo heights. */
+const TEXT_EM = 0.62;
+/** Space around the content, in logo heights. */
+const PAD = 0.3;
+/** Space on each side of the badge letters inside the badge cell, in logo heights. */
+const MARK_CELL_PAD = 0.25;
+/** Gap between the right ink of the badge letters and the text, in logo heights. */
+const MARK_TEXT_GAP = 0.1;
+
+export type WatermarkBox = { x: number; y: number; width: number; height: number; radius: number };
+
+/** One line of logo text. `x` is the pen start, `baseline` the baseline, both in frame pixels. */
+export type WatermarkTextPart = { x: number; baseline: number; em: number; text: string; color: string };
 
 export type WatermarkLayout = {
   /** Logo top-left corner in frame pixels. */
   origin: { x: number; y: number };
   width: number;
   height: number;
-  /** Corner radius of the background rounded rectangle. */
-  radius: number;
-  /** The two rectangles of the T badge: crossbar first, then stem. */
-  tRects: [WatermarkRect, WatermarkRect];
-  /**
-   * Wordmark placement. Font unit (fx, fy) maps to
-   * (offsetX + fx * scale, baselineY + fy * scale). Null for the icon-only variant.
-   */
-  wordmark: { offsetX: number; baselineY: number; scale: number } | null;
-  colors: typeof WATERMARK_COLORS;
+  /** Background rounded rectangle, or null when there is no background. */
+  background: WatermarkBox | null;
+  backgroundColor: string;
+  /** Badge letters, or null when the badge is hidden. */
+  mark: WatermarkTextPart | null;
+  /** Text, or null when the text is hidden. */
+  text: WatermarkTextPart | null;
   opacity: number;
 };
 
-/** Clamps numeric fields to their ranges. Shared by the settings store and IPC validation. */
-export function clampWatermark(settings: WatermarkSettings): WatermarkSettings {
-  return {
-    ...settings,
-    sizePercent: clamp(settings.sizePercent, WATERMARK_RANGES.sizePercent.min, WATERMARK_RANGES.sizePercent.max),
-    marginPercent: clamp(settings.marginPercent, WATERMARK_RANGES.marginPercent.min, WATERMARK_RANGES.marginPercent.max),
-    opacity: clamp(settings.opacity, WATERMARK_RANGES.opacity.min, WATERMARK_RANGES.opacity.max)
-  };
+export function isWatermarkColor(value: string): boolean {
+  return COLOR_PATTERN.test(value);
 }
 
 /**
- * Hand-edited or stored values: unknown enums and non-finite numbers fall back
- * to the defaults, numbers are clamped to their ranges.
+ * Hand-edited or stored values, and IPC input after the type checks: unknown
+ * enums and invalid colours fall back to the defaults, non-finite numbers too,
+ * numbers are clamped to their ranges and text is cleaned.
  */
 export function normalizeWatermark(value: unknown): WatermarkSettings {
   const input: Record<string, unknown> =
     typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-  return clampWatermark({
+  return {
     enabled: typeof input.enabled === 'boolean' ? input.enabled : DEFAULT_WATERMARK.enabled,
-    variant: WATERMARK_VARIANTS.find((variant) => variant === input.variant) ?? DEFAULT_WATERMARK.variant,
-    position: WATERMARK_POSITIONS.find((position) => position === input.position) ?? DEFAULT_WATERMARK.position,
-    sizePercent: finiteOr(input.sizePercent, DEFAULT_WATERMARK.sizePercent),
-    marginPercent: finiteOr(input.marginPercent, DEFAULT_WATERMARK.marginPercent),
-    opacity: finiteOr(input.opacity, DEFAULT_WATERMARK.opacity)
-  });
+    content: oneOf(WATERMARK_CONTENTS, input.content, DEFAULT_WATERMARK.content),
+    markText: textOr(input.markText, WATERMARK_TEXT_LIMITS.markText, DEFAULT_WATERMARK.markText),
+    text: textOr(input.text, WATERMARK_TEXT_LIMITS.text, DEFAULT_WATERMARK.text),
+    background: oneOf(WATERMARK_BACKGROUNDS, input.background, DEFAULT_WATERMARK.background),
+    backgroundColor: colorOr(input.backgroundColor, DEFAULT_WATERMARK.backgroundColor),
+    markColor: colorOr(input.markColor, DEFAULT_WATERMARK.markColor),
+    textColor: colorOr(input.textColor, DEFAULT_WATERMARK.textColor),
+    cornerRadiusPercent: clamp(
+      finiteOr(input.cornerRadiusPercent, DEFAULT_WATERMARK.cornerRadiusPercent),
+      WATERMARK_RANGES.cornerRadiusPercent.min,
+      WATERMARK_RANGES.cornerRadiusPercent.max
+    ),
+    position: oneOf(WATERMARK_POSITIONS, input.position, DEFAULT_WATERMARK.position),
+    sizePercent: clamp(
+      finiteOr(input.sizePercent, DEFAULT_WATERMARK.sizePercent),
+      WATERMARK_RANGES.sizePercent.min,
+      WATERMARK_RANGES.sizePercent.max
+    ),
+    marginPercent: clamp(
+      finiteOr(input.marginPercent, DEFAULT_WATERMARK.marginPercent),
+      WATERMARK_RANGES.marginPercent.min,
+      WATERMARK_RANGES.marginPercent.max
+    ),
+    opacity: clamp(finiteOr(input.opacity, DEFAULT_WATERMARK.opacity), WATERMARK_RANGES.opacity.min, WATERMARK_RANGES.opacity.max)
+  };
 }
 
-/** Layout for the frame size, or null when the logo is off. */
+/** Layout for the frame size, or null when the logo is off or has nothing to show. */
 export function computeWatermarkLayout(settings: WatermarkSettings, frameWidth: number, frameHeight: number): WatermarkLayout | null {
-  if (!settings.enabled) return null;
+  const logo = normalizeWatermark(settings);
+  if (!logo.enabled) return null;
 
   const width = Math.max(1, frameWidth);
   const height = Math.max(1, frameHeight);
-  const { variant, position, sizePercent, marginPercent, opacity } = clampWatermark(settings);
   const short = Math.min(width, height);
-  const logoHeight = (short * sizePercent) / 100;
-  const margin = (short * marginPercent) / 100;
+  const logoHeight = (short * logo.sizePercent) / 100;
+  const margin = (short * logo.marginPercent) / 100;
 
-  const wordmarkScale = (WORDMARK_EM * logoHeight) / WORDMARK.unitsPerEm;
-  const logoWidth =
-    variant === 'icon'
-      ? logoHeight
-      : WORDMARK_LEFT * logoHeight + WORDMARK.maxX * wordmarkScale + WORDMARK_RIGHT_PAD * logoHeight;
+  const showMark = logo.content !== 'text' && logo.markText !== '';
+  const showText = logo.content !== 'mark' && logo.text !== '';
+  if (!showMark && !showText) return null;
 
-  const left = position.endsWith('left');
-  const top = position.startsWith('top');
-  const originX = left ? margin : width - margin - logoWidth;
+  const markEm = MARK_EM * logoHeight;
+  const textEm = TEXT_EM * logoHeight;
+  const pad = PAD * logoHeight;
+  const capRatio = LOGO_FONT_METRICS.capHeight / LOGO_FONT_METRICS.unitsPerEm;
+
+  const markWidth = showMark ? measureLogoText(logo.markText, markEm) : 0;
+  const cellWidth = showMark ? Math.max(logoHeight, markWidth + 2 * MARK_CELL_PAD * logoHeight) : 0;
+  const letterX = (cellWidth - markWidth) / 2;
+  const markBaseline = (logoHeight + capRatio * markEm) / 2;
+
+  const textWidth = showText ? measureLogoText(logo.text, textEm) : 0;
+  const textX = showMark ? letterX + markWidth + MARK_TEXT_GAP * logoHeight : pad;
+  const textBaseline = showMark ? markBaseline : (logoHeight + capRatio * textEm) / 2;
+
+  const logoWidth = showMark && showText ? textX + textWidth + pad : showMark ? cellWidth : pad + textWidth + pad;
+
+  const left = logo.position.endsWith('left');
+  const right = logo.position.endsWith('right');
+  const top = logo.position.startsWith('top');
+  const originX = left ? margin : right ? width - margin - logoWidth : (width - logoWidth) / 2;
   const originY = top ? margin : height - margin - logoHeight;
+
+  const cornerRadius = (logo.cornerRadiusPercent * logoHeight) / 100;
+  const box = (boxWidth: number): WatermarkBox => ({
+    x: originX,
+    y: originY,
+    width: boxWidth,
+    height: logoHeight,
+    radius: Math.max(0, Math.min(cornerRadius, boxWidth / 2, logoHeight / 2))
+  });
+
+  let background: WatermarkBox | null = null;
+  if (logo.background === 'all') background = box(logoWidth);
+  if (logo.background === 'mark' && showMark) background = box(cellWidth);
 
   return {
     origin: { x: originX, y: originY },
     width: logoWidth,
     height: logoHeight,
-    radius: BADGE_RADIUS * logoHeight,
-    tRects: [
-      rectIn(originX, originY, logoHeight, T_CROSSBAR),
-      rectIn(originX, originY, logoHeight, T_STEM)
-    ],
-    wordmark:
-      variant === 'icon_text'
-        ? {
-            offsetX: originX + WORDMARK_LEFT * logoHeight,
-            baselineY: originY + WORDMARK_BASELINE * logoHeight,
-            scale: wordmarkScale
-          }
-        : null,
-    colors: WATERMARK_COLORS,
-    opacity
+    background,
+    backgroundColor: logo.backgroundColor,
+    mark: showMark
+      ? {
+          x: originX + letterX,
+          baseline: originY + markBaseline,
+          em: markEm,
+          text: logo.markText,
+          color: logo.markColor
+        }
+      : null,
+    text: showText
+      ? {
+          x: originX + textX,
+          baseline: originY + textBaseline,
+          em: textEm,
+          text: logo.text,
+          color: logo.textColor
+        }
+      : null,
+    opacity: logo.opacity
   };
 }
 
-function rectIn(originX: number, originY: number, logoHeight: number, box: { x0: number; y0: number; x1: number; y1: number }): WatermarkRect {
-  return {
-    x: originX + box.x0 * logoHeight,
-    y: originY + box.y0 * logoHeight,
-    width: (box.x1 - box.x0) * logoHeight,
-    height: (box.y1 - box.y0) * logoHeight
-  };
+/** Removes line breaks, trims and keeps at most `maxChars` code points. */
+export function cleanWatermarkText(value: string, maxChars: number): string {
+  return Array.from(value.replace(/[\r\n]+/g, '').trim())
+    .slice(0, maxChars)
+    .join('')
+    .trimEnd();
+}
+
+function textOr(value: unknown, maxChars: number, fallback: string): string {
+  return typeof value === 'string' ? cleanWatermarkText(value, maxChars) : fallback;
+}
+
+function colorOr(value: unknown, fallback: string): string {
+  return typeof value === 'string' && COLOR_PATTERN.test(value) ? value : fallback;
+}
+
+function oneOf<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
+  return options.find((option) => option === value) ?? fallback;
 }
 
 function finiteOr(value: unknown, fallback: number): number {
