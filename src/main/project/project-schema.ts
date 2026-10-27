@@ -1,3 +1,4 @@
+import { MAX_VIDEO_CONTEXT_CHARS } from '../../shared/ai-instructions';
 import { AppError } from '../../shared/errors';
 import { SUBTITLE_FONT_FAMILIES, WORD_HIGHLIGHT_MODES, type SubtitlePresetId, type SubtitleStyle } from '../../shared/types/style';
 import type { CaptionRow, CaptionWord, ProjectDocument, ProjectSource } from '../../shared/types/project';
@@ -63,6 +64,10 @@ export function validateProjectDocument(value: unknown): ProjectDocument {
   }
   if (input.transcription !== undefined) {
     result.transcription = readTranscription(doc, input.transcription);
+  }
+  if (input.videoContext !== undefined) {
+    const videoContext = doc.string(input.videoContext, 'project.videoContext', MAX_VIDEO_CONTEXT_CHARS, true);
+    if (videoContext.trim() !== '') result.videoContext = videoContext;
   }
 
   return result;

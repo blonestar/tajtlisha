@@ -17,7 +17,8 @@ import {
   requireJobId,
   requireRecord,
   requireString,
-  requireText
+  requireText,
+  requireWatermark
 } from './validation';
 import type { DesktopDialogs, IpcRegistrar } from './types';
 
@@ -175,6 +176,9 @@ function toPreviewFrameRequest(payload: unknown): PreviewFrameRequest {
   };
   if (input.activeWordIndex !== undefined) {
     request.activeWordIndex = requireWordIndex(input.activeWordIndex, 'activeWordIndex');
+  }
+  if (input.watermark !== undefined) {
+    request.watermark = requireWatermark(input.watermark, 'watermark');
   }
   return request;
 }

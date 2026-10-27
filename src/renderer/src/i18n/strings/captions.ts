@@ -78,7 +78,15 @@ export const captionsStrings = {
       ru: 'Russian',
       uk: 'Ukrainian',
       pl: 'Polish',
-      tr: 'Turkish'
+      tr: 'Turkish',
+      ar: 'Arabic',
+      hi: 'Hindi',
+      id: 'Indonesian',
+      th: 'Thai',
+      vi: 'Vietnamese',
+      zh: 'Chinese (Simplified)',
+      ja: 'Japanese',
+      ko: 'Korean'
     },
     stages: {
       extracting_audio: 'Extracting audio',
@@ -86,6 +94,7 @@ export const captionsStrings = {
       transcribing: 'Transcribing',
       translating: 'Translating',
       polishing: 'Polishing text',
+      correcting: 'Correcting transcript',
       rendering_video: 'Rendering video',
       writing_srt: 'Writing SRT',
       summarizing: 'Summarizing'
@@ -142,6 +151,22 @@ export const captionsStrings = {
         cannotSummarize: '{{provider}} cannot summarize'
       }
     },
+    context: {
+      button: 'Video context',
+      buttonSetTitle: 'Video context: {{text}}',
+      buttonEmptyTitle: 'Describe what the video is about',
+      dialogTitle: 'Video context',
+      description:
+        'Describe what the video is about: topic, place, people, names and terms. AI uses it to recognize words during transcription, correction and translation. It is never copied into the captions.',
+      languageHint: 'Transcription uses it as a hint only when the spoken language is known: pick it in the toolbar, or transcribe once to detect it.',
+      placeholder:
+        'Example: Street in Jakarta, Indonesia. A parking attendant (tukang parkir) guides drivers and collects parking fees.',
+      textLabel: 'Video context text',
+      counter: '{{count}} / {{max}}',
+      save: 'Save',
+      cancel: 'Cancel',
+      clear: 'Clear'
+    },
     summary: {
       title: 'Video summary',
       description: 'Based on the captions inside the trim range. Edit the text, then copy it.',
@@ -163,6 +188,7 @@ export const captionsStrings = {
       videoNone: 'No video',
       videoOriginal: 'Burn original',
       videoTranslation: 'Burn translation',
+      logo: 'Add logo',
       folder: 'Output folder',
       noFolder: 'No folder chosen',
       chooseFolder: 'Choose folder',
@@ -288,7 +314,15 @@ export const captionsStrings = {
       ru: 'Ruski',
       uk: 'Ukrajinski',
       pl: 'Poljski',
-      tr: 'Turski'
+      tr: 'Turski',
+      ar: 'Arapski',
+      hi: 'Hindi',
+      id: 'Indonežanski',
+      th: 'Tajlandski',
+      vi: 'Vijetnamski',
+      zh: 'Kineski (pojednostavljeni)',
+      ja: 'Japanski',
+      ko: 'Korejski'
     },
     stages: {
       extracting_audio: 'Izdvajanje zvuka',
@@ -296,6 +330,7 @@ export const captionsStrings = {
       transcribing: 'Transkripcija',
       translating: 'Prevođenje',
       polishing: 'Dorada teksta',
+      correcting: 'Ispravka transkripta',
       rendering_video: 'Renderovanje videa',
       writing_srt: 'Pisanje SRT-a',
       summarizing: 'Sažimanje'
@@ -352,6 +387,22 @@ export const captionsStrings = {
         cannotSummarize: '{{provider}} ne može da sažima'
       }
     },
+    context: {
+      button: 'Kontekst videa',
+      buttonSetTitle: 'Kontekst videa: {{text}}',
+      buttonEmptyTitle: 'Opiši o čemu je video',
+      dialogTitle: 'Kontekst videa',
+      description:
+        'Opiši o čemu je video: tema, mesto, ljudi, imena i pojmovi. AI ih koristi da prepozna reči pri transkripciji, ispravci i prevodu. Nikad se ne kopira u titlove.',
+      languageHint: 'Transkripcija ga koristi kao pomoć tek kad je poznat govorni jezik: izaberi ga u traci ili prvo transkribuj.',
+      placeholder:
+        'Primer: Ulica u Džakarti, Indonezija. Čuvar parkinga (tukang parkir) navodi vozače i naplaćuje parking.',
+      textLabel: 'Tekst konteksta videa',
+      counter: '{{count}} / {{max}}',
+      save: 'Sačuvaj',
+      cancel: 'Otkaži',
+      clear: 'Obriši'
+    },
     summary: {
       title: 'Sažetak videa',
       description: 'Zasnovano na titlovima unutar isečka. Izmeni tekst, pa ga kopiraj.',
@@ -373,6 +424,7 @@ export const captionsStrings = {
       videoNone: 'Bez videa',
       videoOriginal: 'Utisni original',
       videoTranslation: 'Utisni prevod',
+      logo: 'Dodaj logo',
       folder: 'Folder za izvoz',
       noFolder: 'Folder nije izabran',
       chooseFolder: 'Izaberi folder',
@@ -498,7 +550,15 @@ export const captionsStrings = {
       ru: 'Руски',
       uk: 'Украјински',
       pl: 'Пољски',
-      tr: 'Турски'
+      tr: 'Турски',
+      ar: 'Арапски',
+      hi: 'Хинди',
+      id: 'Индонежански',
+      th: 'Тајландски',
+      vi: 'Вијетнамски',
+      zh: 'Кинески (поједностављени)',
+      ja: 'Јапански',
+      ko: 'Корејски'
     },
     stages: {
       extracting_audio: 'Издвајање звука',
@@ -506,6 +566,7 @@ export const captionsStrings = {
       transcribing: 'Транскрипција',
       translating: 'Превођење',
       polishing: 'Дорада текста',
+      correcting: 'Исправка транскрипта',
       rendering_video: 'Рендеровање видеа',
       writing_srt: 'Писање SRT-а',
       summarizing: 'Сажимање'
@@ -562,6 +623,22 @@ export const captionsStrings = {
         cannotSummarize: '{{provider}} не може да сажима'
       }
     },
+    context: {
+      button: 'Контекст видеа',
+      buttonSetTitle: 'Контекст видеа: {{text}}',
+      buttonEmptyTitle: 'Опиши о чему је видео',
+      dialogTitle: 'Контекст видеа',
+      description:
+        'Опиши о чему је видео: тема, место, људи, имена и појмови. AI их користи да препозна речи при транскрипцији, исправци и преводу. Никад се не копира у титлове.',
+      languageHint: 'Транскрипција га користи као помоћ тек кад је познат говорни језик: изабери га у траци или прво транскрибуј.',
+      placeholder:
+        'Пример: Улица у Џакарти, Индонезија. Чувар паркинга (туканг паркир) наводи возаче и наплаћује паркинг.',
+      textLabel: 'Текст контекста видеа',
+      counter: '{{count}} / {{max}}',
+      save: 'Сачувај',
+      cancel: 'Откажи',
+      clear: 'Обриши'
+    },
     summary: {
       title: 'Сажетак видеа',
       description: 'Засновано на титловима унутар исечка. Измени текст, па га копирај.',
@@ -583,6 +660,7 @@ export const captionsStrings = {
       videoNone: 'Без видеа',
       videoOriginal: 'Утисни оригинал',
       videoTranslation: 'Утисни превод',
+      logo: 'Додај лого',
       folder: 'Фолдер за извоз',
       noFolder: 'Фолдер није изабран',
       chooseFolder: 'Изабери фолдер',

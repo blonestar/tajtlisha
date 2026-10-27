@@ -9,10 +9,9 @@ import type {
   TestConnectionResult
 } from '../../../../shared/types/ai';
 import type { AppSettings } from '../../../../shared/types/settings';
-import { CaptionSettings } from './CaptionSettings';
 import { ProviderPanel } from './ProviderPanel';
 
-type AiSectionProps = {
+type ConnectorsSectionProps = {
   settings: AppSettings;
   providers: ProviderStatus[];
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
@@ -23,7 +22,7 @@ type AiSectionProps = {
   onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
 };
 
-export function AiSection({
+export function ConnectorsSection({
   settings,
   providers,
   onSettingsChange,
@@ -32,7 +31,7 @@ export function AiSection({
   onDisconnectProvider,
   onTestProvider,
   onListModels
-}: AiSectionProps): ReactElement {
+}: ConnectorsSectionProps): ReactElement {
   const { t } = useTranslation();
   const activeId = settings.aiConnector.activeProviderId ?? providers[0]?.id;
   const [selectedId, setSelectedId] = useState<AiProviderId | undefined>();
@@ -81,9 +80,6 @@ export function AiSection({
           onListModels={onListModels}
         />
       ) : null}
-
-      <h3 className="settings-subheading">{t('settings.captions.heading')}</h3>
-      <CaptionSettings settings={settings} onSettingsChange={onSettingsChange} />
     </>
   );
 }

@@ -13,6 +13,12 @@ export type CaptionLimits = {
   maxLinesPerCaption: 1 | 2;
 };
 
+/** Optional user text added to the caption prompts. */
+type PromptExtras = {
+  customInstructions?: string;
+  videoContext?: string;
+};
+
 /** JSON schema for `{ items: [{ id, text }] }`, used with structured output. */
 export const CAPTION_ITEMS_SCHEMA = {
   type: 'object',
@@ -35,7 +41,7 @@ export const CAPTION_ITEMS_SCHEMA = {
 } as const;
 
 export function buildTranslationInstructions(
-  input: CaptionLimits & { sourceLanguage: string; targetLanguage: string }
+  input: CaptionLimits & { sourceLanguage: string; targetLanguage: string } & PromptExtras
 ): string {
   return [
     `Translate subtitle captions from ${languageDisplayName(input.sourceLanguage)} to ${languageDisplayName(input.targetLanguage)}.`,
@@ -47,10 +53,17 @@ export function buildTranslationInstructions(
     'Return only the JSON object described by the schema.'
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
+    .concat(videoContextBlock(input.videoContext), userInstructionsBlock(input.customInstructions));
 }
 
-export function buildPolishInstructions(input: CaptionLimits & { language: string; mode: ProviderPolishMode }): string {
+export function buildPolishInstructions(
+  input: CaptionLimits & { language: string; mode: ProviderPolishMode } & PromptExtras
+): string {
+  if (input.mode === 'transcript_correction') {
+    return buildCorrectionInstructions(input);
+  }
+
   const style =
     input.mode === 'social_caption'
       ? 'Make the wording short, natural, and punchy for social-media captions.'
@@ -66,7 +79,74 @@ export function buildPolishInstructions(input: CaptionLimits & { language: strin
     'Return only the JSON object described by the schema.'
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(' ')
+    .concat(videoContextBlock(input.videoContext), userInstructionsBlock(input.customInstructions));
+}
+
+/**
+ * Correction of raw speech recognition output. The captions are already timed
+ * word by word, so the model must keep the spoken wording and only fix what
+ * was misheard or badly written; rewording would break the word timing.
+ */
+function buildCorrectionInstructions(input: CaptionLimits & { language: string } & PromptExtras): string {
+  const language =
+    input.language.trim() === '' || input.language === 'und'
+      ? 'Keep the captions in the language they are written in. Do not translate them.'
+      : `The captions are in ${languageDisplayName(input.language)}. Keep them in that language. Do not translate them.`;
+
+  return [
+    'You correct subtitle captions produced by automatic speech recognition.',
+    language,
+    'Fix misheard or misspelled words, names, and terms, and fix capitalization and punctuation.',
+    'Use the surrounding captions as context to decide what was really said.',
+    'Keep the speaker\'s own wording and word order. Do not paraphrase, shorten, summarize, censor, or add content.',
+    'If a caption is already correct, return it unchanged.',
+    'Each input item is one on-screen caption, in spoken order.',
+    layoutInstruction(input),
+    'Return exactly one output item for each input id, with the same id. Do not merge or split items, and never return an empty text.',
+    scriptInstruction(input.language),
+    'Return only the JSON object described by the schema.'
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .concat(videoContextBlock(input.videoContext), userInstructionsBlock(input.customInstructions));
+}
+
+/**
+ * What the video is about, as the user described it. It is background only:
+ * the model uses it to recognize names, terms and the topic, and never copies
+ * it into captions.
+ */
+function videoContextBlock(videoContext: string | undefined): string {
+  const text = videoContext?.trim();
+  if (!text) return '';
+
+  return [
+    '',
+    '',
+    'Context about the video, written by the user. Use it to understand the topic and to recognize names and terms. It is not caption text: never copy it into the captions.',
+    '<video_context>',
+    text,
+    '</video_context>'
+  ].join('\n');
+}
+
+/**
+ * The user's own instructions, added after the built-in rules. The output
+ * format rules still win, so a user note cannot break response parsing.
+ */
+function userInstructionsBlock(customInstructions: string | undefined): string {
+  const text = customInstructions?.trim();
+  if (!text) return '';
+
+  return [
+    '',
+    '',
+    'Additional instructions from the user. Follow them, unless they conflict with the rules about ids, item count, or the JSON output format:',
+    '<user_instructions>',
+    text,
+    '</user_instructions>'
+  ].join('\n');
 }
 
 export function buildCaptionItemsInput(items: ProviderTextItem[]): string {

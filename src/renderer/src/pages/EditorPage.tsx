@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import CircleAlert from 'lucide-react/dist/esm/icons/circle-alert.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
-import { PROJECT_LANGUAGES, type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
+import { type CaptionRow, type PreviewTrack } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
 import type { AppSettings } from '../../../shared/types/settings';
 import { activeWordIndex as litWordIndex, resolveWordHighlight, timeCaptionWords } from '../../../shared/word-highlight';
@@ -100,12 +100,14 @@ export function EditorPage({
   }, [wordHighlightMode, activeCaption, captionText, project.previewTrack]);
   const activeWordIndex = litWordIndex(wordSpans, playhead.timeMs);
 
-  // An exact frame belongs to one file. Drop it when the file changes.
+  // An exact frame belongs to one file and one logo setup (the logo is burned
+  // into it). Drop it, and any render in flight, when either changes.
+  const watermarkKey = JSON.stringify(settings.watermark);
   useEffect(() => {
     exactRequestRef.current += 1;
     setExact(null);
     setExactBusy(false);
-  }, [inputPath]);
+  }, [inputPath, watermarkKey]);
 
   const provider = workspace.provider;
   const pendingTranslations = rowsNeedingTranslation(project).filter(
@@ -198,7 +200,8 @@ export function EditorPage({
         videoHeight: source.height,
         text: captionText ?? '',
         style: project.style,
-        activeWordIndex: litWordIndex(wordSpans, atMs)
+        activeWordIndex: litWordIndex(wordSpans, atMs),
+        watermark: settings.watermark
       });
       if (requestId === exactRequestRef.current) setExact({ dataUrl, atMs });
     } catch {
@@ -221,10 +224,8 @@ export function EditorPage({
     hasIssue: (issues[caption.id] ?? []).some((issue) => isBlockingCaptionIssue(issue.code))
   }));
 
-  const languageValue = (code: string | undefined): string => {
-    if (!code || code === UNKNOWN_LANGUAGE) return 'auto';
-    return (PROJECT_LANGUAGES as readonly string[]).includes(code) ? code : 'auto';
-  };
+  // A detected language outside PROJECT_LANGUAGES is kept; the panel shows it as an extra option.
+  const languageValue = (code: string | undefined): string => (!code || code === UNKNOWN_LANGUAGE ? 'auto' : code);
 
   // Until the workspace is measured, the CSS fallback template applies.
   const workspaceColumns = layout.measured
@@ -254,6 +255,8 @@ export function EditorPage({
             summaryEnabled={settings.summary.enabled}
             summarizableRows={summaryTranscript(project).length}
             hasSummary={workspace.summary !== null}
+            videoContext={project.videoContext ?? ''}
+            onVideoContextChange={(videoContext) => dispatch({ type: 'project/setVideoContext', videoContext })}
             onSummarize={workspace.summarize}
             onShowSummary={workspace.openSummary}
             onOpenSettings={onOpenSettings}
@@ -342,6 +345,7 @@ export function EditorPage({
             captionText={captionText}
             style={project.style}
             activeWordIndex={activeWordIndex}
+            watermark={settings.watermark}
             onTimeUpdate={playhead.report}
             onPlayingChange={noop}
             onPlaybackError={workspace.reportPlaybackError}

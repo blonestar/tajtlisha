@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT } from '../../../shared/summary';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
-import type { ProjectSource } from '../../../shared/types/project';
+import type { ProjectDocument, ProjectSource } from '../../../shared/types/project';
 import type { ProviderStatus } from '../../../shared/types/ai';
 import type { AppSettings } from '../../../shared/types/settings';
 import type { GenerateProviderInfo } from '../components/workflow/GeneratePanel';
@@ -19,8 +19,15 @@ import {
   polishFor,
   sourceLanguageCode,
   spokenLanguageOf,
-  summaryTranscript
+  summaryTranscript,
+  videoContextFor
 } from './workspaceModel';
+
+/** Adds the video context to a transcribe or translate request. Blank context is left out. */
+function withVideoContext(project: ProjectDocument): { videoContext?: string } {
+  const videoContext = videoContextFor(project);
+  return videoContext === undefined ? {} : { videoContext };
+}
 
 export type Notice = { tone: 'error' | 'info'; text: string; detail?: string };
 
@@ -202,6 +209,13 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
 
     const context = captureJobContext(current);
     const modelId = optionalModelId(config.aiConnector.transcriptionModelByProvider[providerId]);
+    // The correction pass runs only when the setting is on; then it uses the text model, like translation.
+    const correction = config.aiConnector.correctTranscript
+      ? {
+          modelId: optionalModelId(config.aiConnector.textModelByProvider[providerId]),
+          instructions: config.aiConnector.transcriptCorrectionInstructions
+        }
+      : undefined;
     const outcome = await job.run(
       'transcribe',
       (jobId) =>
@@ -213,7 +227,9 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
           modelId,
           language: spokenLanguageOf(current),
           maxCharsPerLine: captionLineLimit(current, config),
-          maxLinesPerCaption: config.aiConnector.maxLinesPerCaption
+          maxLinesPerCaption: config.aiConnector.maxLinesPerCaption,
+          ...(correction ? { correction } : {}),
+          ...withVideoContext(current)
         }),
       { isStillValid: () => isContextCurrent(context, projectRef.current, { allowEditsSince: true }) }
     );
@@ -231,10 +247,14 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
         sourceLanguage: result.language,
         transcription: { providerId, modelId, timingSource: result.timingSource }
       });
+      // A failed correction still leaves usable captions, so the result stays 'done' and says what happened.
       setJobResult({
         kind: 'transcribe',
         status: 'done',
-        message: t('shell.result.transcribed', { count: result.captions.length })
+        message:
+          result.correction === 'failed'
+            ? t('shell.result.correctionFailed', { count: result.captions.length })
+            : t('shell.result.transcribed', { count: result.captions.length })
       });
     };
 
@@ -298,6 +318,8 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
           targetLanguage,
           captions: rows.map((caption) => ({ id: caption.id, text: caption.original })),
           polish: polishFor(config),
+          instructions: config.aiConnector.translationInstructions,
+          ...withVideoContext(current),
           maxCharsPerLine: captionLineLimit(current, config),
           maxLinesPerCaption: config.aiConnector.maxLinesPerCaption
         }),

@@ -1,6 +1,7 @@
 import type { AppSettings } from '../../shared/types/settings';
 import { DEFAULT_SUMMARY_PROMPT } from '../../shared/summary';
 import { DEFAULT_UI_ZOOM_PERCENT } from '../../shared/ui-zoom';
+import { DEFAULT_WATERMARK } from '../../shared/watermark-geometry';
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   uiLanguage: 'system',
@@ -26,12 +27,16 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     conservativePolish: true,
     socialCaptionPolish: false,
     maxCharsPerLine: 42,
-    maxLinesPerCaption: 2
+    maxLinesPerCaption: 2,
+    correctTranscript: false,
+    transcriptCorrectionInstructions: '',
+    translationInstructions: ''
   },
   summary: {
     enabled: false,
     systemPrompt: DEFAULT_SUMMARY_PROMPT,
     modelByProvider: {},
     reasoningEffort: 'default'
-  }
+  },
+  watermark: { ...DEFAULT_WATERMARK }
 };

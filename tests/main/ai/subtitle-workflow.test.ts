@@ -727,3 +727,410 @@ describe('SubtitleWorkflowService.summarize', () => {
     await expect(service.summarize(summarizeRequest(), { signal: controller.signal })).rejects.toMatchObject({ code: 'JOB_CANCELED' });
   });
 });
+
+const WORD_TRANSCRIPT: ProviderTranscribeResult = {
+  language: 'en',
+  text: 'Hello wrold.',
+  words: [
+    { text: 'Hello', startMs: 0, endMs: 400 },
+    { text: 'wrold.', startMs: 500, endMs: 900 }
+  ]
+};
+
+/** Caption timing only; ids are random per run, so they are left out of comparisons. */
+function timingOf(captions: Array<{ startMs: number; endMs: number; words?: unknown }>) {
+  return captions.map(({ startMs, endMs, words }) => ({ startMs, endMs, words }));
+}
+
+function correctingRegistry(
+  mapText: (text: string) => string,
+  transcription: ProviderTranscribeResult = WORD_TRANSCRIPT
+) {
+  return fakeRegistry({
+    transcribe: vi.fn(async () => transcription),
+    polishTexts: vi.fn(async (_providerId: string, request: ProviderPolishRequest) =>
+      request.items.map((item) => ({ id: item.id, text: mapText(item.text) }))
+    )
+  } as never);
+}
+
+describe('SubtitleWorkflowService.transcribe with transcript correction', () => {
+  it('replaces the caption text and leaves timings and word timing as they were', async () => {
+    const registry = correctingRegistry(() => 'Hello world.');
+    const { service } = createService({ registry });
+
+    const baseline = await service.transcribe(createRequest());
+    const result = await service.transcribe(createRequest({ correction: { modelId: 'gpt-fix', instructions: 'Name: Bojan.' } }));
+
+    expect(result.correction).toBe('applied');
+    expect(result.captions).toHaveLength(1);
+    expect(result.captions[0].original).toBe('Hello world.');
+    expect(result.captions[0].translation).toBe('');
+    expect(timingOf(result.captions)).toEqual(timingOf(baseline.captions));
+    expect(timingOf(result.captions)).toEqual([
+      {
+        startMs: 1000,
+        endMs: 1900,
+        words: [
+          { text: 'Hello', startMs: 1000, endMs: 1400 },
+          { text: 'wrold.', startMs: 1500, endMs: 1900 }
+        ]
+      }
+    ]);
+  });
+
+  it('sends the raw captions with mode, language, model, instructions, and limits to polish', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ maxCharsPerLine: 30, maxLinesPerCaption: 1, correction: { modelId: 'gpt-fix', instructions: 'Name: Bojan.' } }));
+
+    expect(registry.polishTexts).toHaveBeenCalledTimes(1);
+    expect(registry.polishTexts).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({
+        mode: 'transcript_correction',
+        language: 'en',
+        modelId: 'gpt-fix',
+        customInstructions: 'Name: Bojan.',
+        maxCharsPerLine: 30,
+        maxLinesPerCaption: 1,
+        items: [{ id: '0', text: 'Hello wrold.' }]
+      })
+    );
+  });
+
+  it('passes an undefined model id when none is given, so the provider default is used', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    const request = (registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1];
+    expect(request.modelId).toBeUndefined();
+    expect(request.customInstructions).toBe('');
+  });
+
+  it('matches corrected text to captions by id, even when the provider reverses the order', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'en',
+        text: 'Hello wrold. Second line.',
+        segments: [
+          { text: 'Hello wrold.', startMs: 0, endMs: 900 },
+          { text: 'Second line.', startMs: 1000, endMs: 1900 }
+        ]
+      })),
+      polishTexts: vi.fn(async (_providerId: string, request: ProviderPolishRequest) =>
+        [...request.items].reverse().map((item) => ({ id: item.id, text: item.text.replace('wrold', 'world').replace('Second', 'Second,') }))
+      )
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    expect(result.captions.map((caption) => caption.original)).toEqual(['Hello world.', 'Second, line.']);
+  });
+
+  it('reports the correcting stage after transcription', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+    const progress = await captureProgress();
+
+    await service.transcribe(createRequest({ correction: { instructions: '' } }), progress);
+
+    expect(stagesOf(progress.events)).toEqual(['extracting_audio', 'transcribing', 'correcting']);
+    expect(progress.events).toContainEqual({ stage: 'correcting', progress: 0 });
+    expect(progress.events.filter((event) => event.stage === 'correcting').at(-1)).toEqual({ stage: 'correcting', progress: 1 });
+  });
+
+  it('adds no correction key and makes no polish call when correction was not requested', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest());
+
+    expect(result).not.toHaveProperty('correction');
+    expect(registry.polishTexts).not.toHaveBeenCalled();
+  });
+
+  it('keeps the raw transcript and reports failed when the correction provider call fails', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => WORD_TRANSCRIPT),
+      polishTexts: vi.fn(async () => {
+        throw new AppError('PROVIDER_REQUEST_FAILED', 'OpenAI request failed (HTTP 500).');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    const baseline = await service.transcribe(createRequest());
+    const result = await service.transcribe(createRequest({ correction: { instructions: 'Fix names.' } }));
+
+    expect(result.correction).toBe('failed');
+    expect(result.captions[0].original).toBe('Hello wrold.');
+    expect(result.language).toBe('en');
+    expect(timingOf(result.captions)).toEqual(timingOf(baseline.captions));
+  });
+
+  it('treats a plain network error the same way as a provider error', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => WORD_TRANSCRIPT),
+      polishTexts: vi.fn(async () => {
+        throw new Error('socket hang up');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    expect(result.correction).toBe('failed');
+    expect(result.captions[0].original).toBe('Hello wrold.');
+  });
+
+  it('retries missing ids once, then keeps the raw text and reports failed', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => WORD_TRANSCRIPT),
+      polishTexts: vi.fn(async () => [])
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    expect(registry.polishTexts).toHaveBeenCalledTimes(2);
+    expect(result.correction).toBe('failed');
+    expect(result.captions[0].original).toBe('Hello wrold.');
+  });
+
+  it('treats blank corrected text as missing, so the raw text is kept', async () => {
+    const registry = correctingRegistry(() => '   ');
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    expect(result.correction).toBe('failed');
+    expect(result.captions[0].original).toBe('Hello wrold.');
+  });
+
+  it('rejects with JOB_CANCELED when the job is canceled during correction', async () => {
+    const controller = new AbortController();
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => WORD_TRANSCRIPT),
+      polishTexts: vi.fn(async () => {
+        controller.abort();
+        throw new AppError('JOB_CANCELED');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(
+      service.transcribe(createRequest({ correction: { instructions: '' } }), { signal: controller.signal })
+    ).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+  });
+
+  it('does not turn an error raised after an abort into a failed correction', async () => {
+    const controller = new AbortController();
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => WORD_TRANSCRIPT),
+      polishTexts: vi.fn(async () => {
+        controller.abort();
+        throw new Error('fetch aborted');
+      })
+    } as never);
+    const { service } = createService({ registry });
+
+    await expect(
+      service.transcribe(createRequest({ correction: { instructions: '' } }), { signal: controller.signal })
+    ).rejects.toThrow('fetch aborted');
+  });
+
+  it('converts Cyrillic corrected text to Latin for an sr-Latn transcript, and sends Latin to the model', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'und',
+        text: 'Ово је кућа.',
+        segments: [{ text: 'Ово је кућа.', startMs: 0, endMs: 800 }]
+      })),
+      polishTexts: vi.fn(async (_providerId: string, request: ProviderPolishRequest) =>
+        request.items.map((item) => ({ id: item.id, text: 'Ово је кућа!' }))
+      )
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    expect(result.language).toBe('sr-Latn');
+    expect(registry.polishTexts).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ language: 'sr-Latn', items: [{ id: '0', text: 'Ovo je kuća.' }] })
+    );
+    expect(result.captions[0].original).toBe('Ovo je kuća!');
+    expect(result.correction).toBe('applied');
+  });
+});
+
+describe('SubtitleWorkflowService.translate with user instructions', () => {
+  it('forwards the instructions to the translation and to its polish pass', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'social_caption', instructions: 'Use formal address.' }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ customInstructions: 'Use formal address.' }));
+    expect(registry.polishTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ customInstructions: 'Use formal address.' }));
+  });
+
+  it('forwards the instructions to translation alone when polish is none', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'none', instructions: 'Keep brand names.' }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ customInstructions: 'Keep brand names.' }));
+    expect(registry.polishTexts).not.toHaveBeenCalled();
+  });
+
+  it('passes no custom instructions when none are given', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'conservative' }));
+
+    expect((registry.translateTexts.mock.calls[0] as [string, ProviderTranslateRequest])[1].customInstructions).toBeUndefined();
+    expect((registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1].customInstructions).toBeUndefined();
+  });
+});
+
+describe('SubtitleWorkflowService video context', () => {
+  const CONTEXT = 'Ljubav na kraju, epizoda o Beogradu.';
+
+  function transcribePrompt(registry: ReturnType<typeof fakeRegistry>): string | undefined {
+    return (registry.transcribe.mock.calls[0] as [string, ProviderTranscribeRequest])[1].prompt;
+  }
+
+  it('passes the trimmed video context as the transcription prompt when the language is set', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ language: 'sr-Latn', videoContext: `  ${CONTEXT}\n` }));
+
+    expect(registry.transcribe).toHaveBeenCalledWith('openai', expect.objectContaining({ language: 'sr-Latn', prompt: CONTEXT }));
+  });
+
+  it('sends no transcription prompt when the language is unknown, even with a video context', async () => {
+    for (const language of [undefined, '', '  ', 'und']) {
+      const registry = fakeRegistry();
+      const { service } = createService({ registry });
+
+      await service.transcribe(createRequest({ language, videoContext: CONTEXT }));
+
+      expect(transcribePrompt(registry)).toBeUndefined();
+    }
+  });
+
+  it('sends no transcription prompt when the video context is blank', async () => {
+    for (const videoContext of [undefined, '', '   ', '\n\t\r\n']) {
+      const registry = fakeRegistry();
+      const { service } = createService({ registry });
+
+      await service.transcribe(createRequest({ language: 'en', videoContext }));
+
+      expect(transcribePrompt(registry)).toBeUndefined();
+    }
+  });
+
+  it('cuts the transcription prompt to 800 characters, keeping the start of the text', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+    const longContext = Array.from({ length: 2000 }, (_, index) => String.fromCharCode(97 + (index % 26))).join('');
+
+    await service.transcribe(createRequest({ language: 'en', videoContext: longContext }));
+
+    const prompt = transcribePrompt(registry);
+    expect(prompt).toHaveLength(800);
+    expect(prompt).toBe(longContext.slice(0, 800));
+  });
+
+  it('trims before cutting, so the 800 characters start at the first visible character', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ language: 'en', videoContext: `   ${'x'.repeat(799)}yy   ` }));
+
+    expect(transcribePrompt(registry)).toBe(`${'x'.repeat(799)}y`);
+  });
+
+  it('does not cut a prompt that is exactly 800 characters long', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+    const exact = 'z'.repeat(800);
+
+    await service.transcribe(createRequest({ language: 'en', videoContext: exact }));
+
+    expect(transcribePrompt(registry)).toBe(exact);
+  });
+
+  it('forwards the video context to the correction pass even when no transcription prompt is sent', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ videoContext: CONTEXT, correction: { instructions: '' } }));
+
+    expect(transcribePrompt(registry)).toBeUndefined();
+    expect(registry.polishTexts).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ mode: 'transcript_correction', videoContext: CONTEXT })
+    );
+  });
+
+  it('forwards the video context to the correction pass with the stored language', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ language: 'en', videoContext: CONTEXT, correction: { instructions: 'Fix names.' } }));
+
+    expect(transcribePrompt(registry)).toBe(CONTEXT);
+    expect(registry.polishTexts).toHaveBeenCalledWith(
+      'openai',
+      expect.objectContaining({ videoContext: CONTEXT, customInstructions: 'Fix names.' })
+    );
+  });
+
+  it('sends no video context to polish when the transcript is not corrected', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ language: 'en', videoContext: CONTEXT }));
+
+    expect(registry.polishTexts).not.toHaveBeenCalled();
+  });
+
+  it('forwards the video context to translation and to its polish pass', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'conservative', videoContext: CONTEXT }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ videoContext: CONTEXT }));
+    expect(registry.polishTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ videoContext: CONTEXT }));
+  });
+
+  it('forwards the video context to translation alone when polish is none', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'none', videoContext: CONTEXT }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ videoContext: CONTEXT }));
+    expect(registry.polishTexts).not.toHaveBeenCalled();
+  });
+
+  it('passes no video context to translation when none is given', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'social_caption' }));
+
+    expect((registry.translateTexts.mock.calls[0] as [string, ProviderTranslateRequest])[1].videoContext).toBeUndefined();
+    expect((registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1].videoContext).toBeUndefined();
+  });
+});

@@ -1,6 +1,7 @@
 import type { ProviderStatus } from '../../../src/shared/types/ai';
 import type { AppSettings } from '../../../src/shared/types/settings';
 import type { SubtitleTrack } from '../../../src/shared/types/subtitles';
+import { DEFAULT_WATERMARK } from '../../../src/shared/watermark-geometry';
 
 export const mockSettings: AppSettings = {
   uiLanguage: 'en',
@@ -33,14 +34,18 @@ export const mockSettings: AppSettings = {
     conservativePolish: true,
     socialCaptionPolish: false,
     maxCharsPerLine: 42,
-    maxLinesPerCaption: 2
+    maxLinesPerCaption: 2,
+    correctTranscript: false,
+    transcriptCorrectionInstructions: '',
+    translationInstructions: ''
   },
   summary: {
     enabled: false,
     systemPrompt: 'Summarize the clip.',
     modelByProvider: {},
     reasoningEffort: 'default'
-  }
+  },
+  watermark: { ...DEFAULT_WATERMARK }
 };
 
 export const mockProviderStatuses: ProviderStatus[] = [

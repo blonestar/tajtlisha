@@ -19,6 +19,8 @@ function props(overrides: Partial<ExportDialogProps> = {}): ExportDialogProps {
     onBaseNameChange: vi.fn(),
     outputs: allOutputs,
     onOutputsChange: vi.fn(),
+    includeLogo: true,
+    onIncludeLogoChange: vi.fn(),
     sourceLanguage: 'en',
     targetLanguage: 'sr-Latn',
     blockingIssueCount: 0,
@@ -209,3 +211,29 @@ describe('ExportDialog', () => {
     expect(screen.getByRole('alert').textContent).toBe('Export failed: disk full.');
   });
 });
+
+describe('ExportDialog logo choice', () => {
+  it('shows the per-export logo choice as a checkbox', () => {
+    renderWithI18n(<ExportDialog {...props({ includeLogo: false })} />);
+
+    expect(screen.getByLabelText('Add logo')).not.toBeChecked();
+  });
+
+  it('reports a change of the logo choice without touching the outputs', () => {
+    const onIncludeLogoChange = vi.fn();
+    const onOutputsChange = vi.fn();
+    renderWithI18n(<ExportDialog {...props({ includeLogo: false, onIncludeLogoChange, onOutputsChange })} />);
+
+    fireEvent.click(screen.getByLabelText('Add logo'));
+
+    expect(onIncludeLogoChange).toHaveBeenCalledWith(true);
+    expect(onOutputsChange).not.toHaveBeenCalled();
+  });
+
+  it('is disabled when no video is exported, because there is nothing to draw the logo on', () => {
+    renderWithI18n(<ExportDialog {...props({ outputs: { originalSrt: true, translationSrt: false, video: 'none' } })} />);
+
+    expect(screen.getByLabelText('Add logo')).toBeDisabled();
+  });
+});
+

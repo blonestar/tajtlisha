@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_VIDEO_CONTEXT_CHARS } from '../../../src/shared/ai-instructions';
 import { DEFAULT_SUBTITLE_STYLE, SUBTITLE_PRESETS } from '../../../src/shared/subtitle-geometry';
 import type { CaptionRow, ProjectDocument, ProjectSource } from '../../../src/shared/types/project';
 import {
@@ -955,6 +956,7 @@ describe('revision mirror', () => {
       { type: 'caption/insert', atMs: 0 },
       { type: 'source/updateUrl', fileUrl: 'tajtlisha-media://x' },
       { type: 'languages/set', targetLanguage: 'de' },
+      { type: 'project/setVideoContext', videoContext: 'Parking attendants in Jakarta' },
       { type: 'style/set', patch: { fontSizePercent: 6 } },
       { type: 'history/undo' },
       { type: 'history/redo' },
@@ -1133,5 +1135,88 @@ describe('caption word timing', () => {
     const state = run(stateWith([]), { type: 'captions/replaceAll', captions: [timed('a', 0, 2000)] });
 
     expect(state.project.captions[0].words).toEqual(timedWords);
+  });
+});
+
+describe('video context', () => {
+  it('sets the context, trimmed, and bumps the revision', () => {
+    const state = stateWith();
+    const next = run(state, { type: 'project/setVideoContext', videoContext: '  Parking in Jakarta \n' });
+
+    expect(next.project.videoContext).toBe('Parking in Jakarta');
+    expect(next.revision).toBe(state.revision + 1);
+    expect(next.project.revision).toBe(next.revision);
+  });
+
+  it('removes the key for blank or whitespace-only text', () => {
+    const state = stateWith([], { videoContext: 'Parking in Jakarta' });
+    const next = run(state, { type: 'project/setVideoContext', videoContext: ' \n\t ' });
+
+    expect(next.project).not.toHaveProperty('videoContext');
+    expect(next.revision).toBe(state.revision + 1);
+  });
+
+  it('is a no-op when the value is unchanged, with no revision bump', () => {
+    const state = stateWith([], { videoContext: 'Parking in Jakarta' });
+
+    expect(projectReducer(state, { type: 'project/setVideoContext', videoContext: 'Parking in Jakarta ' })).toBe(state);
+  });
+
+  it('is a no-op when blank text is saved over no context', () => {
+    const state = stateWith();
+
+    expect(projectReducer(state, { type: 'project/setVideoContext', videoContext: '  ' })).toBe(state);
+  });
+
+  it('caps the stored text at the shared limit', () => {
+    const next = run(stateWith(), {
+      type: 'project/setVideoContext',
+      videoContext: 'a'.repeat(MAX_VIDEO_CONTEXT_CHARS + 500)
+    });
+
+    expect(next.project.videoContext).toHaveLength(MAX_VIDEO_CONTEXT_CHARS);
+  });
+
+  it('is undoable and redoable like other document edits', () => {
+    const state = stateWith();
+    const first = run(state, { type: 'project/setVideoContext', videoContext: 'Parking' });
+    const second = run(first, { type: 'project/setVideoContext', videoContext: 'Parking attendants' });
+
+    const undone = run(second, { type: 'history/undo' });
+    expect(undone.project.videoContext).toBe('Parking');
+    expect(run(undone, { type: 'history/undo' }).project.videoContext).toBeUndefined();
+
+    const redone = run(undone, { type: 'history/redo' });
+    expect(redone.project.videoContext).toBe('Parking attendants');
+  });
+
+  it('leaves captions and languages alone', () => {
+    const state = stateWith([caption('a', 0, 1000)], { sourceLanguage: 'id' });
+    const next = run(state, { type: 'project/setVideoContext', videoContext: 'Parking' });
+
+    expect(next.project.captions).toEqual(state.project.captions);
+    expect(next.project.sourceLanguage).toBe('id');
+  });
+
+  it('is cleared by a new video, like the languages and captions', () => {
+    const state = stateWith([caption('a', 0, 1000)], { videoContext: 'Parking', sourceLanguage: 'id' });
+    const next = run(state, { type: 'source/set', source: { ...source, inputPath: '/clips/b.mp4' } });
+
+    expect(next.project).not.toHaveProperty('videoContext');
+    expect(next.project).not.toHaveProperty('sourceLanguage');
+  });
+
+  it('is kept when the video is relinked', () => {
+    const state = stateWith([caption('a', 0, 1000)], { videoContext: 'Parking' });
+    const next = run(state, { type: 'source/relink', source: { ...source, fileUrl: 'tajtlisha-media://moved' } });
+
+    expect(next.project.videoContext).toBe('Parking');
+  });
+
+  it('is kept when a saved project is loaded', () => {
+    const loaded = { ...stateWith().project, videoContext: 'Parking', revision: 4 };
+    const next = run(stateWith(), { type: 'project/replace', project: loaded });
+
+    expect(next.project.videoContext).toBe('Parking');
   });
 });

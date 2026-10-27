@@ -97,6 +97,12 @@ export type ProjectDocument = {
     modelId?: string;
     timingSource: 'word' | 'segment' | 'speech_detection';
   };
+  /**
+   * What the clip is about, written by the user (topic, place, names, terms).
+   * Helps transcription, AI correction and translation. Absent = none. At most
+   * MAX_VIDEO_CONTEXT_CHARS.
+   */
+  videoContext?: string;
   /** ISO timestamp of the last modification (informational only, not used for ordering). */
   updatedAt: string;
 };
@@ -125,5 +131,13 @@ export const PROJECT_LANGUAGES = [
   'ru',
   'uk',
   'pl',
-  'tr'
+  'tr',
+  'ar',
+  'hi',
+  'id',
+  'th',
+  'vi',
+  'zh',
+  'ja',
+  'ko'
 ] as const;

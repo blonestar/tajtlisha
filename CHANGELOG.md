@@ -6,6 +6,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-27
+
+### Added
+- Logo watermark: a badge with letters (T by default) and a text (tajtliša by default) is drawn into the exported MP4 and the preview, in the corner you choose.
+  On by default. Its own Settings > Logo tab sets the letters, the text (up to 30 characters), content, background, colours, corner roundness, position, size, margin and opacity, with a live preview. Turn it off there, or for a single export with the "Add logo" checkbox.
+- Languages: Arabic, Hindi, Indonesian, Thai, Vietnamese, Chinese (Simplified), Japanese and Korean for the spoken
+  language and the translation.
+- AI correction after transcription (Settings > Transcription, off by default): a second AI pass fixes misheard
+  words, names and punctuation, using your own correction instructions. Caption timing and word timing are kept; if
+  the correction fails, the raw transcript is kept and the result says so.
+- Translation instructions (Settings > Translation): your own rules for the translation and its polish pass.
+- Video context: a button next to Transcribe opens a short description of the clip (topic, place, names, terms),
+  stored in the project. It guides transcription when the spoken language is known, and the AI correction and
+  translation always.
+
+### Changed
+- AI settings are split into Connectors, Transcription and Translation tabs.
+
+### Fixed
+- When the system language is Serbo-Croatian (`sh`), file dialogs and warnings are now in Serbian Latin like the rest
+  of the app, instead of English.
+- A language Whisper detects is now shown after transcription, also when it is not in the list (for example Malay),
+  instead of "Detect automatically". Before, only the listed languages were recognized.
+- Chinese, Japanese and Thai captions are no longer split by spaces between every character; their words are
+  joined as written, and ideographs count as double width when lines wrap.
+
 ## [0.6.1] - 2026-10-25
 
 ### Fixed
@@ -133,7 +159,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...develop
+[0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/blonestar/tajtlisha/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/blonestar/tajtlisha/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/blonestar/tajtlisha/compare/v0.5.0...v0.5.1

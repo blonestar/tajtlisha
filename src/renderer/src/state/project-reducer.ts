@@ -1,3 +1,4 @@
+import { MAX_VIDEO_CONTEXT_CHARS } from '../../../shared/ai-instructions';
 import { DEFAULT_SUBTITLE_STYLE, SUBTITLE_PRESETS, clamp } from '../../../shared/subtitle-geometry';
 import type { CaptionRow, CaptionWord, PreviewTrack, ProjectDocument, ProjectSource, TrimRange } from '../../../shared/types/project';
 import type { SubtitlePresetId, SubtitleStyle } from '../../../shared/types/style';
@@ -38,7 +39,10 @@ export type ProjectAction =
    * load itself is not an edit, so it does not add one.
    */
   | { type: 'project/replace'; project: ProjectDocument }
-  /** Not undoable. Clears history and captions, since the old captions belong to the old video. */
+  /**
+   * Not undoable. Clears history, captions and the video context, since they
+   * belong to the old video. Relink keeps them.
+   */
   | { type: 'source/set'; source: ProjectSource }
   /**
    * Not undoable. Replaces the video but keeps captions, translations and
@@ -72,6 +76,11 @@ export type ProjectAction =
   | { type: 'style/set'; patch: Partial<Omit<SubtitleStyle, 'presetId'>> }
   | { type: 'style/applyPreset'; presetId: SubtitlePresetId }
   | { type: 'languages/set'; sourceLanguage?: string; targetLanguage?: string }
+  /**
+   * Sets the per-video context (what the clip is about). Blank text removes it.
+   * The text is trimmed and cut to MAX_VIDEO_CONTEXT_CHARS. Undoable.
+   */
+  | { type: 'project/setVideoContext'; videoContext: string }
   | { type: 'previewTrack/set'; track: PreviewTrack }
   | { type: 'history/undo' }
   | { type: 'history/redo' };
@@ -131,6 +140,7 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       delete next.sourceLanguage;
       delete next.translationLanguage;
       delete next.transcription;
+      delete next.videoContext;
       return resetHistory(state, next);
     }
 
@@ -374,6 +384,15 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       return applyEdit(state, next);
     }
 
+    case 'project/setVideoContext': {
+      const videoContext = normalizeVideoContext(action.videoContext);
+      if (videoContext === project.videoContext) return state;
+      const next: ProjectDocument = { ...project };
+      if (videoContext === undefined) delete next.videoContext;
+      else next.videoContext = videoContext;
+      return applyEdit(state, next);
+    }
+
     case 'previewTrack/set': {
       if (project.previewTrack === action.track) return state;
       return applyEdit(state, { ...project, previewTrack: action.track });
@@ -508,6 +527,12 @@ function splitTextAtRatio(text: string, ratio: number): [string, string] {
     if (Math.abs(position - target) < Math.abs(best - target)) best = position;
   }
   return [normalized.slice(0, best), normalized.slice(best + 1)];
+}
+
+/** Stored form of the video context: trimmed and capped; blank means none (undefined). */
+function normalizeVideoContext(value: string): string | undefined {
+  const text = value.slice(0, MAX_VIDEO_CONTEXT_CHARS).trim();
+  return text === '' ? undefined : text;
 }
 
 function joinText(first: string, second: string): string {

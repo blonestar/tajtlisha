@@ -93,6 +93,22 @@ describe('OpenAI transcription request building', () => {
   it('falls back to und when neither the request nor the response names a language', () => {
     expect(parseOpenAiTranscription({ text: 'hi' }, { modelId: 'gpt-transcribe' }).language).toBe('und');
   });
+
+  it('maps Asian languages detected by Whisper to ISO codes', () => {
+    const detected = (name: string): string =>
+      parseOpenAiTranscription({ language: name, text: 'x' }, { modelId: 'whisper-1' }).language;
+
+    expect(detected('indonesian')).toBe('id');
+    expect(detected('Japanese')).toBe('ja');
+    expect(detected('chinese')).toBe('zh');
+    expect(detected('korean')).toBe('ko');
+    expect(detected('thai')).toBe('th');
+    expect(detected('hindi')).toBe('hi');
+    expect(detected('malay')).toBe('ms');
+    expect(detected('javanese')).toBe('jv');
+    expect(detected('serbian')).toBe('sr-Latn');
+    expect(detected('klingon')).toBe('und');
+  });
 });
 
 describe('OpenAI provider requests', () => {
@@ -467,5 +483,67 @@ describe('OpenAI summary', () => {
 
     await expect(provider.listModels('summary')).resolves.toHaveLength(2);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenAI transcription prompt', () => {
+  it('sends the prompt field with the trimmed text for whisper-1 and the GPT transcribe models', () => {
+    for (const modelId of ['whisper-1', 'gpt-4o-transcribe']) {
+      const form = buildOpenAiTranscriptionForm({ modelId, prompt: '  Ljubav na kraju, Beograd.\n', audio: blob(), fileName: 'a.mp3' });
+
+      expect(form.get('prompt')).toBe('Ljubav na kraju, Beograd.');
+    }
+  });
+
+  it('sends no prompt field when the prompt is missing, empty, or blank', () => {
+    for (const prompt of [undefined, '', '   ', '\n\t\r\n']) {
+      const form = buildOpenAiTranscriptionForm({ modelId: 'whisper-1', prompt, audio: blob(), fileName: 'a.mp3' });
+
+      expect(form.has('prompt')).toBe(false);
+    }
+  });
+
+  it('keeps the prompt next to the language and the timing fields', () => {
+    const form = buildOpenAiTranscriptionForm({ modelId: 'whisper-1', language: 'sr-Cyrl', prompt: 'Topic', audio: blob(), fileName: 'a.mp3' });
+
+    expect(form.get('language')).toBe('sr');
+    expect(form.get('prompt')).toBe('Topic');
+    expect(form.getAll('timestamp_granularities[]')).toEqual(['word', 'segment']);
+  });
+});
+
+describe('OpenAI provider transcription prompt', () => {
+  let tempDir: string;
+  let audioPath: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'tajtlisha-openai-prompt-test-'));
+    audioPath = join(tempDir, 'audio.mp3');
+    await writeFile(audioPath, 'fake mp3');
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('sends the request prompt in the multipart body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ language: 'english', text: 'Hi' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await (await connectedProvider()).transcribe({ audioPath, audioFormat: 'mp3', language: 'en', prompt: 'Ana Petrović, Crna Gora.' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.body as FormData).get('prompt')).toBe('Ana Petrović, Crna Gora.');
+  });
+
+  it('sends no prompt field when the request has no prompt', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ language: 'english', text: 'Hi' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await (await connectedProvider()).transcribe({ audioPath, audioFormat: 'mp3', language: 'en' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.body as FormData).has('prompt')).toBe(false);
   });
 });

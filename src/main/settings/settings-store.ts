@@ -4,8 +4,10 @@ import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { REASONING_EFFORTS } from '../../shared/types/ai';
 import type { AppSettings, SummarySettings } from '../../shared/types/settings';
+import { MAX_AI_INSTRUCTIONS_CHARS } from '../../shared/ai-instructions';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../shared/summary';
 import { normalizeUiZoom } from '../../shared/ui-zoom';
+import { normalizeWatermark } from '../../shared/watermark-geometry';
 import { DEFAULT_APP_SETTINGS } from './defaults';
 import { rejectSecretFields } from './secret-fields';
 
@@ -114,9 +116,13 @@ function normalizeSettings(settings: AppSettings): AppSettings {
     uiZoomPercent: normalizeUiZoom(settings.uiZoomPercent),
     aiConnector: {
       ...settings.aiConnector,
-      maxLinesPerCaption: settings.aiConnector.maxLinesPerCaption === 1 ? 1 : 2
+      maxLinesPerCaption: settings.aiConnector.maxLinesPerCaption === 1 ? 1 : 2,
+      correctTranscript: settings.aiConnector.correctTranscript === true,
+      transcriptCorrectionInstructions: normalizeInstructions(settings.aiConnector.transcriptCorrectionInstructions),
+      translationInstructions: normalizeInstructions(settings.aiConnector.translationInstructions)
     },
-    summary: normalizeSummary(settings.summary)
+    summary: normalizeSummary(settings.summary),
+    watermark: normalizeWatermark(settings.watermark)
   };
 }
 
@@ -138,6 +144,14 @@ function normalizeSummaryPrompt(value: unknown): string {
     return DEFAULT_SUMMARY_PROMPT;
   }
   return value.slice(0, MAX_SUMMARY_PROMPT_CHARS);
+}
+
+/** Blank (only whitespace) is stored as ''; longer text is cut to the limit. */
+function normalizeInstructions(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return '';
+  }
+  return value.slice(0, MAX_AI_INSTRUCTIONS_CHARS);
 }
 
 function normalizeModelByProvider(value: unknown): SummarySettings['modelByProvider'] {

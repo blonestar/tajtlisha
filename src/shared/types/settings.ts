@@ -1,5 +1,6 @@
 import type { AiProviderId, AuthMode, ReasoningEffort } from './ai';
 import type { ExportOverwritePolicy } from './export';
+import type { WatermarkSettings } from './watermark';
 
 export type UiLanguage = 'system' | 'en' | 'sr-Latn' | 'sr-Cyrl';
 
@@ -22,6 +23,12 @@ export type AiConnectorSettings = {
   socialCaptionPolish: boolean;
   maxCharsPerLine: number;
   maxLinesPerCaption: 1 | 2;
+  /** Runs an AI correction pass on the transcript right after transcription. */
+  correctTranscript: boolean;
+  /** User instructions added to the correction prompt. '' = none. At most MAX_AI_INSTRUCTIONS_CHARS. */
+  transcriptCorrectionInstructions: string;
+  /** User instructions added to the translation (and translation polish) prompt. '' = none. */
+  translationInstructions: string;
 };
 
 /**
@@ -51,4 +58,6 @@ export type AppSettings = {
   exportDefaults: ExportSettings;
   aiConnector: AiConnectorSettings;
   summary: SummarySettings;
+  /** Logo drawn into the exported MP4 and shown in the preview. */
+  watermark: WatermarkSettings;
 };

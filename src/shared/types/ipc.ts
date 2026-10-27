@@ -23,6 +23,7 @@ import type { FfmpegStatus } from './media';
 import type { ProjectDocument, ProjectLoadResult, ProjectSource } from './project';
 import type { SubtitleStyle } from './style';
 import type { AppSettings } from './settings';
+import type { WatermarkSettings } from './watermark';
 import type { UpdateState } from './updates';
 
 /**
@@ -138,6 +139,8 @@ export type TajtlishaApi = {
        * activeWordIndex() in src/shared/word-highlight.ts. -1 or missing = none.
        */
       activeWordIndex?: number;
+      /** Logo in the frame, the same settings the export uses. Missing or enabled: false = no logo. */
+      watermark?: WatermarkSettings;
     }): Promise<{ dataUrl: string }>;
   };
   workflow: {

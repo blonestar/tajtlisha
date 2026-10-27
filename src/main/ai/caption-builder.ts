@@ -35,6 +35,11 @@ export type CaptionLimits = {
 export type CaptionBuildOptions = CaptionLimits & {
   /** Clip length in ms. Captions never extend past it. */
   clipDurationMs?: number;
+  /**
+   * Spoken language code. Languages written without spaces (Chinese, Japanese,
+   * Thai...) are split into words with Intl.Segmenter and joined without spaces.
+   */
+  language?: string;
 };
 
 export const MAX_CAPTION_DURATION_MS = 6000;
@@ -42,9 +47,28 @@ export const MIN_CAPTION_DURATION_MS = 700;
 export const MAX_GAP_BETWEEN_WORDS_MS = 600;
 
 /** A caption ends after sentence punctuation (optionally followed by closing quotes or brackets). */
-const SENTENCE_END = /[.!?\u2026]["'\u201d\u2019)\]]*$/;
+const SENTENCE_END = /[.!?\u2026\u3002\uff01\uff1f]["'\u201d\u2019)\]\u300d\u300f\uff09]*$/;
 /** Clause punctuation is a preferred cut only when a limit forces a break. */
-const CLAUSE_END = /[,;:]["'\u201d\u2019)\]]*$/;
+const CLAUSE_END = /[,;:\u3001\uff0c\uff1b\uff1a]["'\u201d\u2019)\]\u300d\u300f\uff09]*$/;
+
+/** Languages written without spaces between words (ISO 639 base codes). */
+const SPACELESS_LANGUAGES = new Set(['zh', 'yue', 'ja', 'th', 'lo', 'km', 'my', 'bo']);
+
+/**
+ * How words of one language are split and joined. In spaceless scripts a word
+ * that followed a space in the source keeps it as a leading ' ', so joining
+ * with '' restores the original spacing.
+ */
+type WordScript = { joiner: string; language?: string };
+
+function wordScript(language: string | undefined): WordScript {
+  const base = language?.split('-')[0].toLowerCase();
+  return base && SPACELESS_LANGUAGES.has(base) ? { joiner: '', language: base } : { joiner: ' ' };
+}
+
+export function isSpacelessLanguage(language: string | undefined): boolean {
+  return wordScript(language).joiner === '';
+}
 
 type Token = {
   text: string;
@@ -54,10 +78,13 @@ type Token = {
 
 /** Groups timed words into captions. Words are sorted and overlaps are clamped. */
 export function buildCaptionsFromWords(words: TimedSpan[], options: CaptionBuildOptions): CaptionDraft[] {
-  const tokens = normalizeTokens(words);
-  const drafts = chunkTokens(tokens, options, true).map((group) => ({
-    ...captionFromTokens(options)(group),
-    words: group.map((token) => ({ text: token.text, startMs: token.startMs, endMs: token.endMs }))
+  const script = wordScript(options.language);
+  const normalized = normalizeTokens(words);
+  // Whisper times spaceless scripts per character or fragment; regroup them into real words.
+  const tokens = script.joiner === '' ? regroupSpacelessTokens(normalized, script) : normalized;
+  const drafts = chunkTokens(tokens, options, true, script.joiner).map((group) => ({
+    ...captionFromTokens(options, script.joiner)(group),
+    words: group.map((token) => ({ text: token.text.trim(), startMs: token.startMs, endMs: token.endMs }))
   }));
   return finalizeDrafts(drafts, options);
 }
@@ -69,22 +96,23 @@ export function buildCaptionsFromWords(words: TimedSpan[], options: CaptionBuild
  */
 export function buildCaptionsFromSegments(segments: TimedSpan[], options: CaptionBuildOptions): CaptionDraft[] {
   const drafts: CaptionDraft[] = [];
+  const script = wordScript(options.language);
 
   for (const segment of segments) {
-    const words = splitWords(segment.text);
+    const words = splitWords(segment.text, script);
     if (words.length === 0) continue;
 
     const startMs = Math.max(0, Math.round(segment.startMs));
     const endMs = Math.max(startMs + 1, Math.round(segment.endMs));
-    const fitsWhole = layoutLines(words, options) !== null && endMs - startMs <= MAX_CAPTION_DURATION_MS;
+    const fitsWhole = layoutLines(words, options, script.joiner) !== null && endMs - startMs <= MAX_CAPTION_DURATION_MS;
 
     if (fitsWhole) {
-      drafts.push({ startMs, endMs, text: layoutCaptionText(words, options) });
+      drafts.push({ startMs, endMs, text: layoutCaptionText(words, options, script.joiner) });
       continue;
     }
 
     const tokens = allocateByCharacters(words, startMs, endMs);
-    drafts.push(...chunkTokens(tokens, options, true).map(captionFromTokens(options)));
+    drafts.push(...chunkTokens(tokens, options, true, script.joiner).map(captionFromTokens(options, script.joiner)));
   }
 
   return finalizeDrafts(drafts, options);
@@ -100,17 +128,19 @@ export function buildCaptionsFromSpeechRegions(
   regions: SpeechRegion[],
   options: CaptionBuildOptions
 ): CaptionDraft[] {
-  const words = splitWords(text);
+  const script = wordScript(options.language);
+  const words = splitWords(text, script);
   const speech = mergeRegions(regions);
   if (words.length === 0 || speech.length === 0) return [];
 
   const chunks = chunkTokens(
     words.map((word) => ({ text: word, startMs: 0, endMs: 0 })),
     options,
-    false
+    false,
+    script.joiner
   ).map((group) => {
     const words = group.map((token) => token.text);
-    return { text: layoutCaptionText(words, options), chars: charLength(words.join(' ')) };
+    return { text: layoutCaptionText(words, options, script.joiner), chars: charLength(joinWords(words, script.joiner)) };
   });
 
   const totalChars = chunks.reduce((sum, chunk) => sum + chunk.chars, 0);
@@ -156,22 +186,22 @@ export function buildCaptionsFromSpeechRegions(
 /**
  * Line layout for one caption. Returns null when the words do not fit within
  * maxLinesPerCaption lines of maxCharsPerLine. A single word always fits, since
- * words are never broken.
+ * words are never broken. `joiner` is '' for spaceless scripts.
  */
-export function layoutLines(words: string[], limits: CaptionLimits): string[] | null {
+export function layoutLines(words: string[], limits: CaptionLimits, joiner = ' '): string[] | null {
   if (words.length === 0) return [];
-  if (words.length === 1) return [words[0]];
+  if (words.length === 1) return [words[0].trim()];
 
   // A caption wraps only when it does not fit on one line.
-  const line = words.join(' ');
+  const line = joinWords(words, joiner);
   if (charLength(line) <= limits.maxCharsPerLine) return [line];
   if (limits.maxLinesPerCaption === 1) return null;
 
   // Two lines: pick the word boundary that makes the lines closest in length.
   let best: { index: number; difference: number } | null = null;
   for (let index = 1; index < words.length; index++) {
-    const firstLength = charLength(words.slice(0, index).join(' '));
-    const secondLength = charLength(words.slice(index).join(' '));
+    const firstLength = charLength(joinWords(words.slice(0, index), joiner));
+    const secondLength = charLength(joinWords(words.slice(index), joiner));
     if (firstLength > limits.maxCharsPerLine || secondLength > limits.maxCharsPerLine) continue;
 
     const difference = Math.abs(firstLength - secondLength);
@@ -181,7 +211,7 @@ export function layoutLines(words: string[], limits: CaptionLimits): string[] | 
   }
 
   if (!best) return null;
-  return [words.slice(0, best.index).join(' '), words.slice(best.index).join(' ')];
+  return [joinWords(words.slice(0, best.index), joiner), joinWords(words.slice(best.index), joiner)];
 }
 
 /**
@@ -192,7 +222,7 @@ export function layoutLines(words: string[], limits: CaptionLimits): string[] | 
  * MAX_GAP_BETWEEN_WORDS_MS and spans longer than MAX_CAPTION_DURATION_MS also
  * close a group.
  */
-function chunkTokens(tokens: Token[], options: CaptionLimits, timed: boolean): Token[][] {
+function chunkTokens(tokens: Token[], options: CaptionLimits, timed: boolean, joiner: string): Token[][] {
   const groups: Token[][] = [];
   let current: Token[] = [];
 
@@ -206,8 +236,8 @@ function chunkTokens(tokens: Token[], options: CaptionLimits, timed: boolean): T
       flush(current.length);
     }
 
-    while (current.length > 0 && !canAppend([...current, token], options, timed)) {
-      flush(preferredCut(current, options));
+    while (current.length > 0 && !canAppend([...current, token], options, timed, joiner)) {
+      flush(preferredCut(current, options, joiner));
     }
 
     current.push(token);
@@ -223,18 +253,18 @@ function chunkTokens(tokens: Token[], options: CaptionLimits, timed: boolean): T
   return groups;
 }
 
-function canAppend(candidate: Token[], options: CaptionLimits, timed: boolean): boolean {
-  if (layoutLines(candidate.map((token) => token.text), options) === null) return false;
+function canAppend(candidate: Token[], options: CaptionLimits, timed: boolean, joiner: string): boolean {
+  if (layoutLines(candidate.map((token) => token.text), options, joiner) === null) return false;
   if (timed && spanMs(candidate) > MAX_CAPTION_DURATION_MS) return false;
   return true;
 }
 
-function preferredCut(current: Token[], options: CaptionLimits): number {
+function preferredCut(current: Token[], options: CaptionLimits, joiner: string): number {
   const minimumChars = Math.ceil(options.maxCharsPerLine / 2);
 
   for (let count = current.length; count >= 1; count--) {
     const prefix = current.slice(0, count);
-    if (CLAUSE_END.test(current[count - 1].text) && charLength(joinTexts(prefix)) >= minimumChars) {
+    if (CLAUSE_END.test(current[count - 1].text) && charLength(joinWords(prefix.map((token) => token.text), joiner)) >= minimumChars) {
       return count;
     }
   }
@@ -242,11 +272,11 @@ function preferredCut(current: Token[], options: CaptionLimits): number {
   return current.length;
 }
 
-function captionFromTokens(options: CaptionLimits): (group: Token[]) => CaptionDraft {
+function captionFromTokens(options: CaptionLimits, joiner: string): (group: Token[]) => CaptionDraft {
   return (group) => ({
     startMs: group[0].startMs,
     endMs: group[group.length - 1].endMs,
-    text: layoutCaptionText(group.map((token) => token.text), options)
+    text: layoutCaptionText(group.map((token) => token.text), options, joiner)
   });
 }
 
@@ -349,27 +379,88 @@ function mergeRegions(regions: SpeechRegion[]): SpeechRegion[] {
   return merged;
 }
 
-function layoutCaptionText(words: string[], options: CaptionLimits): string {
-  return (layoutLines(words, options) ?? [words.join(' ')]).join('\n');
+function layoutCaptionText(words: string[], options: CaptionLimits, joiner: string): string {
+  return (layoutLines(words, options, joiner) ?? [joinWords(words, joiner)]).join('\n');
 }
 
 function spanMs(tokens: Token[]): number {
   return tokens[tokens.length - 1].endMs - tokens[0].startMs;
 }
 
-function splitWords(text: string): string[] {
-  return collapseWhitespace(text).split(' ').filter((word) => word.length > 0);
+function splitWords(text: string, script: WordScript): string[] {
+  const collapsed = collapseWhitespace(text);
+  if (script.joiner !== '') return collapsed.split(' ').filter((word) => word.length > 0);
+  return segmentSpaceless(collapsed, script.language).map((piece) => piece.text);
 }
 
-function joinTexts(tokens: Token[]): string {
-  return tokens.map((token) => token.text).join(' ');
+/** Joins words into one line. Leading spaces kept by spaceless scripts never start or end a line. */
+function joinWords(words: string[], joiner: string): string {
+  return words.join(joiner).trim();
+}
+
+type SpacelessPiece = { text: string; start: number; end: number };
+
+/**
+ * Splits spaceless text into words with Intl.Segmenter. Punctuation sticks to
+ * the word before it, and a word after a space keeps one leading ' '.
+ * start/end are UTF-16 offsets into `text`.
+ */
+function segmentSpaceless(text: string, language: string | undefined): SpacelessPiece[] {
+  const pieces: SpacelessPiece[] = [];
+  let spaceBefore = false;
+  for (const { segment, index, isWordLike } of new Intl.Segmenter(language, { granularity: 'word' }).segment(text)) {
+    if (/^\s+$/.test(segment)) {
+      spaceBefore = pieces.length > 0;
+      continue;
+    }
+
+    const last = pieces[pieces.length - 1];
+    if (!isWordLike && !spaceBefore && last) {
+      last.text += segment;
+      last.end = index + segment.length;
+      continue;
+    }
+
+    pieces.push({ text: spaceBefore ? ` ${segment}` : segment, start: index, end: index + segment.length });
+    spaceBefore = false;
+  }
+  return pieces;
+}
+
+/**
+ * Regroups character or fragment tokens of a spaceless script into words.
+ * Each word takes the start of its first fragment and the end of its last.
+ */
+function regroupSpacelessTokens(tokens: Token[], script: WordScript): Token[] {
+  if (tokens.length === 0) return tokens;
+
+  let text = '';
+  const owner: number[] = [];
+  tokens.forEach((token, tokenIndex) => {
+    text += token.text;
+    for (let offset = 0; offset < token.text.length; offset++) owner.push(tokenIndex);
+  });
+
+  return segmentSpaceless(text, script.language).map((piece) => ({
+    text: piece.text,
+    startMs: tokens[owner[piece.start]].startMs,
+    endMs: tokens[owner[piece.end - 1]].endMs
+  }));
 }
 
 function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-/** Length in Unicode code points, so Cyrillic and combining characters count once. */
+/** Hangul, CJK ideographs, kana and fullwidth forms take about two Latin characters of width. */
+const WIDE_CHARACTER = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua960-\ua97f\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}]/u;
+
+/**
+ * Line width in Latin-character units: one per code point (so Cyrillic and
+ * combining characters count once), two for wide East Asian characters.
+ */
 function charLength(text: string): number {
-  return [...text].length;
+  let width = 0;
+  for (const character of text) width += WIDE_CHARACTER.test(character) ? 2 : 1;
+  return width;
 }

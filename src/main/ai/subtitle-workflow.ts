@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MAX_TRANSCRIPTION_PROMPT_CHARS } from '../../shared/ai-instructions';
 import { AppError } from '../../shared/errors';
 import type {
   CaptionTimingSource,
@@ -10,6 +11,7 @@ import type {
   SummarizeTranscriptResult,
   TranscribeClipRequest,
   TranscribeClipResult,
+  TranscriptCorrectionOutcome,
   TranslateCaptionsRequest,
   TranslateCaptionsResult
 } from '../../shared/types/jobs';
@@ -39,7 +41,7 @@ export type WorkflowContext = {
   onProgress?: (event: WorkflowProgress) => void;
 };
 
-type TextStage = Extract<JobStage, 'translating' | 'polishing'>;
+type TextStage = Extract<JobStage, 'translating' | 'polishing' | 'correcting'>;
 
 /**
  * Clip transcription and caption translation. Dependencies are injected so
@@ -82,6 +84,7 @@ export class SubtitleWorkflowService {
           audioFormat: 'mp3',
           modelId: request.modelId,
           language: request.language,
+          prompt: transcriptionPrompt(request),
           signal: context.signal
         })
       );
@@ -93,19 +96,25 @@ export class SubtitleWorkflowService {
       const options: CaptionBuildOptions = {
         maxCharsPerLine: request.maxCharsPerLine,
         maxLinesPerCaption: request.maxLinesPerCaption,
-        clipDurationMs
+        clipDurationMs,
+        language: transcription.language
       };
       const layout = await this.layoutCaptions(transcription, audioPath, options, clipDurationMs, context);
-      const captions = toSourceCaptions(layout.drafts, request.trim);
+      const language = transcription.language.trim() || 'und';
+      const corrected = request.correction
+        ? await this.correctDrafts(layout.drafts, request, language, context)
+        : undefined;
+      const captions = toSourceCaptions(corrected?.drafts ?? layout.drafts, request.trim);
 
       if (captions.length === 0) {
         throw new AppError('NO_SPEECH');
       }
 
       return {
-        language: transcription.language.trim() || 'und',
+        language,
         captions,
-        timingSource: layout.timingSource
+        timingSource: layout.timingSource,
+        ...(corrected ? { correction: corrected.outcome } : {})
       };
     } finally {
       await rm(tempDir, { recursive: true, force: true });
@@ -131,6 +140,8 @@ export class SubtitleWorkflowService {
         modelId: request.modelId,
         maxCharsPerLine: request.maxCharsPerLine,
         maxLinesPerCaption: request.maxLinesPerCaption,
+        customInstructions: request.instructions,
+        videoContext: request.videoContext,
         signal: context.signal
       })
     );
@@ -148,11 +159,58 @@ export class SubtitleWorkflowService {
         modelId: request.modelId,
         maxCharsPerLine: request.maxCharsPerLine,
         maxLinesPerCaption: request.maxLinesPerCaption,
+        customInstructions: request.instructions,
+        videoContext: request.videoContext,
         signal: context.signal
       })
     );
 
     return { translations: toScript(polished, request.targetLanguage) };
+  }
+
+  /**
+   * AI correction of the transcript text. Caption timing and word timing stay
+   * as they are; the word highlight matches the corrected words to the timed
+   * ones. A failure keeps the raw transcript, because the transcription itself
+   * already succeeded (and was paid for). Cancel still cancels the job.
+   */
+  private async correctDrafts(
+    drafts: CaptionDraft[],
+    request: TranscribeClipRequest,
+    language: string,
+    context: WorkflowContext
+  ): Promise<{ drafts: CaptionDraft[]; outcome: TranscriptCorrectionOutcome }> {
+    const correction = request.correction;
+    const items = drafts.map((draft, index) => ({ id: String(index), text: draft.text })).filter((item) => item.text.trim() !== '');
+    if (!correction || items.length === 0) {
+      return { drafts, outcome: 'applied' };
+    }
+
+    try {
+      const corrected = await this.runTextStage(items, 'correcting', context, (batch) =>
+        this.registry.polishTexts(request.providerId, {
+          items: batch,
+          language,
+          mode: 'transcript_correction',
+          modelId: correction.modelId,
+          maxCharsPerLine: request.maxCharsPerLine,
+          maxLinesPerCaption: request.maxLinesPerCaption,
+          customInstructions: correction.instructions,
+          videoContext: request.videoContext,
+          signal: context.signal
+        })
+      );
+      const textById = new Map(toScript(corrected, language).map((item) => [item.id, item.text]));
+      return {
+        drafts: drafts.map((draft, index) => ({ ...draft, text: textById.get(String(index)) ?? draft.text })),
+        outcome: 'applied'
+      };
+    } catch (error) {
+      if (context.signal?.aborted || (error instanceof AppError && error.code === 'JOB_CANCELED')) {
+        throw error;
+      }
+      return { drafts, outcome: 'failed' };
+    }
   }
 
   /**
@@ -319,6 +377,17 @@ function toRequestedScript(transcription: ProviderTranscribeResult): ProviderTra
     ...(result.words ? { words: convert(result.words) } : {}),
     ...(result.segments ? { segments: convert(result.segments) } : {})
   };
+}
+
+/**
+ * The video context as a transcription prompt, only when the spoken language
+ * is set. Whisper tends to switch its output to the language of the prompt, and
+ * a fixed language prevents that. Cut to the length Whisper actually reads.
+ */
+function transcriptionPrompt(request: TranscribeClipRequest): string | undefined {
+  const context = request.videoContext?.trim();
+  if (!context || !request.language || isUnknownLanguage(request.language)) return undefined;
+  return context.slice(0, MAX_TRANSCRIPTION_PROMPT_CHARS);
 }
 
 function isUnknownLanguage(language: string): boolean {

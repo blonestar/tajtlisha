@@ -17,8 +17,10 @@ import StepForward from 'lucide-react/dist/esm/icons/step-forward.js';
 import X from 'lucide-react/dist/esm/icons/x.js';
 import type { ProjectSource, TrimRange } from '../../../../shared/types/project';
 import type { SubtitleStyle } from '../../../../shared/types/style';
+import type { WatermarkSettings } from '../../../../shared/types/watermark';
 import { formatTimecode } from '../../utils/time';
 import { SubtitleOverlay } from './SubtitleOverlay';
+import { WatermarkOverlay } from './WatermarkOverlay';
 import { clampToTrim, fitFrame, nextTimeOnPlay, reachedTrimEnd, stepTime } from './playback';
 import './preview.css';
 
@@ -43,6 +45,8 @@ export type VideoPreviewProps = {
   style: SubtitleStyle;
   /** Word lit at the playhead when word highlight is on. -1 or missing means none. */
   activeWordIndex?: number;
+  /** Logo laid over the frame. Missing or enabled: false = no logo. Not drawn on an exact frame, which already has it. */
+  watermark?: WatermarkSettings;
   /** Source-absolute time. Fires every animation frame while playing, and on seek and pause. */
   onTimeUpdate: (ms: number) => void;
   onPlayingChange: (playing: boolean) => void;
@@ -71,6 +75,7 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(fu
     captionText,
     style,
     activeWordIndex,
+    watermark,
     exactFrame = null,
     onRequestExactFrame,
     onCloseExactFrame,
@@ -264,13 +269,16 @@ export const VideoPreview = forwardRef<VideoPreviewHandle, VideoPreviewProps>(fu
               </div>
             </>
           ) : (
-            <SubtitleOverlay
-              text={captionText ?? ''}
-              style={style}
-              frameWidth={frame.width}
-              frameHeight={frame.height}
-              activeWordIndex={activeWordIndex}
-            />
+            <>
+              <SubtitleOverlay
+                text={captionText ?? ''}
+                style={style}
+                frameWidth={frame.width}
+                frameHeight={frame.height}
+                activeWordIndex={activeWordIndex}
+              />
+              {watermark ? <WatermarkOverlay watermark={watermark} frameWidth={frame.width} frameHeight={frame.height} /> : null}
+            </>
           )}
         </div>
       </div>

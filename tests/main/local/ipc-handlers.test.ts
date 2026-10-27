@@ -842,3 +842,318 @@ function summarizeRequest(jobId = 'sum-1') {
     segments: [{ startMs: 0, endMs: 1000, text: 'Hello.' }]
   };
 }
+
+describe('watermark at the IPC boundary', () => {
+  const logo = {
+    enabled: true,
+    content: 'mark_text',
+    markText: 'MK',
+    text: 'Moj kanal',
+    background: 'all',
+    backgroundColor: '#112233',
+    markColor: '#F2A93B',
+    textColor: '#F2F2F2',
+    cornerRadiusPercent: 19,
+    position: 'bottom_right',
+    sizePercent: 40,
+    marginPercent: 3,
+    opacity: 0.5
+  };
+
+  it('clamps a valid export logo and passes it to the exporter', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: logo });
+
+    expect(exportProject.mock.calls[0]?.[0]).toMatchObject({ watermark: { ...logo, sizePercent: 15 } });
+  });
+
+  it('leaves the export logo absent when the request has none', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), exportPayload);
+
+    expect(exportProject.mock.calls[0]?.[0]).not.toHaveProperty('watermark');
+  });
+
+  it('rejects an export logo with wrong types, naming the field and not the value', async () => {
+    const exportProject = vi.fn(async (_request: Record<string, unknown>) => ({ files: [] }));
+    const { ipc } = setupExport({ responses: 2, exportProject });
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, enabled: 'yes' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.enabled must be a boolean.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, content: 'big' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.content must be one of mark_text, mark, text.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, position: 'center' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.position must be one of');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, text: 5 } })
+    ).rejects.toThrow('[UNKNOWN] watermark.text must be a string.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, backgroundColor: 'red' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.backgroundColor must be a #rrggbb colour.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, background: 'some' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.background must be one of all, mark, none.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, sizePercent: '7' } })
+    ).rejects.toThrow('[UNKNOWN] watermark.sizePercent must be a finite number.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: { ...logo, opacity: Number.NaN } })
+    ).rejects.toThrow('[UNKNOWN] watermark.opacity must be a finite number.');
+    await expect(ipc.invoke(IPC_CHANNELS.exportProject, fakeOwner(1), { ...exportPayload, watermark: null })).rejects.toThrow(
+      '[UNKNOWN] watermark must be an object.'
+    );
+    expect(exportProject).not.toHaveBeenCalled();
+  });
+
+  it('validates the preview frame logo the same way', async () => {
+    const ipc = fakeIpc();
+    const renderPreviewFrame = vi.fn(async (_request: Record<string, unknown>) => ({ dataUrl: 'data:image/png;base64,' }));
+    registerProjectIpc({
+      ipc,
+      jobs: new JobRegistry(),
+      dialogs: fakeDialogs(),
+      mediaService: { probe: vi.fn(), createPreviewProxy: vi.fn() } as never,
+      projectStore: { loadLast: vi.fn(), save: vi.fn() } as never,
+      previewProxies: { get: vi.fn() } as never,
+      exporter: { renderPreviewFrame } as never,
+      createVideoUrl: fakeVideoUrl,
+      strings: async () => ENGLISH,
+      sources: sourcesWith('/videos/clip.mkv')
+    });
+    const frame = { inputPath: '/videos/clip.mkv', atMs: 0, videoWidth: 2, videoHeight: 2, text: 'x', style: DEFAULT_SUBTITLE_STYLE };
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, watermark: logo });
+    expect(renderPreviewFrame.mock.calls[0]?.[0]).toMatchObject({ watermark: { ...logo, sizePercent: 15 } });
+
+    await ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), frame);
+    expect(renderPreviewFrame.mock.calls[1]?.[0]).not.toHaveProperty('watermark');
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.projectRenderPreviewFrame, fakeOwner(1), { ...frame, watermark: { ...logo, enabled: 1 } })
+    ).rejects.toThrow('[UNKNOWN] watermark.enabled must be a boolean.');
+    expect(renderPreviewFrame).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('workflow:transcribe correction validation', () => {
+  function setup() {
+    const ipc = fakeIpc();
+    const transcribe = vi.fn(async (_request: unknown) => ({ language: 'en', captions: [], timingSource: 'word' }));
+    registerWorkflowIpc({ ipc, jobs: new JobRegistry(), workflow: { transcribe, translate: vi.fn() } as never, sources: sourcesWith('/videos/clip.mp4') });
+    return { ipc, transcribe };
+  }
+
+  it('passes no correction through when the field is absent', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), transcribeRequest('job-1'));
+
+    expect(transcribe.mock.calls[0]?.[0]).not.toHaveProperty('correction');
+  });
+
+  it('accepts a correction with a model and instructions', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+      ...transcribeRequest('job-1'),
+      correction: { modelId: 'gpt-fix', instructions: 'Name: Bojan.' }
+    });
+
+    expect(transcribe.mock.calls[0]?.[0]).toMatchObject({ correction: { modelId: 'gpt-fix', instructions: 'Name: Bojan.' } });
+  });
+
+  it('maps an empty model id to undefined and a missing instructions field to empty text', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), correction: { modelId: '' } });
+
+    expect(transcribe.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ correction: { modelId: undefined, instructions: '' } }));
+  });
+
+  it('accepts instructions at exactly the length limit and rejects one character more', async () => {
+    const { ipc, transcribe } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+        ...transcribeRequest('job-1'),
+        correction: { instructions: 'a'.repeat(4000) }
+      })
+    ).resolves.toBeDefined();
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+        ...transcribeRequest('job-2'),
+        correction: { instructions: 'a'.repeat(4001) }
+      })
+    ).rejects.toThrow('[UNKNOWN] correction.instructions must be at most 4000 characters.');
+    expect(transcribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a correction that is not an object, and instructions that are not a string', async () => {
+    const { ipc, transcribe } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), correction: 'yes' })
+    ).rejects.toThrow('[UNKNOWN] correction must be an object.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), correction: null })
+    ).rejects.toThrow('[UNKNOWN] correction must be an object.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), correction: { instructions: 42 } })
+    ).rejects.toThrow('[UNKNOWN] correction.instructions must be a string.');
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), correction: { modelId: 7, instructions: '' } })
+    ).rejects.toThrow('[UNKNOWN] modelId must be a non-empty string.');
+    expect(transcribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('workflow:translate instructions validation', () => {
+  function setup() {
+    const ipc = fakeIpc();
+    const translate = vi.fn(async (_request: unknown) => ({ translations: [] }));
+    registerWorkflowIpc({ ipc, jobs: new JobRegistry(), workflow: { transcribe: vi.fn(), translate } as never, sources: new KnownSources() });
+    return { ipc, translate };
+  }
+
+  function translateRequest(overrides: Record<string, unknown> = {}) {
+    return {
+      jobId: 'tr-1',
+      providerId: 'openai',
+      sourceLanguage: 'en',
+      targetLanguage: 'sr-Latn',
+      captions: [{ id: 'a', text: 'hello' }],
+      polish: 'none',
+      maxCharsPerLine: 42,
+      maxLinesPerCaption: 2,
+      ...overrides
+    };
+  }
+
+  it('passes instructions through, and passes none when the field is absent', async () => {
+    const { ipc, translate } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ instructions: 'Use formal address.' }));
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest());
+
+    expect(translate.mock.calls[0]?.[0]).toMatchObject({ instructions: 'Use formal address.' });
+    expect(translate.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ instructions: undefined }));
+  });
+
+  it('accepts instructions at the limit and rejects a longer text or a non-string', async () => {
+    const { ipc, translate } = setup();
+
+    await expect(ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ instructions: 'a'.repeat(4000) }))).resolves.toBeDefined();
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ instructions: 'a'.repeat(4001) }))
+    ).rejects.toThrow('[UNKNOWN] instructions must be at most 4000 characters.');
+    await expect(ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ instructions: ['x'] }))).rejects.toThrow(
+      '[UNKNOWN] instructions must be a string.'
+    );
+    expect(translate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('workflow:transcribe video context validation', () => {
+  function setup() {
+    const ipc = fakeIpc();
+    const transcribe = vi.fn(async (_request: unknown) => ({ language: 'en', captions: [], timingSource: 'word' }));
+    registerWorkflowIpc({ ipc, jobs: new JobRegistry(), workflow: { transcribe, translate: vi.fn() } as never, sources: sourcesWith('/videos/clip.mp4') });
+    return { ipc, transcribe };
+  }
+
+  it('passes the video context through, and leaves it undefined when the field is absent', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), videoContext: 'Epizoda o Beogradu.' });
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), transcribeRequest('job-2'));
+
+    expect(transcribe.mock.calls[0]?.[0]).toMatchObject({ videoContext: 'Epizoda o Beogradu.' });
+    expect((transcribe.mock.calls[1]?.[0] as { videoContext?: string }).videoContext).toBeUndefined();
+  });
+
+  it('accepts a video context at exactly the 2000 character limit and rejects one character more', async () => {
+    const { ipc, transcribe } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), videoContext: 'a'.repeat(2000) })
+    ).resolves.toBeDefined();
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-2'), videoContext: 'a'.repeat(2001) })
+    ).rejects.toThrow('[UNKNOWN] videoContext must be at most 2000 characters.');
+    expect(transcribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts an empty or blank video context, which the workflow ignores', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), videoContext: '' });
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-2'), videoContext: '   ' });
+
+    expect(transcribe).toHaveBeenCalledTimes(2);
+    expect(transcribe.mock.calls[1]?.[0]).toMatchObject({ videoContext: '   ' });
+  });
+
+  it('rejects a video context that is not a string before starting work', async () => {
+    const { ipc, transcribe } = setup();
+
+    for (const videoContext of [42, null, ['Ana'], { text: 'Ana' }]) {
+      await expect(
+        ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), { ...transcribeRequest('job-1'), videoContext })
+      ).rejects.toThrow('[UNKNOWN] videoContext must be a string.');
+    }
+    expect(transcribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('workflow:translate video context validation', () => {
+  function setup() {
+    const ipc = fakeIpc();
+    const translate = vi.fn(async (_request: unknown) => ({ translations: [] }));
+    registerWorkflowIpc({ ipc, jobs: new JobRegistry(), workflow: { transcribe: vi.fn(), translate } as never, sources: new KnownSources() });
+    return { ipc, translate };
+  }
+
+  function translateRequest(overrides: Record<string, unknown> = {}) {
+    return {
+      jobId: 'tr-1',
+      providerId: 'openai',
+      sourceLanguage: 'en',
+      targetLanguage: 'sr-Latn',
+      captions: [{ id: 'a', text: 'hello' }],
+      polish: 'none',
+      maxCharsPerLine: 42,
+      maxLinesPerCaption: 2,
+      ...overrides
+    };
+  }
+
+  it('passes the video context through, and leaves it undefined when the field is absent', async () => {
+    const { ipc, translate } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ videoContext: 'Vlog o Crnoj Gori.' }));
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest());
+
+    expect(translate.mock.calls[0]?.[0]).toMatchObject({ videoContext: 'Vlog o Crnoj Gori.' });
+    expect((translate.mock.calls[1]?.[0] as { videoContext?: string }).videoContext).toBeUndefined();
+  });
+
+  it('accepts a video context at the limit and rejects a longer one or a non-string', async () => {
+    const { ipc, translate } = setup();
+
+    await expect(ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ videoContext: 'a'.repeat(2000) }))).resolves.toBeDefined();
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ videoContext: 'a'.repeat(2001) }))
+    ).rejects.toThrow('[UNKNOWN] videoContext must be at most 2000 characters.');
+    await expect(ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ videoContext: 7 }))).rejects.toThrow(
+      '[UNKNOWN] videoContext must be a string.'
+    );
+    expect(translate).toHaveBeenCalledTimes(1);
+  });
+});

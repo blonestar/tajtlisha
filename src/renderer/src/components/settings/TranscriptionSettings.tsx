@@ -1,34 +1,24 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppSettings, AiConnectorSettings } from '../../../../shared/types/settings';
+import { InstructionsRow } from './InstructionsRow';
 import { SegmentedControl, SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
-type CaptionSettingsProps = {
+type TranscriptionSettingsProps = {
   settings: AppSettings;
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
 };
 
-type PolishMode = 'none' | 'light' | 'social';
-
 const MIN_CHARS_PER_LINE = 20;
 const MAX_CHARS_PER_LINE = 60;
 
-export function CaptionSettings({ settings, onSettingsChange }: CaptionSettingsProps): ReactElement {
+/** The Transcription tab: how the speech is recognized, split into captions, and corrected afterwards. */
+export function TranscriptionSettings({ settings, onSettingsChange }: TranscriptionSettingsProps): ReactElement {
   const { t } = useTranslation();
   const connector = settings.aiConnector;
 
   function updateConnector(patch: Partial<AiConnectorSettings>): void {
     onSettingsChange?.({ aiConnector: { ...connector, ...patch } });
-  }
-
-  // The two polish flags are one choice in the UI, so exactly one is ever set.
-  const polishMode: PolishMode = connector.socialCaptionPolish ? 'social' : connector.conservativePolish ? 'light' : 'none';
-
-  function setPolishMode(mode: PolishMode): void {
-    updateConnector({
-      conservativePolish: mode === 'light',
-      socialCaptionPolish: mode === 'social'
-    });
   }
 
   return (
@@ -79,18 +69,22 @@ export function CaptionSettings({ settings, onSettingsChange }: CaptionSettingsP
         />
       </SettingsRow>
 
-      <SettingsRow label={t('settings.captions.polish')} labelId="settings-polish" hint={t(`settings.captions.polishHint.${polishMode}`)}>
-        <SegmentedControl<PolishMode>
-          labelledBy="settings-polish"
-          value={polishMode}
-          options={[
-            { value: 'none', label: t('settings.captions.polishNone') },
-            { value: 'light', label: t('settings.captions.polishLight') },
-            { value: 'social', label: t('settings.captions.polishSocial') }
-          ]}
-          onChange={setPolishMode}
+      <SettingsRow label={t('settings.transcription.correct')} htmlFor="settings-correct-transcript" hint={t('settings.transcription.correctHint')}>
+        <SettingsSwitch
+          id="settings-correct-transcript"
+          checked={connector.correctTranscript}
+          onChange={(correctTranscript) => updateConnector({ correctTranscript })}
         />
       </SettingsRow>
+
+      <InstructionsRow
+        id="settings-correction-instructions"
+        label={t('settings.transcription.correctionInstructions')}
+        hint={t('settings.transcription.correctionInstructionsHint')}
+        placeholder={t('settings.transcription.correctionPlaceholder')}
+        value={connector.transcriptCorrectionInstructions}
+        onCommit={(transcriptCorrectionInstructions) => updateConnector({ transcriptCorrectionInstructions })}
+      />
     </>
   );
 }

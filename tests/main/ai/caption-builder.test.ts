@@ -3,6 +3,7 @@ import {
   buildCaptionsFromSegments,
   buildCaptionsFromSpeechRegions,
   buildCaptionsFromWords,
+  isSpacelessLanguage,
   layoutLines,
   MAX_CAPTION_DURATION_MS,
   MIN_CAPTION_DURATION_MS,
@@ -315,5 +316,60 @@ describe('buildCaptionsFromSpeechRegions', () => {
     );
 
     expect(captions).toEqual([{ startMs: 0, endMs: 1500, text: 'alpha beta' }]);
+  });
+});
+
+describe('spaceless scripts', () => {
+  // Whisper word fragments as returned for Japanese and Thai (real responses).
+  const JA_FRAGMENTS = ['\u3053\u3093\u306b\u3061\u306f', '\u4eca\u65e5\u306f', '\u3068', '\u3066', '\u3082', '\u826f', '\u3044', '\u5929', '\u6c17', '\u3067\u3059\u306d'];
+  const TH_FRAGMENTS = ['\u0e2a', '\u0e27', '\u0e31', '\u0e2a', '\u0e14', '\u0e35', '\u0e04\u0e23', '\u0e31', '\u0e1a'];
+  const fragments = (texts: string[]): TimedSpan[] =>
+    texts.map((text, index) => ({ text, startMs: index * 200, endMs: index * 200 + 150 }));
+
+  it('knows which languages are written without spaces', () => {
+    expect(isSpacelessLanguage('ja')).toBe(true);
+    expect(isSpacelessLanguage('zh')).toBe(true);
+    expect(isSpacelessLanguage('th')).toBe(true);
+    expect(isSpacelessLanguage('ko')).toBe(false);
+    expect(isSpacelessLanguage('id')).toBe(false);
+    expect(isSpacelessLanguage(undefined)).toBe(false);
+  });
+
+  it('joins Japanese word fragments without spaces and regroups them into words', () => {
+    const [caption] = buildCaptionsFromWords(fragments(JA_FRAGMENTS), { ...twoLines(60), language: 'ja' });
+
+    expect(caption.text).toBe(JA_FRAGMENTS.join(''));
+    expect(caption.words?.length).toBeLessThan(JA_FRAGMENTS.length);
+    // '\u3068\u3066\u3082' (totemo) is one word timed from its first to its last fragment.
+    expect(caption.words).toContainEqual({ text: '\u3068\u3066\u3082', startMs: 400, endMs: 950 });
+  });
+
+  it('rebuilds Thai text from fragments that split vowel marks', () => {
+    const [caption] = buildCaptionsFromWords(fragments(TH_FRAGMENTS), { ...twoLines(60), language: 'th' });
+
+    expect(caption.text).toBe(TH_FRAGMENTS.join(''));
+    expect(caption.words?.every((word) => !/^[\u0e31\u0e34-\u0e3a\u0e47-\u0e4e]/.test(word.text))).toBe(true);
+  });
+
+  it('still spaces words of other languages', () => {
+    const [caption] = buildCaptionsFromWords(timedWords('Kenapa Pak', 300), { ...oneLine(40), language: 'id' });
+    expect(caption.text).toBe('Kenapa Pak');
+  });
+
+  it('wraps Chinese segments without spaces, counting ideographs as double width', () => {
+    const text = '\u4f60\u597d\uff01\u4eca\u5929\u5929\u6c14\u5f88\u597d\uff0c\u6211\u4eec\u4e00\u8d77\u53bb\u516c\u56ed\u6563\u6b65\u5427\u3002';
+    const captions = buildCaptionsFromSegments([{ text, startMs: 0, endMs: 4000 }], { ...twoLines(24), language: 'zh' });
+
+    expect(captions.map((caption) => caption.text.replace('\n', '')).join('')).toBe(text);
+    for (const line of captions.flatMap((caption) => caption.text.split('\n'))) {
+      expect(line).not.toMatch(/\s/);
+      expect([...line].length * 2).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it('keeps the spaces Thai puts between phrases', () => {
+    const text = '\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35\u0e04\u0e23\u0e31\u0e1a \u0e27\u0e31\u0e19\u0e19\u0e35\u0e49\u0e2d\u0e32\u0e01\u0e32\u0e28\u0e14\u0e35\u0e21\u0e32\u0e01';
+    const [caption] = buildCaptionsFromSegments([{ text, startMs: 0, endMs: 3000 }], { ...oneLine(60), language: 'th' });
+    expect(caption.text).toBe(text);
   });
 });

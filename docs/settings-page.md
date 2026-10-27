@@ -14,6 +14,7 @@ Settings stranica ima ove sekcije:
 - Language & localization
 - AI connector
 - Export defaults
+- Logo
 - Advanced / diagnostics
 
 ## General
@@ -60,7 +61,9 @@ Pravila:
 
 ## AI connector
 
-AI connector je posebna sekcija Settings stranice i centralno mesto za sve AI opcije.
+AI opcije su u UI-u podeljene u tabove: Connectors (provider-i, kljucevi, modeli), Transcription
+(jezik, raspored titlova, AI ispravka transkripta) i Translation (dorada prevoda, uputstva za prevod).
+Summary je zaseban tab.
 
 ### Provider izbor
 
@@ -116,6 +119,15 @@ Opcije:
 - keep original meaning,
 - preserve timing during translation.
 
+### Korisnicka uputstva (tabovi Transcription i Translation)
+
+- AI ispravka posle transkripcije (podrazumevano iskljucena): drugi prolaz modela za tekst ispravlja pogresno
+  cute reci, imena, interpunkciju; timing i word timing ostaju isti. Ako ispravka ne uspe, zadrzava se sirovi
+  transkript i korisnik dobija poruku; cancel i dalje prekida ceo posao.
+- Uputstva za ispravku i uputstva za prevod (do 4000 znakova, prazno = nema): dodaju se posle ugradjenih pravila
+  u bloku `<user_instructions>`; pravila o id-jevima, broju stavki i JSON formatu imaju prednost.
+- Uputstva za prevod koristi i dorada (polish) prevoda.
+
 ### Sazetak videa (zaseban tab "Summary")
 
 - prekidac koji prikazuje ili sakriva dugme Summarize u Editoru (podrazumevano iskljuceno); ostala polja ostaju
@@ -166,6 +178,34 @@ Opcije:
   - ask,
   - overwrite,
   - create copy.
+
+## Logo
+
+Zaseban tab u Settings, odmah posle Export. Logo se crta u izvezeni MP4 i u pregled
+istim rasporedom (`computeWatermarkLayout`), pa pregled i izvoz izgledaju isto.
+
+Kontrole:
+
+- switch "Logo na videu" (podrazumevano ukljucen). Dok je iskljucen, sve ostale kontrole su onemogucene,
+  ukljucujuci "Vrati podrazumevano",
+- sadrzaj: "Znak + tekst" (podrazumevano), "Samo znak" ili "Samo tekst". Polje za znak i polje za tekst
+  nestaju kad ta strana nije u sadrzaju,
+- slova u znaku: do 3 znaka (podrazumevano `T`). Prazno sakriva znak,
+- tekst: do 30 znakova (podrazumevano `tajtliša`). Prazno sakriva tekst,
+- pozadina: "Iza svega" (podrazumevano), "Samo iza znaka" ili "Bez pozadine",
+- boje: pozadina (`#1D2025`), znak (`#F2A93B`) i tekst (`#F2F2F2`),
+- zaobljenost ivica: 0..50% visine loga (podrazumevano 19%),
+- polozaj: mreza 3 x 2 (gore levo, gore u sredini, gore desno, dole levo, dole u sredini, dole desno;
+  podrazumevano gore levo). Strelice na tastaturi pomeraju izbor,
+- velicina: 3..15% krace strane videa (podrazumevano 7%),
+- margina: 0..10% krace strane videa (podrazumevano 3%),
+- neprozirnost: 20..100% (podrazumevano 90%),
+- pregled: uzorak 16:9 sa trenutnim podesavanjem, odmah ispod switch-a,
+- "Vrati podrazumevano" vraca ceo logo na podrazumevana podesavanja.
+
+Tekst se upisuje dok se kuca, ociscen (bez novih redova i spoljnih razmaka, po limitu znakova).
+Razmak izmedju reci ostaje u polju dok se kuca. Velicina, margina, zaobljenost i neprozirnost
+se upisuju pri svakom koraku klizaca. Logo nije tajna, pa ide u obican settings store.
 
 ## Advanced / diagnostics
 
