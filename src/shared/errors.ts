@@ -13,6 +13,8 @@ export const APP_ERROR_CODES = [
   'NO_SPEECH',
   'PROVIDER_NOT_CONNECTED',
   'PROVIDER_UNSUPPORTED',
+  /** The connector is turned off in Settings > Connectors. */
+  'PROVIDER_DISABLED',
   'PROVIDER_REQUEST_FAILED',
   'PROVIDER_AUTH_FAILED',
   'PROVIDER_RATE_LIMITED',

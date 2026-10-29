@@ -31,6 +31,7 @@ const EMPTY_SETTINGS: AppSettings = {
   },
   aiConnector: {
     authModeByProvider: {},
+    enabledProviders: {},
     transcriptionModelByProvider: {},
     textModelByProvider: {},
     autoDetectInputLanguage: true,

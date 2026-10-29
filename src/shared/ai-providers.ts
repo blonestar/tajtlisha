@@ -1,6 +1,22 @@
 import { LOCAL_CLI_PROVIDER_IDS, type AiProviderId } from './types/ai';
 import type { AiConnectorSettings, SummarySettings } from './types/settings';
 
+/**
+ * Connectors that start turned off until the user turns them on in
+ * Settings > Connectors. Claude Code uses the user's Claude subscription, which
+ * Anthropic's terms may not allow for third-party apps, so it stays opt-in.
+ */
+export const DEFAULT_DISABLED_PROVIDER_IDS: readonly AiProviderId[] = ['claude_code_cli'];
+
+/** The explicit choice if the user made one, otherwise the provider default. */
+export function isProviderEnabled(connector: Pick<AiConnectorSettings, 'enabledProviders'>, providerId: AiProviderId): boolean {
+  const explicit = connector.enabledProviders[providerId];
+  if (typeof explicit === 'boolean') {
+    return explicit;
+  }
+  return !DEFAULT_DISABLED_PROVIDER_IDS.includes(providerId);
+}
+
 export function isLocalCliProviderId(providerId: AiProviderId | undefined): boolean {
   return (LOCAL_CLI_PROVIDER_IDS as readonly string[]).includes(providerId ?? '');
 }

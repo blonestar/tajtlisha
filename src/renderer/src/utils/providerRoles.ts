@@ -13,15 +13,21 @@ export type ProviderRoles = {
   summaryId?: AiProviderId;
 };
 
+/**
+ * `providers` are the connectors the user turned on. A role whose provider is not in
+ * the list (turned off, or not in this build) is undefined, so no picker or task uses it.
+ */
 export function providerRolesOf(
   settings: Pick<AppSettings, 'aiConnector' | 'summary'>,
   providers: readonly ProviderStatus[]
 ): ProviderRoles {
   const registeredIds = providers.map((provider) => provider.id);
+  const onlyRegistered = (providerId: AiProviderId | undefined): AiProviderId | undefined =>
+    providerId && registeredIds.includes(providerId) ? providerId : undefined;
   return {
-    transcriptionId: settings.aiConnector.activeProviderId,
-    textId: resolveTextProviderId(settings.aiConnector, registeredIds),
-    summaryId: resolveSummaryProviderId(settings.aiConnector, settings.summary, registeredIds)
+    transcriptionId: onlyRegistered(settings.aiConnector.activeProviderId),
+    textId: onlyRegistered(resolveTextProviderId(settings.aiConnector, registeredIds)),
+    summaryId: onlyRegistered(resolveSummaryProviderId(settings.aiConnector, settings.summary, registeredIds))
   };
 }
 

@@ -547,3 +547,57 @@ describe('auto-check updates setting', () => {
     });
   });
 });
+
+describe('SettingsStore enabled connectors', () => {
+  async function withSettingsFile<T>(fileContent: unknown, run: (store: SettingsStore) => Promise<T>): Promise<T> {
+    const dir = await mkdtemp(join(tmpdir(), 'tajtlisha-settings-'));
+    const filePath = join(dir, 'settings.json');
+    try {
+      if (fileContent !== undefined) {
+        await writeFile(filePath, JSON.stringify(fileContent), 'utf8');
+      }
+      return await run(new SettingsStore({ filePath }));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('defaults to no explicit choices, so Claude Code is off until the user turns it on', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      expect((await store.get()).aiConnector.enabledProviders).toEqual({});
+    });
+  });
+
+  it('keeps only known provider ids with a boolean choice from a hand-edited file', async () => {
+    await withSettingsFile(
+      {
+        aiConnector: {
+          enabledProviders: { openai: false, codex_cli: 'yes', unknown_provider: true, claude_code_cli: true, openrouter: 1 }
+        }
+      },
+      async (store) => {
+        expect((await store.get()).aiConnector.enabledProviders).toEqual({ openai: false, claude_code_cli: true });
+      }
+    );
+  });
+
+  it('treats a missing or non-object enabledProviders as no choices', async () => {
+    await withSettingsFile({ aiConnector: { enabledProviders: ['claude_code_cli'] } }, async (store) => {
+      expect((await store.get()).aiConnector.enabledProviders).toEqual({});
+    });
+    await withSettingsFile({ aiConnector: { enabledProviders: 'off' } }, async (store) => {
+      expect((await store.get()).aiConnector.enabledProviders).toEqual({});
+    });
+  });
+
+  it('persists a single toggle and keeps the other connectors choices', async () => {
+    await withSettingsFile(undefined, async (store) => {
+      await store.update({ aiConnector: { enabledProviders: { claude_code_cli: true } } } as never);
+      const updated = await store.update({ aiConnector: { enabledProviders: { openai: false } } } as never);
+
+      expect(updated.aiConnector.enabledProviders).toEqual({ openai: false, claude_code_cli: true });
+      expect((await store.get()).aiConnector.enabledProviders).toEqual({ openai: false, claude_code_cli: true });
+    });
+  });
+});
+

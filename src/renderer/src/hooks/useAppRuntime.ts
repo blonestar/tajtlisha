@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AiProviderCapabilities, AiProviderId, AuthMode, ProviderModelDescriptor, ProviderStatus, TestConnectionResult } from '../../../shared/types/ai';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
+import { isProviderEnabled } from '../../../shared/ai-providers';
 import type { AppSettings, UiLanguage } from '../../../shared/types/settings';
 import { normalizeUiZoom } from '../../../shared/ui-zoom';
 import { resolveUiLanguage } from '../i18n';
@@ -14,7 +15,10 @@ export type AppRuntime = {
   /** Message from the failed settings load. Null unless phase is 'error'. */
   loadError: string | null;
   settings: AppSettings;
+  /** Connectors the user turned on. Every picker and task uses only these. */
   providers: ProviderStatus[];
+  /** Every provider, turned on or off. Settings > Connectors lists all of them. */
+  allProviders: ProviderStatus[];
   /** Retries the settings and provider load after a failure. */
   reload: () => void;
   changeLanguage: (language: UiLanguage) => void;
@@ -45,7 +49,18 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
   const [phase, setPhase] = useState<AppRuntimePhase>(() => (getApi() ? 'loading' : 'ready'));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [settings, setSettingsState] = useState<AppSettings>(fallbackSettings);
-  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+  const [allProviders, setAllProviders] = useState<ProviderStatus[]>([]);
+  // A connector counts as on only when both its last status and the current settings say so, so a late status
+  // reply can never bring back a connector the user just turned off.
+  const providers = useMemo(
+    () =>
+      allProviders.filter(
+        (provider) => provider.enabled !== false && isProviderEnabled(settings.aiConnector, provider.id)
+      ),
+    [allProviders, settings.aiConnector]
+  );
+  // Only the newest status refresh may apply its result.
+  const refreshSeqRef = useRef(0);
   const [attempt, setAttempt] = useState(0);
   // Latest settings for callbacks that build the next patch. Updated synchronously, before re-render.
   const settingsRef = useRef(settings);
@@ -77,7 +92,7 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
       const statuses = await Promise.all(summaries.map((provider) => api!.ai.getProviderStatus(provider.id)));
       if (cancelled) return;
       setSettings(loadedSettings);
-      setProviders(statuses);
+      setAllProviders(statuses);
       applyLanguage(loadedSettings.uiLanguage);
       setPhase('ready');
     }
@@ -134,17 +149,20 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
   const refreshProviders = useCallback(async () => {
     const api = getApi();
     if (!api) return;
+    const seq = ++refreshSeqRef.current;
     const summaries = await api.ai.listProviders();
-    setProviders(await Promise.all(summaries.map((provider) => api.ai.getProviderStatus(provider.id))));
+    const statuses = await Promise.all(summaries.map((provider) => api.ai.getProviderStatus(provider.id)));
+    if (seq !== refreshSeqRef.current) return;
+    setAllProviders(statuses);
   }, []);
 
   const connectProvider = useCallback(
     async (providerId: AiProviderId, authMode: AuthMode, secret: string) => {
       const api = getApi();
       const status = await api?.ai.connectProvider({ providerId, authMode, secret });
-      const nextProviders = status ? providers.map((provider) => (provider.id === providerId ? status : provider)) : providers;
+      const nextProviders = status ? allProviders.map((provider) => (provider.id === providerId ? status : provider)) : allProviders;
       if (status) {
-        setProviders(nextProviders);
+        setAllProviders(nextProviders);
       }
       const current = settingsRef.current;
       const next = {
@@ -157,13 +175,13 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
       };
       await saveSettings({ aiConnector: next.aiConnector }, next);
     },
-    [providers, saveSettings]
+    [allProviders, saveSettings]
   );
 
   const disconnectProvider = useCallback(async (providerId: AiProviderId) => {
     const status = await getApi()?.ai.disconnectProvider(providerId);
     if (status) {
-      setProviders((current) => current.map((provider) => (provider.id === providerId ? status : provider)));
+      setAllProviders((current) => current.map((provider) => (provider.id === providerId ? status : provider)));
     }
   }, []);
 
@@ -194,6 +212,7 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
     loadError,
     settings,
     providers,
+    allProviders,
     reload,
     changeLanguage,
     updateSettings,
