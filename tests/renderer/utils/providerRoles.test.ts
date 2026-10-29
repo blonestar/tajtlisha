@@ -42,6 +42,26 @@ describe('providerRolesOf', () => {
     });
   });
 
+  it('ignores a turned-off transcription provider, so no role is left on it', () => {
+    const settings = { ...SETTINGS, aiConnector: { ...SETTINGS.aiConnector, activeProviderId: 'claude_code_cli' as const } };
+
+    expect(providerRolesOf(settings, [OPENAI_STATUS])).toEqual({
+      transcriptionId: undefined,
+      textId: undefined,
+      summaryId: undefined
+    });
+  });
+
+  it('keeps a turned-on text provider when the transcription provider is turned off', () => {
+    const settings = {
+      ...SETTINGS,
+      aiConnector: { ...SETTINGS.aiConnector, activeProviderId: 'claude_code_cli' as const, textProviderId: 'codex_cli' as const }
+    };
+
+    expect(providerRolesOf(settings, [codex]).transcriptionId).toBeUndefined();
+    expect(providerRolesOf(settings, [codex]).textId).toBe('codex_cli');
+  });
+
   it('falls back to the text provider when the summary provider is not registered', () => {
     const settings = {
       ...SETTINGS,

@@ -20,6 +20,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   aiConnector: {
     activeProviderId: 'openai',
     authModeByProvider: {},
+    // Empty: every provider takes its default (Claude Code is off).
+    enabledProviders: {},
     // whisper-1 is the only OpenAI transcription model with word timestamps.
     transcriptionModelByProvider: { openai: 'whisper-1' },
     textModelByProvider: { openai: 'gpt-4.1-mini' },

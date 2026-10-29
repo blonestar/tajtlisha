@@ -24,9 +24,12 @@ import '../components/settings/settings.css';
 
 type SettingsPageProps = {
   settings: AppSettings;
+  /** Connectors that are turned on. */
   providers?: ProviderStatus[];
+  /** Every connector, for the Enabled connectors checkboxes. Defaults to providers. */
+  allProviders?: ProviderStatus[];
   onLanguageChange: (language: UiLanguage) => void;
-  onSettingsChange?: (patch: Partial<AppSettings>) => void;
+  onSettingsChange?: (patch: Partial<AppSettings>) => void | Promise<void>;
   onConnectProvider?: (providerId: AiProviderId, authMode: AuthMode, secret: string) => Promise<void>;
   onDisconnectProvider?: (providerId: AiProviderId) => Promise<void>;
   onTestProvider?: (providerId: AiProviderId) => Promise<TestConnectionResult>;
@@ -52,6 +55,7 @@ const sections: { id: SettingsSectionId; icon: typeof Settings }[] = [
 export function SettingsPage({
   settings,
   providers = [],
+  allProviders,
   onLanguageChange,
   onSettingsChange,
   onConnectProvider,
@@ -101,10 +105,12 @@ export function SettingsPage({
               <ConnectorsSection
                 settings={settings}
                 providers={providers}
+                allProviders={allProviders}
                 onConnectProvider={onConnectProvider}
                 onDisconnectProvider={onDisconnectProvider}
                 onTestProvider={onTestProvider}
                 onRefreshProviders={onRefreshProviders}
+                onSettingsChange={onSettingsChange}
               />
             ) : null}
             {section === 'transcription' ? (

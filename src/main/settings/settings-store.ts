@@ -2,8 +2,8 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { REASONING_EFFORTS, type AiProviderId } from '../../shared/types/ai';
-import type { AppSettings, SummarySettings } from '../../shared/types/settings';
+import { AI_PROVIDER_IDS, REASONING_EFFORTS, type AiProviderId } from '../../shared/types/ai';
+import type { AiConnectorSettings, AppSettings, SummarySettings } from '../../shared/types/settings';
 import { MAX_AI_INSTRUCTIONS_CHARS } from '../../shared/ai-instructions';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../shared/summary';
 import { normalizeUiZoom } from '../../shared/ui-zoom';
@@ -122,7 +122,8 @@ function normalizeSettings(settings: AppSettings): AppSettings {
       transcriptCorrectionInstructions: normalizeInstructions(settings.aiConnector.transcriptCorrectionInstructions),
       translationInstructions: normalizeInstructions(settings.aiConnector.translationInstructions),
       textReasoningEffort:
-        REASONING_EFFORT_SETTINGS.find((effort) => effort === settings.aiConnector.textReasoningEffort) ?? 'default'
+        REASONING_EFFORT_SETTINGS.find((effort) => effort === settings.aiConnector.textReasoningEffort) ?? 'default',
+      enabledProviders: normalizeEnabledProviders(settings.aiConnector.enabledProviders)
     },
     summary: normalizeSummary(settings.summary),
     watermark: normalizeWatermark(settings.watermark)
@@ -158,6 +159,17 @@ function normalizeInstructions(value: unknown): string {
     return '';
   }
   return value.slice(0, MAX_AI_INSTRUCTIONS_CHARS);
+}
+
+/** Only known provider ids with a boolean choice are kept. Anything else is dropped, so the provider default applies. */
+function normalizeEnabledProviders(value: unknown): AiConnectorSettings['enabledProviders'] {
+  if (!isPlainObject(value)) {
+    return {};
+  }
+  const choices = AI_PROVIDER_IDS.flatMap((providerId) =>
+    typeof value[providerId] === 'boolean' ? [[providerId, value[providerId]] as const] : []
+  );
+  return Object.fromEntries(choices);
 }
 
 function normalizeModelByProvider(value: unknown): SummarySettings['modelByProvider'] {
