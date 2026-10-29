@@ -109,7 +109,7 @@ export function EditorPage({
     setExactBusy(false);
   }, [inputPath, watermarkKey]);
 
-  const provider = workspace.provider;
+  const { transcriptionProvider, textProvider, summaryProvider } = workspace;
   const pendingTranslations = rowsNeedingTranslation(project).filter(
     (id) => project.captions.find((caption) => caption.id === id)?.original.trim() !== ''
   ).length;
@@ -239,7 +239,9 @@ export function EditorPage({
           <GeneratePanel
             hasSource={source !== null}
             hasAudio={source?.hasAudio ?? false}
-            provider={provider}
+            transcriptionProvider={transcriptionProvider}
+            textProvider={textProvider}
+            summaryProvider={summaryProvider}
             sourceLanguage={languageValue(project.sourceLanguage)}
             targetLanguage={project.targetLanguage}
             captionCount={project.captions.length}

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type {
+  AiProviderCapabilities,
+  AiProviderId,
+  ProviderModelDescriptor
+} from '../../../../shared/types/ai';
 import type { FfmpegStatus } from '../../../../shared/types/media';
 import type { UpdateState } from '../../../../shared/types/updates';
 
@@ -137,4 +142,52 @@ export function useCommitOnUnmount(draft: string, flush: (draft: string) => void
     latest.current = { draft, flush };
   });
   useEffect(() => () => latest.current.flush(latest.current.draft), []);
+}
+
+export type ModelsState = 'idle' | 'loading' | 'ready' | 'error';
+
+/**
+ * Model list of one provider for one capability. Idle unless the provider is
+ * connected and a list function is given. A failed load is an error state, and
+ * the picker still accepts a saved model id.
+ */
+export function useProviderModels(
+  providerId: AiProviderId | undefined,
+  capability: keyof AiProviderCapabilities,
+  connected: boolean,
+  onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>
+): { models: ProviderModelDescriptor[]; state: ModelsState } {
+  const [models, setModels] = useState<ProviderModelDescriptor[]>([]);
+  const [state, setState] = useState<ModelsState>('idle');
+
+  useEffect(() => {
+    if (!providerId || !connected || !onListModels) {
+      setModels([]);
+      setState('idle');
+      return undefined;
+    }
+
+    let active = true;
+    setState('loading');
+    onListModels(providerId, capability).then(
+      (next) => {
+        if (active) {
+          setModels(next);
+          setState('ready');
+        }
+      },
+      () => {
+        if (active) {
+          setModels([]);
+          setState('error');
+        }
+      }
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [providerId, capability, connected, onListModels]);
+
+  return { models, state };
 }

@@ -1,4 +1,5 @@
 import { effectiveMaxCharsPerLine } from '../../../shared/subtitle-geometry';
+import type { ReasoningEffort } from '../../../shared/types/ai';
 import type { ExportOutputs, PolishMode, SummarizeTranscriptRequest } from '../../../shared/types/jobs';
 import type { CaptionRow, ProjectDocument } from '../../../shared/types/project';
 import type { AppSettings } from '../../../shared/types/settings';
@@ -16,6 +17,11 @@ import {
 export function optionalModelId(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+/** 'default' is not sent, so non-reasoning models keep working. Undefined = send no reasoning parameter. */
+export function reasoningEffortOf(choice: 'default' | ReasoningEffort): ReasoningEffort | undefined {
+  return choice === 'default' ? undefined : choice;
 }
 
 /** Language code used when the spoken language is unknown or should be detected. */

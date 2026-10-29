@@ -17,11 +17,13 @@ import {
   captionLineLimit,
   optionalModelId,
   polishFor,
+  reasoningEffortOf,
   sourceLanguageCode,
   spokenLanguageOf,
   summaryTranscript,
   videoContextFor
 } from './workspaceModel';
+import { generateProviderInfo, providerRolesOf } from '../utils/providerRoles';
 
 /** Adds the video context to a transcribe or translate request. Blank context is left out. */
 function withVideoContext(project: ProjectDocument): { videoContext?: string } {
@@ -47,8 +49,12 @@ export type WorkspaceOptions = {
 };
 
 export type Workspace = {
-  /** The active AI provider as the generate panel shows it. Null when none is selected. */
-  provider: GenerateProviderInfo | null;
+  /** The provider for transcription, as the generate panel shows it. Null when none is selected. */
+  transcriptionProvider: GenerateProviderInfo | null;
+  /** The provider for translation and transcript correction. Null when none is selected. */
+  textProvider: GenerateProviderInfo | null;
+  /** The provider for the summary. Null when none is selected. */
+  summaryProvider: GenerateProviderInfo | null;
   jobResult: JobView | null;
   dismissJobResult: () => void;
   cancelJob: () => void;
@@ -94,9 +100,11 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   // Refs hold the latest project and settings for async continuations.
   const projectRef = useRef(state.project);
   const settingsRef = useRef(settings);
+  const providersRef = useRef(providers);
   useLayoutEffect(() => {
     projectRef.current = state.project;
     settingsRef.current = settings;
+    providersRef.current = providers;
   });
 
   const [jobResult, setJobResult] = useState<JobView | null>(null);
@@ -118,18 +126,10 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     setSummaryOpen(false);
   }, [projectId, sourcePath]);
 
-  const activeId = settings.aiConnector.activeProviderId;
-  const activeStatus = providers.find((provider) => provider.id === activeId) ?? null;
-  const provider: GenerateProviderInfo | null = activeId
-    ? {
-        id: activeId,
-        displayName: activeStatus?.displayName ?? activeId,
-        connected: activeStatus?.connected ?? false,
-        canTranscribe: activeStatus?.capabilities.transcription ?? false,
-        canTranslate: activeStatus?.capabilities.translation ?? false,
-        canSummarize: activeStatus?.capabilities.summary ?? false
-      }
-    : null;
+  const roles = providerRolesOf(settings, providers);
+  const transcriptionProvider = generateProviderInfo(roles.transcriptionId, providers);
+  const textProvider = generateProviderInfo(roles.textId, providers);
+  const summaryProvider = generateProviderInfo(roles.summaryId, providers);
 
   const noticeFromError = useCallback(
     (error: unknown): Notice => {
@@ -209,10 +209,14 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
 
     const context = captureJobContext(current);
     const modelId = optionalModelId(config.aiConnector.transcriptionModelByProvider[providerId]);
-    // The correction pass runs only when the setting is on; then it uses the text model, like translation.
+    // The correction pass runs only when the setting is on. It uses the translation provider, model and thinking effort.
+    const textId = providerRolesOf(config, providersRef.current).textId ?? providerId;
+    const correctionEffort = reasoningEffortOf(config.aiConnector.textReasoningEffort);
     const correction = config.aiConnector.correctTranscript
       ? {
-          modelId: optionalModelId(config.aiConnector.textModelByProvider[providerId]),
+          providerId: textId,
+          modelId: optionalModelId(config.aiConnector.textModelByProvider[textId]),
+          ...(correctionEffort ? { reasoningEffort: correctionEffort } : {}),
           instructions: config.aiConnector.transcriptCorrectionInstructions
         }
       : undefined;
@@ -288,7 +292,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   const translate = useCallback(async () => {
     const current = projectRef.current;
     const config = settingsRef.current;
-    const providerId = config.aiConnector.activeProviderId;
+    const providerId = providerRolesOf(config, providersRef.current).textId;
     if (!api || !providerId) return;
 
     const pendingIds = new Set(rowsNeedingTranslation(current));
@@ -307,6 +311,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     );
     const targetLanguage = current.targetLanguage;
     const context = captureJobContext(current);
+    const translateEffort = reasoningEffortOf(config.aiConnector.textReasoningEffort);
     const outcome = await job.run(
       'translate',
       (jobId) =>
@@ -314,6 +319,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
           jobId,
           providerId,
           modelId: optionalModelId(config.aiConnector.textModelByProvider[providerId]),
+          ...(translateEffort ? { reasoningEffort: translateEffort } : {}),
           sourceLanguage: sourceLanguageCode(current),
           targetLanguage,
           captions: rows.map((caption) => ({ id: caption.id, text: caption.original })),
@@ -366,7 +372,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   const summarize = useCallback(async () => {
     const current = projectRef.current;
     const config = settingsRef.current;
-    const providerId = config.aiConnector.activeProviderId;
+    const providerId = providerRolesOf(config, providersRef.current).summaryId;
     if (!api || !providerId) return;
 
     const segments = summaryTranscript(current);
@@ -376,6 +382,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     }
 
     const summarySettings = config.summary;
+    const summaryEffort = reasoningEffortOf(summarySettings.reasoningEffort);
     const context = captureJobContext(current);
     const outcome = await job.run(
       'summarize',
@@ -386,8 +393,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
           modelId:
             optionalModelId(summarySettings.modelByProvider[providerId]) ??
             optionalModelId(config.aiConnector.textModelByProvider[providerId]),
-          // 'default' sends no reasoning parameter, so non-reasoning models keep working.
-          ...(summarySettings.reasoningEffort === 'default' ? {} : { reasoningEffort: summarySettings.reasoningEffort }),
+          ...(summaryEffort ? { reasoningEffort: summaryEffort } : {}),
           systemPrompt: summarySettings.systemPrompt.trim() || DEFAULT_SUMMARY_PROMPT,
           language: sourceLanguageCode(current),
           segments
@@ -464,7 +470,9 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
   }, [job, t]);
 
   return {
-    provider,
+    transcriptionProvider,
+    textProvider,
+    summaryProvider,
     jobResult,
     dismissJobResult: () => setJobResult(null),
     cancelJob,
