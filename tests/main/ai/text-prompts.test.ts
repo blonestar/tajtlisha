@@ -44,6 +44,17 @@ describe('buildSummaryTranscript', () => {
 describe('script instructions', () => {
   const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
 
+  it('asks for standard Serbian vocabulary for both Serbian scripts', () => {
+    for (const targetLanguage of ['sr-Latn', 'sr-Cyrl']) {
+      expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage })).toContain(
+        'Use natural Serbian vocabulary and grammar'
+      );
+    }
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'sr-Latn', targetLanguage: 'en' })).not.toContain(
+      'natural Serbian'
+    );
+  });
+
   it('asks for Latin script for an sr-Latn translation and polish', () => {
     expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn' })).toContain(
       'Never use Cyrillic letters.'

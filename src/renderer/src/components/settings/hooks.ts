@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type {
+  AiProviderCapabilities,
+  AiProviderId,
+  ProviderModelDescriptor
+} from '../../../../shared/types/ai';
 import type { FfmpegStatus } from '../../../../shared/types/media';
 import type { UpdateState } from '../../../../shared/types/updates';
 
@@ -137,4 +142,51 @@ export function useCommitOnUnmount(draft: string, flush: (draft: string) => void
     latest.current = { draft, flush };
   });
   useEffect(() => () => latest.current.flush(latest.current.draft), []);
+}
+
+export type ModelsState = 'idle' | 'loading' | 'ready' | 'error';
+
+/**
+ * Model list of one provider for one capability. Idle unless the provider is
+ * connected and a list function is given. A failed load is an error state, and
+ * the picker still accepts a saved model id.
+ */
+export function useProviderModels(
+  providerId: AiProviderId | undefined,
+  capability: keyof AiProviderCapabilities,
+  connected: boolean,
+  onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>
+): { models: ProviderModelDescriptor[]; state: ModelsState } {
+  // Results are tagged with the provider and capability they belong to, so a
+  // provider switch never shows (or lets the user save) the previous provider's models.
+  const key = providerId && connected && onListModels ? `${providerId}:${capability}` : '';
+  const [loaded, setLoaded] = useState<{ key: string; models: ProviderModelDescriptor[]; state: ModelsState }>({
+    key: '',
+    models: [],
+    state: 'idle'
+  });
+
+  useEffect(() => {
+    if (!key || !providerId || !onListModels) {
+      return undefined;
+    }
+
+    let active = true;
+    onListModels(providerId, capability).then(
+      (next) => {
+        if (active) setLoaded({ key, models: next, state: 'ready' });
+      },
+      () => {
+        if (active) setLoaded({ key, models: [], state: 'error' });
+      }
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [key, providerId, capability, onListModels]);
+
+  if (!key) return { models: [], state: 'idle' };
+  if (loaded.key !== key) return { models: [], state: 'loading' };
+  return { models: loaded.models, state: loaded.state };
 }

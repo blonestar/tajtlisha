@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
-import type { AiProviderCapabilities, ProviderModelDescriptor } from '../../shared/types/ai';
+import type { AiProviderCapabilities, ProviderModelDescriptor, ReasoningEffort } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
 import { validatePath } from '../media/contracts';
 import { transcriptionLanguageCode, languageCodeFromSpokenName } from './language';
@@ -69,8 +69,14 @@ type OpenAiModelsPayload = {
 };
 
 /** Chat-capable model ids; audio, image, embedding, and similar models are left out. */
-const OPENAI_SUMMARY_MODEL_ID = /^(gpt-|chatgpt-|o\d)/;
+const OPENAI_TEXT_MODEL_ID = /^(gpt-|chatgpt-|o\d)/;
 const OPENAI_NON_TEXT_MODEL_ID = /(audio|realtime|transcribe|tts|image|search|embedding|moderation|instruct|whisper|dall-e)/i;
+/**
+ * Older chat models without strict JSON schema output. Caption translation and
+ * polish need structured output, so these are hidden for those tasks.
+ */
+const OPENAI_NO_STRUCTURED_OUTPUT_ID = /^(gpt-3\.5|gpt-4($|-)|chatgpt-)/;
+const OPENAI_LIVE_CAPABILITIES = new Set<keyof AiProviderCapabilities>(['translation', 'subtitlePolish', 'summary']);
 
 type OpenAiTextResponse = {
   output_text?: string;
@@ -113,21 +119,25 @@ export class OpenAiProvider extends BaseAiProvider {
   }
 
   /**
-   * Summary models are listed live so new releases appear without an app update.
-   * If the live call fails, the static descriptors are returned instead.
+   * Text models (translation, polish, summary) are listed live so new releases
+   * appear without an app update. If the live call fails, the static
+   * descriptors are returned instead.
    */
   override async listModels(capability: keyof AiProviderCapabilities): Promise<ProviderModelDescriptor[]> {
-    if (capability !== 'summary') {
+    if (!OPENAI_LIVE_CAPABILITIES.has(capability)) {
       return super.listModels(capability);
     }
 
+    const needsStructuredOutput = capability !== 'summary';
     try {
       const payload = (await this.fetchJson(this.modelsUrl, { method: 'GET' })) as OpenAiModelsPayload;
-      return (payload.data ?? [])
+      const models = (payload.data ?? [])
         .flatMap((model) => (typeof model.id === 'string' ? [model.id] : []))
-        .filter((id) => OPENAI_SUMMARY_MODEL_ID.test(id) && !OPENAI_NON_TEXT_MODEL_ID.test(id))
+        .filter((id) => OPENAI_TEXT_MODEL_ID.test(id) && !OPENAI_NON_TEXT_MODEL_ID.test(id))
+        .filter((id) => !needsStructuredOutput || !OPENAI_NO_STRUCTURED_OUTPUT_ID.test(id))
         .sort((a, b) => a.localeCompare(b))
-        .map((id) => ({ id, label: id, capability: 'summary' }));
+        .map((id) => ({ id, label: id, capability }));
+      return models.length > 0 ? models : super.listModels(capability);
     } catch (error) {
       if (error instanceof AppError && error.code === 'JOB_CANCELED') throw error;
       return super.listModels(capability);
@@ -161,6 +171,7 @@ export class OpenAiProvider extends BaseAiProvider {
       model: request.modelId ?? OPENAI_DEFAULT_TEXT_MODEL,
       instructions: buildTranslationInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -171,6 +182,7 @@ export class OpenAiProvider extends BaseAiProvider {
       model: request.modelId ?? OPENAI_DEFAULT_TEXT_MODEL,
       instructions: buildPolishInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -180,6 +192,7 @@ export class OpenAiProvider extends BaseAiProvider {
     model: string;
     instructions: string;
     items: ProviderTextItem[];
+    reasoningEffort?: ReasoningEffort;
     signal?: AbortSignal;
   }): Promise<string> {
     const response = (await this.fetchJson(`${OPENAI_API}/responses`, {
@@ -199,7 +212,8 @@ export class OpenAiProvider extends BaseAiProvider {
             strict: true,
             schema: CAPTION_ITEMS_SCHEMA
           }
-        }
+        },
+        ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {})
       }),
       signal: input.signal
     })) as OpenAiTextResponse;

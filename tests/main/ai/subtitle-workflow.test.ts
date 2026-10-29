@@ -589,6 +589,16 @@ describe('SubtitleWorkflowService.translate', () => {
     expect(stagesOf(progress.events)).toEqual(['translating', 'polishing']);
   });
 
+  it('sends the reasoning effort to translation and polish', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'conservative', reasoningEffort: 'high' }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+    expect(registry.polishTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+  });
+
   it('does not call polish when polish is none', async () => {
     const registry = fakeRegistry();
     const { service } = createService({ registry });
@@ -857,6 +867,18 @@ describe('SubtitleWorkflowService.transcribe with transcript correction', () => 
     const request = (registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1];
     expect(request.modelId).toBeUndefined();
     expect(request.customInstructions).toBe('');
+  });
+
+  it('sends the correction reasoning effort, and none when it is not set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ correction: { instructions: '', reasoningEffort: 'medium' } }));
+    await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    const [first, second] = (registry.polishTexts.mock.calls as Array<[string, ProviderPolishRequest]>).map(([, request]) => request);
+    expect(first.reasoningEffort).toBe('medium');
+    expect(second).not.toHaveProperty('reasoningEffort');
   });
 
   it('matches corrected text to captions by id, even when the provider reverses the order', async () => {
@@ -1141,6 +1163,31 @@ describe('SubtitleWorkflowService video context', () => {
       'openai',
       expect.objectContaining({ videoContext: CONTEXT, customInstructions: 'Fix names.' })
     );
+  });
+
+  it('sends the correction pass to its own text provider when one is set, and keeps translation on the request provider', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(
+      createRequest({
+        providerId: 'openai',
+        correction: { providerId: 'codex_cli', modelId: 'gpt-fix', instructions: 'Fix names.' }
+      })
+    );
+
+    expect(registry.transcribe).toHaveBeenCalledWith('openai', expect.anything());
+    expect(registry.polishTexts).toHaveBeenCalledWith('codex_cli', expect.objectContaining({ mode: 'transcript_correction' }));
+    expect(registry.polishTexts).not.toHaveBeenCalledWith('openai', expect.anything());
+  });
+
+  it('uses the request provider for the correction pass when no correction provider is set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ providerId: 'openrouter', correction: { instructions: '' } }));
+
+    expect(registry.polishTexts).toHaveBeenCalledWith('openrouter', expect.objectContaining({ mode: 'transcript_correction' }));
   });
 
   it('sends no video context to polish when the transcript is not corrected', async () => {

@@ -1,112 +1,32 @@
 import type { FormEvent, ReactElement } from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  AiProviderCapabilities,
-  AiProviderId,
-  ProviderModelDescriptor,
-  ProviderStatus,
-  TestConnectionResult
-} from '../../../../shared/types/ai';
-import type { AppSettings } from '../../../../shared/types/settings';
+import type { AiProviderId, ProviderStatus, TestConnectionResult } from '../../../../shared/types/ai';
 import { userFacingErrorMessage } from '../../utils/error-message';
 import { SettingsRow } from './SettingsPrimitives';
 
-/** Timing whisper-1 gives; the hint names it because OpenAI retires it. */
-const EXACT_TIMING_MODEL = 'whisper-1';
-
 type ProviderPanelProps = {
   provider: ProviderStatus;
-  isActive: boolean;
-  settings: AppSettings;
-  onSettingsChange?: (patch: Partial<AppSettings>) => void;
-  onActivate?: (providerId: AiProviderId) => void;
   onConnectProvider?: (providerId: AiProviderId, authMode: 'api_key', secret: string) => Promise<void>;
   onDisconnectProvider?: (providerId: AiProviderId) => Promise<void>;
   onTestProvider?: (providerId: AiProviderId) => Promise<TestConnectionResult>;
-  onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
 };
 
 type Notice = { tone: 'success' | 'error'; text: string };
 
-type ModelsState = 'idle' | 'loading' | 'ready' | 'error';
-
-export function ProviderPanel({
-  provider,
-  isActive,
-  settings,
-  onSettingsChange,
-  onActivate,
-  onConnectProvider,
-  onDisconnectProvider,
-  onTestProvider,
-  onListModels
-}: ProviderPanelProps): ReactElement {
+/** Connects an API provider with its key. Models are chosen in the Transcription and Translation tabs. */
+export function ProviderPanel({ provider, onConnectProvider, onDisconnectProvider, onTestProvider }: ProviderPanelProps): ReactElement {
   const { t } = useTranslation();
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [transcriptionModels, setTranscriptionModels] = useState<ProviderModelDescriptor[]>([]);
-  const [textModels, setTextModels] = useState<ProviderModelDescriptor[]>([]);
-  const [modelsState, setModelsState] = useState<ModelsState>('idle');
 
   const providerId = provider.id;
   const connected = provider.connected;
   const supportsApiKey = provider.authModes.includes('api_key');
   const keyInputId = `settings-ai-key-${providerId}`;
-  const transcriptionId = settings.aiConnector.transcriptionModelByProvider[providerId] ?? '';
-  const textId = settings.aiConnector.textModelByProvider[providerId] ?? '';
-  const selectedTranscription = transcriptionModels.find((model) => model.id === transcriptionId);
 
-  useEffect(() => {
-    if (!connected || !onListModels) {
-      setTranscriptionModels([]);
-      setTextModels([]);
-      setModelsState('idle');
-      return undefined;
-    }
-
-    let active = true;
-    setModelsState('loading');
-    Promise.all([onListModels(providerId, 'transcription'), onListModels(providerId, 'translation')])
-      .then(([nextTranscription, nextText]) => {
-        if (active) {
-          setTranscriptionModels(nextTranscription);
-          setTextModels(nextText);
-          setModelsState('ready');
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setTranscriptionModels([]);
-          setTextModels([]);
-          setModelsState('error');
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [providerId, connected, onListModels]);
-
-  // "Default" is stored as ''. Settings patches merge maps deeply, so a deleted key would keep its old model.
-  // Requests treat a blank id as absent (see optionalModelId in useWorkspace).
-  function updateModel(kind: 'transcription' | 'translation', modelId: string): void {
-    const connector = settings.aiConnector;
-    onSettingsChange?.({
-      aiConnector:
-        kind === 'transcription'
-          ? {
-              ...connector,
-              transcriptionModelByProvider: { ...connector.transcriptionModelByProvider, [providerId]: modelId }
-            }
-          : {
-              ...connector,
-              textModelByProvider: { ...connector.textModelByProvider, [providerId]: modelId }
-            }
-    });
-  }
-
+  // The typed key leaves React state as soon as it is submitted.
   async function handleConnect(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     const key = secret.trim();
@@ -114,7 +34,6 @@ export function ProviderPanel({
       return;
     }
 
-    // The typed key leaves React state as soon as it is submitted.
     setSecret('');
     setNotice(null);
     setBusy(true);
@@ -208,11 +127,6 @@ export function ProviderPanel({
               {t('settings.ai.testConnection')}
             </button>
           ) : null}
-          {connected && !isActive ? (
-            <button type="button" className="btn" disabled={busy} onClick={() => onActivate?.(providerId)}>
-              {t('settings.ai.useForSubtitles')}
-            </button>
-          ) : null}
           {connected ? (
             <button type="button" className="btn btn-ghost btn-danger" disabled={!onDisconnectProvider || busy} onClick={() => void handleDisconnect()}>
               {t('settings.ai.disconnect')}
@@ -225,99 +139,6 @@ export function ProviderPanel({
           </p>
         ) : null}
       </SettingsRow>
-
-      {connected ? (
-        <>
-          <SettingsRow
-            label={t('settings.ai.transcriptionModel')}
-            htmlFor={`${keyInputId}-transcription`}
-            hint={
-              providerId === 'openai' ? (
-                <>
-                  {t('settings.ai.transcriptionHint')} {t('settings.ai.whisperRetired', { model: EXACT_TIMING_MODEL })}
-                </>
-              ) : (
-                t('settings.ai.transcriptionHint')
-              )
-            }
-          >
-            <div className="settings-inline">
-              <select
-                id={`${keyInputId}-transcription`}
-                className="select"
-                value={transcriptionId}
-                onChange={(event) => updateModel('transcription', event.currentTarget.value)}
-              >
-                <option value="">{t('settings.ai.modelDefault')}</option>
-                {modelOptions(transcriptionModels, transcriptionId).map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.label}
-                  </option>
-                ))}
-              </select>
-              <TimingBadge model={selectedTranscription} />
-            </div>
-            <ModelsStatus state={modelsState} />
-          </SettingsRow>
-
-          <SettingsRow label={t('settings.ai.textModel')} htmlFor={`${keyInputId}-text`} hint={t('settings.ai.textHint')}>
-            <select
-              id={`${keyInputId}-text`}
-              className="select"
-              value={textId}
-              onChange={(event) => updateModel('translation', event.currentTarget.value)}
-            >
-              <option value="">{t('settings.ai.modelDefault')}</option>
-              {modelOptions(textModels, textId).map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-          </SettingsRow>
-
-        </>
-      ) : (
-        <p className="settings-card-note muted">{t('settings.ai.connectToChooseModels')}</p>
-      )}
     </section>
   );
-}
-
-function ModelsStatus({ state }: { state: ModelsState }): ReactElement | null {
-  const { t } = useTranslation();
-
-  if (state === 'loading') {
-    return <p className="settings-row-hint">{t('settings.ai.modelsLoading')}</p>;
-  }
-
-  if (state === 'error') {
-    return <p className="message message-error">{t('settings.ai.modelsError')}</p>;
-  }
-
-  return null;
-}
-
-function TimingBadge({ model }: { model?: ProviderModelDescriptor }): ReactElement | null {
-  const { t } = useTranslation();
-
-  switch (model?.timestamps) {
-    case 'word':
-      return <span className="badge badge-success">{t('settings.ai.timing.word')}</span>;
-    case 'none':
-      return <span className="badge badge-warning">{t('settings.ai.timing.none')}</span>;
-    case 'segment':
-      return <span className="badge badge-muted">{t('settings.ai.timing.segment')}</span>;
-    default:
-      return null;
-  }
-}
-
-/** Keeps a saved model selectable even when the provider no longer lists it. */
-function modelOptions(models: ProviderModelDescriptor[], selectedModelId: string): ProviderModelDescriptor[] {
-  if (!selectedModelId || models.some((model) => model.id === selectedModelId)) {
-    return models;
-  }
-
-  return [{ id: selectedModelId, label: selectedModelId, capability: 'translation' }, ...models];
 }

@@ -1,28 +1,115 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AiProviderCapabilities, AiProviderId, ProviderModelDescriptor, ProviderStatus } from '../../../../shared/types/ai';
 import type { AppSettings, AiConnectorSettings } from '../../../../shared/types/settings';
+import { providerRolesOf } from '../../utils/providerRoles';
+import { useProviderModels } from './hooks';
 import { InstructionsRow } from './InstructionsRow';
+import { ModelPicker, ProviderSelect } from './ProviderControls';
 import { SegmentedControl, SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
 type TranscriptionSettingsProps = {
   settings: AppSettings;
+  providers?: ProviderStatus[];
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
+  onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
+  /** Opens the Connectors tab. Shown as a button when no connected provider can transcribe. */
+  onOpenConnectors?: () => void;
 };
 
 const MIN_CHARS_PER_LINE = 20;
 const MAX_CHARS_PER_LINE = 60;
 
-/** The Transcription tab: how the speech is recognized, split into captions, and corrected afterwards. */
-export function TranscriptionSettings({ settings, onSettingsChange }: TranscriptionSettingsProps): ReactElement {
+/** Timing whisper-1 gives; the hint names it because OpenAI retires it. */
+const EXACT_TIMING_MODEL = 'whisper-1';
+
+/** The Transcription tab: which provider transcribes, how the speech is split into captions, and the correction pass. */
+export function TranscriptionSettings({
+  settings,
+  providers = [],
+  onSettingsChange,
+  onListModels,
+  onOpenConnectors
+}: TranscriptionSettingsProps): ReactElement {
   const { t } = useTranslation();
   const connector = settings.aiConnector;
+  const { transcriptionId } = providerRolesOf(settings, providers);
+  const chosen = providers.find((provider) => provider.id === transcriptionId);
+  const canTranscribe = providers.some((provider) => provider.connected && provider.capabilities.transcription);
+  const { models, state } = useProviderModels(transcriptionId, 'transcription', Boolean(chosen?.connected), onListModels);
+  const modelId = (transcriptionId && connector.transcriptionModelByProvider[transcriptionId]) || '';
 
   function updateConnector(patch: Partial<AiConnectorSettings>): void {
     onSettingsChange?.({ aiConnector: { ...connector, ...patch } });
   }
 
+  // "Default" is stored as ''. Settings patches merge maps deeply, so a deleted key would keep its old model.
+  // Requests treat a blank id as absent (see optionalModelId in useWorkspace).
+  function updateModel(transcriptionModel: string): void {
+    if (!transcriptionId) return;
+    updateConnector({
+      transcriptionModelByProvider: { ...connector.transcriptionModelByProvider, [transcriptionId]: transcriptionModel }
+    });
+  }
+
   return (
     <>
+      <h3 className="settings-subheading">{t('settings.ai.providerAndModel')}</h3>
+      <SettingsRow
+        label={t('settings.ai.transcriptionProvider')}
+        htmlFor="settings-transcription-provider"
+        hint={t('settings.ai.transcriptionProviderHint')}
+      >
+        <ProviderSelect
+          id="settings-transcription-provider"
+          value={transcriptionId ?? ''}
+          providers={providers}
+          capability="transcription"
+          onChange={(providerId) => {
+            if (providerId) updateConnector({ activeProviderId: providerId });
+          }}
+        />
+        {canTranscribe ? null : (
+          <div className="settings-inline settings-provider-notice">
+            <span className="muted">{t('settings.ai.noTranscriptionProvider')}</span>
+            {onOpenConnectors ? (
+              <button type="button" className="btn btn-sm" onClick={onOpenConnectors}>
+                {t('settings.ai.openConnectors')}
+              </button>
+            ) : null}
+          </div>
+        )}
+        {canTranscribe && transcriptionId && !chosen?.connected ? (
+          <p className="settings-row-hint">{t('settings.ai.connectToChooseModels')}</p>
+        ) : null}
+      </SettingsRow>
+
+
+      {chosen?.connected ? (
+        <SettingsRow
+          label={t('settings.ai.transcriptionModel')}
+          htmlFor="settings-transcription-model"
+          hint={
+            transcriptionId === 'openai' ? (
+              <>
+                {t('settings.ai.transcriptionHint')} {t('settings.ai.whisperRetired', { model: EXACT_TIMING_MODEL })}
+              </>
+            ) : (
+              t('settings.ai.transcriptionHint')
+            )
+          }
+        >
+          <ModelPicker
+            id="settings-transcription-model"
+            value={modelId}
+            models={models}
+            state={state}
+            showTiming
+            onChange={updateModel}
+          />
+        </SettingsRow>
+      ) : null}
+
       <SettingsRow
         label={t('settings.captions.detectLanguage')}
         htmlFor="settings-auto-detect"

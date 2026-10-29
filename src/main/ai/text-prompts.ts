@@ -203,13 +203,20 @@ function formatClockTime(ms: number): string {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 }
 
-/** Explicit script rule for Serbian targets; empty for other languages. */
+/**
+ * Models sometimes slip words from related Slavic languages into Serbian
+ * (for example Polish/Czech "ale" instead of "ali").
+ */
+const SERBIAN_VOCABULARY_RULE =
+  'Use natural Serbian vocabulary and grammar, as a native Serbian speaker would write it. Never use words from other Slavic languages, such as Polish, Czech, Slovenian, or Russian.';
+
+/** Explicit script and vocabulary rules for Serbian targets; empty for other languages. */
 function scriptInstruction(language: string): string {
   if (language === 'sr-Latn') {
-    return 'Write Serbian only in Latin script (with č, ć, š, ž, đ). Never use Cyrillic letters.';
+    return `Write Serbian only in Latin script (with č, ć, š, ž, đ). Never use Cyrillic letters. ${SERBIAN_VOCABULARY_RULE}`;
   }
   if (language === 'sr-Cyrl') {
-    return 'Write Serbian only in Cyrillic script. Never use Latin letters for Serbian words.';
+    return `Write Serbian only in Cyrillic script. Never use Latin letters for Serbian words. ${SERBIAN_VOCABULARY_RULE}`;
   }
   return '';
 }

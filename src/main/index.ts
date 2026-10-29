@@ -131,7 +131,9 @@ app.whenReady().then(async () => {
     filePath: join(app.getPath('userData'), 'credentials.json'),
     crypto: safeStorage
   });
-  const aiRegistry = createDefaultAiProviderRegistry(credentialStore);
+  const aiRegistry = createDefaultAiProviderRegistry(credentialStore, {
+    enableClaudeCode: !app.isPackaged || process.env.TAJTLISHA_ENABLE_CLAUDE_CODE === '1'
+  });
   const ffmpeg = new FfmpegService();
   const mediaService = new MediaService(ffmpeg);
   const exporter = new ProjectExportService({ fontsDir: bundledFontsDir() });

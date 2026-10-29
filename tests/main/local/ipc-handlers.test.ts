@@ -431,6 +431,16 @@ describe('ai:listModels capability validation', () => {
     expect(listModels).toHaveBeenCalledWith('openai', 'summary');
     await expect(ipc.invoke(IPC_CHANNELS.aiListModels, fakeOwner(1), 'openai', 'vision')).rejects.toThrow('capability must be one of');
   });
+
+  it('accepts the local_cli auth mode without a secret', async () => {
+    const ipc = fakeIpc();
+    const connectProvider = vi.fn(async () => ({ connected: true }));
+    registerAiIpc({ ipc, registry: { connectProvider } as never });
+
+    await ipc.invoke(IPC_CHANNELS.aiConnectProvider, fakeOwner(1), { providerId: 'codex_cli', authMode: 'local_cli' });
+
+    expect(connectProvider).toHaveBeenCalledWith({ providerId: 'codex_cli', authMode: 'local_cli' });
+  });
 });
 
 describe('project:selectVideo', () => {
@@ -958,6 +968,39 @@ describe('workflow:transcribe correction validation', () => {
     expect(transcribe.mock.calls[0]?.[0]).not.toHaveProperty('correction');
   });
 
+  it('passes the correction text provider through and accepts a local CLI provider id', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+      ...transcribeRequest('job-1'),
+      correction: { providerId: 'codex_cli', instructions: '' }
+    });
+
+    expect(transcribe.mock.calls[0]?.[0]).toMatchObject({ correction: { providerId: 'codex_cli', instructions: '' } });
+  });
+
+  it('passes the correction reasoning effort through', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+      ...transcribeRequest('job-1'),
+      correction: { instructions: '', reasoningEffort: 'low' }
+    });
+
+    expect(transcribe.mock.calls[0]?.[0]).toMatchObject({ correction: { reasoningEffort: 'low' } });
+  });
+
+  it('rejects an unknown correction provider id', async () => {
+    const { ipc } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+        ...transcribeRequest('job-1'),
+        correction: { providerId: 'mystery', instructions: '' }
+      })
+    ).rejects.toThrow('[UNKNOWN] providerId must be one of openai, openrouter, codex_cli, claude_code_cli.');
+  });
+
   it('accepts a correction with a model and instructions', async () => {
     const { ipc, transcribe } = setup();
 
@@ -1044,6 +1087,19 @@ describe('workflow:translate instructions validation', () => {
 
     expect(translate.mock.calls[0]?.[0]).toMatchObject({ instructions: 'Use formal address.' });
     expect(translate.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ instructions: undefined }));
+  });
+
+  it('passes a known reasoning effort through and rejects an unknown one', async () => {
+    const { ipc, translate } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ reasoningEffort: 'high' }));
+    await ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest());
+
+    expect(translate.mock.calls[0]?.[0]).toMatchObject({ reasoningEffort: 'high' });
+    expect(translate.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ reasoningEffort: undefined }));
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranslate, fakeOwner(1), translateRequest({ reasoningEffort: 'ultra' }))
+    ).rejects.toThrow('reasoningEffort');
   });
 
   it('accepts instructions at the limit and rejects a longer text or a non-string', async () => {

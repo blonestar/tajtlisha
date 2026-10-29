@@ -146,6 +146,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -165,6 +166,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -192,7 +194,7 @@ export class SubtitleWorkflowService {
 
     try {
       const corrected = await this.runTextStage(items, 'correcting', context, (batch) =>
-        this.registry.polishTexts(request.providerId, {
+        this.registry.polishTexts(correction.providerId ?? request.providerId, {
           items: batch,
           language,
           mode: 'transcript_correction',
@@ -201,6 +203,7 @@ export class SubtitleWorkflowService {
           maxLinesPerCaption: request.maxLinesPerCaption,
           customInstructions: correction.instructions,
           videoContext: request.videoContext,
+          ...(correction.reasoningEffort ? { reasoningEffort: correction.reasoningEffort } : {}),
           signal: context.signal
         })
       );

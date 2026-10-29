@@ -61,16 +61,31 @@ Pravila:
 
 ## AI connector
 
-AI opcije su u UI-u podeljene u tabove: Connectors (provider-i, kljucevi, modeli), Transcription
-(jezik, raspored titlova, AI ispravka transkripta) i Translation (dorada prevoda, uputstva za prevod).
-Summary je zaseban tab.
+AI opcije su u UI-u podeljene u tabove:
+
+- Connectors: samo povezivanje. Svi registrovani provider-i, API kljucevi, status lokalnog CLI-ja, test i
+  disconnect. Nema izbora modela.
+- Transcription: provider za transkripciju (`aiConnector.activeProviderId`, samo provider-i koji umeju da
+  transkribuju) i model, jezik, raspored titlova, AI ispravka transkripta.
+- Translation: provider za tekst (`aiConnector.textProviderId`; prevod, dorada i ispravka transkripta), model,
+  thinking effort (`aiConnector.textReasoningEffort`), dorada prevoda, uputstva za prevod.
+- Summary: zaseban provider (`summary.providerId`, prazno = isto kao za prevod), model, thinking effort, prompt.
+
+Provider koji nije registrovan u ovom build-u (npr. Claude Code u javnom izdanju) pada nazad: tekst na provider
+za transkripciju, sazetak na provider za tekst (`src/shared/ai-providers.ts`). Povezivanje novog API provider-a
+preuzima transkripciju samo ako nijedan povezan provider za transkripciju nije izabran.
 
 ### Provider izbor
 
-MVP provider-i:
+Provider-i:
 
 - OpenAI,
-- OpenRouter.
+- OpenRouter,
+- Codex CLI (lokalno, experimental; samo tekst),
+- Claude Code (lokalno, experimental; samo tekst; samo dev build ili `TAJTLISHA_ENABLE_CLAUDE_CODE=1`).
+
+Lokalni CLI provider-i nemaju kljuc: kartica pokazuje Found / Not found, panel pokazuje verziju i putanju
+CLI-ja, dugmad Check again i Test connection (proverava login CLI-ja). Detalji su u `docs/ai-providers.md`.
 
 UI mora da prikaze:
 
@@ -90,10 +105,10 @@ OpenRouter:
 
 - API key / Bearer token.
 
-Codex auth:
+Codex CLI / Claude Code:
 
-- samo experimental/dev ako se nadje podrzan nacin,
-- ne citati direktno `~/.codex/auth.json` kao production mehanizam.
+- bez kljuca; aplikacija pokrece instalirani CLI koji koristi sopstveni login,
+- nikad ne citati `~/.codex/auth.json` ni Claude Code auth fajlove.
 
 ### Model opcije
 
@@ -134,7 +149,8 @@ Opcije:
   vidljiva i izmenljiva i kada je iskljucen,
 - sistemski prompt (do 8000 znakova, dugme za vracanje podrazumevanog; prazan prompt se vraca na podrazumevani),
 - thinking effort: Default (ne salje se) ili `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`,
-- model za aktivni provider (slobodan unos sa predlozima; prazno = isti kao model za tekst); cuva se po provideru.
+- provider za sazetak (prazno = isto kao za prevod),
+- model za taj provider (slobodan unos sa predlozima; prazno = isti kao model za tekst); cuva se po provideru.
 
 ### Credential prikaz
 
