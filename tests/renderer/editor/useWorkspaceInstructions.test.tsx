@@ -7,7 +7,7 @@ import type { AppSettings } from '../../../src/shared/types/settings';
 import { useWorkspace } from '../../../src/renderer/src/hooks/useWorkspace';
 import type { JobRunner } from '../../../src/renderer/src/state/useJobRunner';
 import { useProjectStore } from '../../../src/renderer/src/state/useProjectStore';
-import { caption, makeProject, SETTINGS } from './fixtures';
+import { caption, makeProject, OPENAI_STATUS, SETTINGS } from './fixtures';
 import { createFakeApi } from '../state/fakeApi';
 import { createI18n } from '../../../src/renderer/src/i18n';
 
@@ -56,7 +56,7 @@ function setup(
   const hook = renderHook(
     () => {
       const store = useProjectStore({ targetLanguage: 'en', api: fake.api });
-      const workspace = useWorkspace({ store, settings, providers: [], job: directJobRunner() });
+      const workspace = useWorkspace({ store, settings, providers: [OPENAI_STATUS], job: directJobRunner() });
       return { store, workspace };
     },
     { wrapper }

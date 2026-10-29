@@ -16,6 +16,7 @@ import { createBroadcast, registerUpdatesIpc } from './ipc/updates.ipc';
 import type { DesktopDialogs, DesktopShell, MessageBoxRequest, OpenDialogRequest } from './ipc/types';
 import { registerWorkflowIpc } from './ipc/workflow.ipc';
 import { guardIpc, isRendererEntryUrl, rendererEntryFor, type SenderPolicy } from './ipc/trusted-sender';
+import { isProviderEnabled } from '../shared/ai-providers';
 import { mainStringsFor, resolveMainLanguage } from './i18n';
 import { JobRegistry } from './jobs/job-registry';
 import { MediaService } from './media';
@@ -132,7 +133,7 @@ app.whenReady().then(async () => {
     crypto: safeStorage
   });
   const aiRegistry = createDefaultAiProviderRegistry(credentialStore, {
-    enableClaudeCode: !app.isPackaged || process.env.TAJTLISHA_ENABLE_CLAUDE_CODE === '1'
+    isProviderEnabled: async (providerId) => isProviderEnabled((await settingsStore.get()).aiConnector, providerId)
   });
   const ffmpeg = new FfmpegService();
   const mediaService = new MediaService(ffmpeg);

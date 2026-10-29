@@ -114,7 +114,14 @@ claude -p --output-format json --json-schema <schema> --system-prompt <instrukci
 
 Summary koristi istu komandu bez `--json-schema`. Prijava se proverava sa `claude auth status` (JSON polje `loggedIn`). `--bare` se ne koristi, jer preskace prijavu pretplatom. `none` i `minimal` se mapiraju na `low`. Modeli su CLI aliasi: `fable`, `opus`, `sonnet`, `haiku`.
 
-Claude Code nije vidljiv u paketovanim (instaliranim) build-ovima, osim ako je `TAJTLISHA_ENABLE_CLAUDE_CODE=1`. Razlog: Anthropic ne dozvoljava third-party proizvodima da nude koriscenje Claude pretplate bez odobrenja. U `pnpm dev` build-u je uvek vidljiv.
+Claude Code je uvek registrovan, u svim build-ovima (paketovanom i `pnpm dev`), ali je podrazumevano iskljucen. Korisnik ga ukljucuje u Settings > Connectors > Enabled connectors. Ispod njegovog reda uvek stoji upozorenje: korisenje Claude pretplate iz third-party aplikacije moze biti u suprotnosti sa Anthropic-ovim uslovima, Anthropic moze da ogranici ili zatvori nalog, a Tajtlisha ne snosi odgovornost; ukljucivanje je korisnikova odluka i odgovornost. Razlog: Anthropic ne dozvoljava third-party proizvodima da nude koriscenje Claude pretplate bez odobrenja. Nema env varijable za ukljucivanje; izbor se cuva u `aiConnector.enabledProviders`.
+
+Iskljuceni konektor (`enabledProviders[id] === false`, ili podrazumevani iskljuceni provider) se ne pokrece:
+
+- `getProviderStatus` vraca `enabled: false`, `connected: false` i poruku da je konektor iskljucen. Ne radi CLI detekcija i ne cita se kredencijal.
+- `testConnection`, `listModels`, `connectProvider`, `transcribe`, `translateTexts`, `polishTexts` i `summarizeText` bacaju `PROVIDER_DISABLED`.
+- `disconnectProvider` ostaje dostupan, pa korisnik moze da obrise kljuc iskljucenog konektora.
+- Renderer ne nudi iskljucen provider ni u karticama ni u izboru za zadatke (`providers` u `useAppRuntime` sadrzi samo ukljucene).
 
 Privatnost i greske:
 

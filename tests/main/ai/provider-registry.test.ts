@@ -9,8 +9,9 @@ import { AiProviderRegistry, createDefaultAiProviderRegistry } from '../../../sr
 import { ClaudeCodeCliProvider } from '../../../src/main/ai/claude-code-cli-provider';
 import { CodexCliProvider } from '../../../src/main/ai/codex-cli-provider';
 import type { AiProvider } from '../../../src/main/ai/provider';
-import type { AiProviderCapabilities, ProviderSummary } from '../../../src/shared/types/ai';
+import type { AiProviderCapabilities, AiProviderId, ProviderSummary } from '../../../src/shared/types/ai';
 import { AppError } from '../../../src/shared/errors';
+import { isProviderEnabled } from '../../../src/shared/ai-providers';
 import { failed, fakeRunner, installedResolveDeps, missingResolveDeps, ok } from './local-cli-fakes';
 
 function createRegistry(store = new MemoryCredentialStore()): AiProviderRegistry {
@@ -26,10 +27,16 @@ afterEach(() => {
 });
 
 describe('AI provider registry', () => {
-  it('lists OpenAI, OpenRouter, and Codex CLI with truthful capability flags', async () => {
+  it('lists every connector with truthful capability flags, Claude Code (local) included in every build', async () => {
     const providers = await createRegistry().listProviders();
 
-    expect(providers.map((provider) => provider.id)).toEqual(['openai', 'openrouter', 'codex_cli']);
+    expect(providers.map((provider) => provider.id)).toEqual(['openai', 'openrouter', 'codex_cli', 'claude_code_cli']);
+    expect(providers.find((provider) => provider.id === 'claude_code_cli')).toMatchObject({
+      displayName: 'Claude Code (local)',
+      authModes: ['local_cli'],
+      experimental: true,
+      capabilities: { transcription: false, translation: true, subtitlePolish: true, summary: true }
+    });
     expect(providers.find((provider) => provider.id === 'openrouter')?.capabilities).toMatchObject({
       transcription: true,
       wordTimestamps: false,
@@ -41,18 +48,6 @@ describe('AI provider registry', () => {
       authModes: ['local_cli'],
       experimental: true,
       capabilities: { transcription: false, translation: true, subtitlePolish: true, summary: true }
-    });
-  });
-
-  it('hides Claude Code (local) unless enableClaudeCode is set', async () => {
-    const hidden = await createDefaultAiProviderRegistry(new MemoryCredentialStore(), { enableClaudeCode: false }).listProviders();
-    const shown = await createDefaultAiProviderRegistry(new MemoryCredentialStore(), { enableClaudeCode: true }).listProviders();
-
-    expect(hidden.map((provider) => provider.id)).not.toContain('claude_code_cli');
-    expect(shown.find((provider) => provider.id === 'claude_code_cli')).toMatchObject({
-      displayName: 'Claude Code (local)',
-      authModes: ['local_cli'],
-      experimental: true
     });
   });
 
@@ -365,3 +360,107 @@ describe('AI provider registry', () => {
     expect(new OpenRouterProvider({ credentialStore: new MemoryCredentialStore() }).id).toBe('openrouter');
   });
 });
+
+describe('turned-off connectors', () => {
+  it('reports a turned-off connector as disabled without detecting its CLI or reading its credential', async () => {
+    const store = new MemoryCredentialStore();
+    const getSpy = vi.spyOn(store, 'get');
+    const claude = new ClaudeCodeCliProvider({ runner: fakeRunner(() => ok('2.1.312 (Claude Code)\n')).runner, resolveDeps: installedResolveDeps('claude') });
+    const detectSpy = vi.spyOn(claude, 'detectLocalCli');
+    const registry = new AiProviderRegistry([claude], store, { isProviderEnabled: () => false });
+
+    await expect(registry.getProviderStatus('claude_code_cli')).resolves.toMatchObject({
+      id: 'claude_code_cli',
+      enabled: false,
+      connected: false,
+      message: 'Claude Code (local) is turned off.'
+    });
+    expect(detectSpy).not.toHaveBeenCalled();
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports an API-key connector as disabled without reading its stored key', async () => {
+    const store = new MemoryCredentialStore();
+    await store.set({ providerId: 'openai', authMode: 'api_key', secret: 'sk-test-secret-1234' });
+    const getSpy = vi.spyOn(store, 'get');
+    const registry = createDefaultAiProviderRegistry(store, { isProviderEnabled: (providerId) => providerId !== 'openai' });
+
+    await expect(registry.getProviderStatus('openai')).resolves.toMatchObject({
+      enabled: false,
+      connected: false,
+      message: 'OpenAI is turned off.'
+    });
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
+  it('refuses every operation for a turned-off connector with PROVIDER_DISABLED, and makes no network call', async () => {
+    const store = new MemoryCredentialStore();
+    await store.set({ providerId: 'openai', authMode: 'api_key', secret: 'sk-test-secret-1234' });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const registry = createDefaultAiProviderRegistry(store, { isProviderEnabled: (providerId) => providerId !== 'openai' });
+    const textRequest = {
+      items: [{ id: 'c1', text: 'Hello' }],
+      sourceLanguage: 'en',
+      targetLanguage: 'sr-Latn',
+      maxCharsPerLine: 42,
+      maxLinesPerCaption: 2 as const
+    };
+    const disabled = { code: 'PROVIDER_DISABLED', detail: 'OpenAI is turned off in Settings > Connectors.' };
+
+    await expect(registry.testConnection('openai')).rejects.toMatchObject(disabled);
+    await expect(registry.listModels('openai', 'translation')).rejects.toMatchObject(disabled);
+    await expect(
+      registry.connectProvider({ providerId: 'openai', authMode: 'api_key', secret: 'sk-new-secret-5678' })
+    ).rejects.toMatchObject(disabled);
+    await expect(registry.transcribe('openai', { audioPath: '/tmp/audio.mp3', audioFormat: 'mp3' })).rejects.toMatchObject(disabled);
+    await expect(registry.translateTexts('openai', textRequest)).rejects.toMatchObject(disabled);
+    await expect(registry.polishTexts('openai', { ...textRequest, language: 'sr-Latn', mode: 'conservative' })).rejects.toMatchObject(disabled);
+    await expect(registry.summarizeText('openai', { systemPrompt: 'Summarize.', transcript: '[0:00] Hi' })).rejects.toMatchObject(disabled);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(store.get('openai')).resolves.toMatchObject({ secret: 'sk-test-secret-1234' });
+  });
+
+  it('still lets the user disconnect a turned-off connector, which removes its key', async () => {
+    const store = new MemoryCredentialStore();
+    await store.set({ providerId: 'openai', authMode: 'api_key', secret: 'sk-test-secret-1234' });
+    const registry = createDefaultAiProviderRegistry(store, { isProviderEnabled: () => false });
+
+    await expect(registry.disconnectProvider('openai')).resolves.toMatchObject({ enabled: false, connected: false });
+    await expect(store.get('openai')).resolves.toBeUndefined();
+  });
+
+  it('asks the callback for each connector, and resolves it on every status', async () => {
+    const store = new MemoryCredentialStore();
+    const isProviderEnabled = vi.fn(async (providerId: AiProviderId) => providerId === 'codex_cli');
+    const registry = new AiProviderRegistry(
+      [
+        new CodexCliProvider({ runner: fakeRunner(() => ok('codex-cli 0.165.0\n')).runner, resolveDeps: installedResolveDeps('codex') }),
+        new OpenAiProvider({ credentialStore: store })
+      ],
+      store,
+      { isProviderEnabled }
+    );
+
+    await expect(registry.getProviderStatus('codex_cli')).resolves.toMatchObject({ enabled: true, connected: true });
+    await expect(registry.getProviderStatus('openai')).resolves.toMatchObject({ enabled: false, connected: false });
+    expect(isProviderEnabled).toHaveBeenCalledWith('codex_cli');
+    expect(isProviderEnabled).toHaveBeenCalledWith('openai');
+  });
+
+  it('keeps Claude Code off until the settings turn it on', async () => {
+    const store = new MemoryCredentialStore();
+    const claude = new ClaudeCodeCliProvider({ runner: fakeRunner(() => ok('2.1.312 (Claude Code)\n')).runner, resolveDeps: installedResolveDeps('claude') });
+    const offByDefault = new AiProviderRegistry([claude], store, {
+      isProviderEnabled: (providerId) => isProviderEnabled({ enabledProviders: {} }, providerId)
+    });
+    const turnedOn = new AiProviderRegistry([claude], store, {
+      isProviderEnabled: (providerId) => isProviderEnabled({ enabledProviders: { claude_code_cli: true } }, providerId)
+    });
+
+    await expect(offByDefault.getProviderStatus('claude_code_cli')).resolves.toMatchObject({ enabled: false, connected: false });
+    await expect(turnedOn.getProviderStatus('claude_code_cli')).resolves.toMatchObject({ enabled: true, connected: true });
+  });
+});
+

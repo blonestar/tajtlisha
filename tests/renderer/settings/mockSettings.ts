@@ -20,6 +20,7 @@ export const mockSettings: AppSettings = {
     fileNamePattern: '{name}.{track}.{language}'
   },
   aiConnector: {
+    enabledProviders: {},
     activeProviderId: 'openai',
     authModeByProvider: {
       openai: 'api_key'
@@ -55,6 +56,7 @@ export const mockProviderStatuses: ProviderStatus[] = [
     id: 'openai',
     displayName: 'OpenAI',
     authModes: ['api_key'],
+    enabled: true,
     connected: true,
     activeAuthMode: 'api_key',
     maskedCredential: 'API key ending in 1234',

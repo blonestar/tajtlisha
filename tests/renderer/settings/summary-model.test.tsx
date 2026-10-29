@@ -14,6 +14,7 @@ const codexFound: ProviderStatus = {
   displayName: 'Codex CLI (local)',
   authModes: ['local_cli'],
   experimental: true,
+  enabled: true,
   connected: true,
   cliVersion: 'codex-cli 0.165.0',
   cliPath: '/home/user/.local/bin/codex',

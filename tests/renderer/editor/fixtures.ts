@@ -60,6 +60,7 @@ export const SETTINGS: AppSettings = {
     fileNamePattern: '{name}.{track}.{language}'
   },
   aiConnector: {
+    enabledProviders: {},
     activeProviderId: 'openai',
     authModeByProvider: { openai: 'api_key' },
     transcriptionModelByProvider: { openai: 'whisper-1' },
@@ -87,6 +88,7 @@ export const OPENAI_STATUS: ProviderStatus = {
   id: 'openai',
   displayName: 'OpenAI',
   authModes: ['api_key'],
+  enabled: true,
   connected: true,
   capabilities: {
     detectLanguage: true,

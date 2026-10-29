@@ -364,6 +364,47 @@
   flex-wrap: wrap;
 }
 
+/* Enabled connectors: one checkbox row per connector, with the Claude Code warning under its row. */
+.settings-sheet .connector-toggles {
+  display: grid;
+  gap: var(--space-3);
+}
+.settings-sheet .connector-toggle {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.settings-sheet .connector-toggle-row {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  min-width: 0;
+}
+.settings-sheet .connector-toggle-label {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.settings-sheet .connector-warning {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+}
+.settings-sheet .connector-warning p {
+  line-height: 1.45;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-sheet .connector-warning svg {
+  flex: none;
+  margin-top: 2px;
+}
+
 /* Credential */
 .settings-sheet .settings-stored-key {
   align-items: center;
