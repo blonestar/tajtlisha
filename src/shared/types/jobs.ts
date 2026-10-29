@@ -55,6 +55,8 @@ export type TranscribeClipRequest = {
 };
 
 export type TranscriptCorrectionRequest = {
+  /** Text provider for the correction pass; undefined = the request's providerId. */
+  providerId?: AiProviderId;
   /** Text model id; undefined = provider default text model. */
   modelId?: string;
   /** User instructions; '' = none. At most MAX_AI_INSTRUCTIONS_CHARS. */

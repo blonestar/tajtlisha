@@ -13,7 +13,14 @@ export type ExportSettings = {
 };
 
 export type AiConnectorSettings = {
+  /** Provider for transcription. Also the text provider when textProviderId is not set. */
   activeProviderId?: AiProviderId;
+  /**
+   * Provider for translation, polish, transcript correction, and summary.
+   * Undefined, or a provider that is not registered, = activeProviderId.
+   * Resolve it with resolveTextProviderId.
+   */
+  textProviderId?: AiProviderId;
   authModeByProvider: Partial<Record<AiProviderId, AuthMode>>;
   transcriptionModelByProvider: Partial<Record<AiProviderId, string>>;
   textModelByProvider: Partial<Record<AiProviderId, string>>;

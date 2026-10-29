@@ -1,6 +1,17 @@
-export type AiProviderId = 'openai' | 'openrouter';
+/**
+ * 'codex_cli' and 'claude_code_cli' run the AI CLI installed on this computer
+ * (Codex CLI, Claude Code) with the user's own login. They have no transcription,
+ * so they can only be the text provider (translation, polish, correction, summary).
+ */
+export type AiProviderId = 'openai' | 'openrouter' | 'codex_cli' | 'claude_code_cli';
 
-export type AuthMode = 'api_key' | 'codex_auth_experimental';
+export const LOCAL_CLI_PROVIDER_IDS = ['codex_cli', 'claude_code_cli'] as const satisfies readonly AiProviderId[];
+
+/**
+ * 'local_cli': no secret. The provider is connected when its CLI is found on
+ * this computer; the CLI uses its own login. Tajtlisha never reads CLI auth files.
+ */
+export type AuthMode = 'api_key' | 'codex_auth_experimental' | 'local_cli';
 
 export type AiProviderCapabilities = {
   detectLanguage: boolean;
@@ -27,12 +38,18 @@ export type ProviderSummary = {
   displayName: string;
   authModes: AuthMode[];
   capabilities: AiProviderCapabilities;
+  /** Shown with an "experimental" badge in Settings. */
+  experimental?: boolean;
 };
 
 export type ProviderStatus = ProviderSummary & {
   connected: boolean;
   activeAuthMode?: AuthMode;
   maskedCredential?: string;
+  /** Local CLI providers only: the detected CLI, for example "codex-cli 0.165.0". Undefined when not found. */
+  cliVersion?: string;
+  /** Local CLI providers only: absolute path of the detected executable. */
+  cliPath?: string;
   lastCheckedAt?: string;
   message?: string;
 };
