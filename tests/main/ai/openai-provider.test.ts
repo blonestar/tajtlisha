@@ -460,6 +460,42 @@ describe('OpenAI summary', () => {
     ]);
   });
 
+  it('lists live translation and polish models without legacy models that lack structured output', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          data: [
+            { id: 'gpt-5' },
+            { id: 'gpt-4.1' },
+            { id: 'gpt-4o' },
+            { id: 'gpt-4' },
+            { id: 'gpt-4-turbo' },
+            { id: 'gpt-3.5-turbo' },
+            { id: 'chatgpt-4o-latest' },
+            { id: 'whisper-1' }
+          ]
+        })
+      )
+    );
+    const provider = await connectedProvider();
+
+    for (const capability of ['translation', 'subtitlePolish'] as const) {
+      await expect(provider.listModels(capability)).resolves.toEqual([
+        { id: 'gpt-4.1', label: 'gpt-4.1', capability },
+        { id: 'gpt-4o', label: 'gpt-4o', capability },
+        { id: 'gpt-5', label: 'gpt-5', capability }
+      ]);
+    }
+  });
+
+  it('falls back to the static translation models when the live list fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    const models = await (await connectedProvider()).listModels('translation');
+    expect(models.map((model) => model.id)).toEqual(['gpt-4.1-mini', 'gpt-4.1']);
+  });
+
   it('falls back to the static summary models when the live list fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
 
