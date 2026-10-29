@@ -61,6 +61,8 @@ type ProviderTextBaseRequest = {
   customInstructions?: string;
   /** What the video is about, from the project. Undefined or '' = none. */
   videoContext?: string;
+  /** Undefined = send no reasoning parameter. */
+  reasoningEffort?: ReasoningEffort;
   signal?: AbortSignal;
 };
 

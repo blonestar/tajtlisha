@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import type { AiProviderCapabilities, ProviderModelDescriptor } from '../../shared/types/ai';
+import type { AiProviderCapabilities, ProviderModelDescriptor, ReasoningEffort } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
 import { validatePath } from '../media/contracts';
 import { transcriptionLanguageCode } from './language';
@@ -143,6 +143,7 @@ export class OpenRouterProvider extends BaseAiProvider {
       model: request.modelId ?? OPENROUTER_DEFAULT_TEXT_MODEL,
       instructions: buildTranslationInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -153,6 +154,7 @@ export class OpenRouterProvider extends BaseAiProvider {
       model: request.modelId ?? OPENROUTER_DEFAULT_TEXT_MODEL,
       instructions: buildPolishInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -162,6 +164,7 @@ export class OpenRouterProvider extends BaseAiProvider {
     model: string;
     instructions: string;
     items: ProviderTextItem[];
+    reasoningEffort?: ReasoningEffort;
     signal?: AbortSignal;
   }): Promise<string> {
     const payload = (await this.fetchJson(`${OPENROUTER_API}/chat/completions`, {
@@ -175,7 +178,8 @@ export class OpenRouterProvider extends BaseAiProvider {
             content: `${input.instructions} Return JSON only: {"items":[{"id":"...","text":"..."}]}.`
           },
           { role: 'user', content: buildCaptionItemsInput(input.items) }
-        ]
+        ],
+        ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {})
       }),
       signal: input.signal
     })) as OpenRouterChatPayload;

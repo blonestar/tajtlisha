@@ -541,6 +541,16 @@ describe('SubtitleWorkflowService.translate', () => {
     expect(stagesOf(progress.events)).toEqual(['translating', 'polishing']);
   });
 
+  it('sends the reasoning effort to translation and polish', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'conservative', reasoningEffort: 'high' }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+    expect(registry.polishTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+  });
+
   it('does not call polish when polish is none', async () => {
     const registry = fakeRegistry();
     const { service } = createService({ registry });
@@ -809,6 +819,18 @@ describe('SubtitleWorkflowService.transcribe with transcript correction', () => 
     const request = (registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1];
     expect(request.modelId).toBeUndefined();
     expect(request.customInstructions).toBe('');
+  });
+
+  it('sends the correction reasoning effort, and none when it is not set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ correction: { instructions: '', reasoningEffort: 'medium' } }));
+    await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    const [first, second] = (registry.polishTexts.mock.calls as Array<[string, ProviderPolishRequest]>).map(([, request]) => request);
+    expect(first.reasoningEffort).toBe('medium');
+    expect(second).not.toHaveProperty('reasoningEffort');
   });
 
   it('matches corrected text to captions by id, even when the provider reverses the order', async () => {

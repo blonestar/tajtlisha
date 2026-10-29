@@ -233,6 +233,15 @@ describe('ClaudeCodeCliProvider text requests', () => {
     expect(calls[0].stdin).toBe(buildCaptionItemsInput(ITEMS));
   });
 
+  it('passes the mapped reasoning effort of a caption request', async () => {
+    const { runner, calls } = fakeRunner(() => ok(structuredReply(ITEMS)));
+    const provider = new ClaudeCodeCliProvider({ runner, resolveDeps: installedResolveDeps('claude') });
+
+    await provider.translateTexts({ ...TRANSLATE_REQUEST, reasoningEffort: 'minimal' });
+
+    expect(calls[0].args.slice(-2)).toEqual(['--effort', 'low']);
+  });
+
   it('prefers structured_output and falls back to the result text', async () => {
     const structuredOnly = fakeRunner(() =>
       ok(JSON.stringify({ subtype: 'success', is_error: false, result: '', structured_output: { items: [{ id: '1', text: 'A' }] } }))

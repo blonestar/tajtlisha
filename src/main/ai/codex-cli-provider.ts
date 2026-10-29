@@ -123,6 +123,7 @@ export class CodexCliProvider extends LocalCliProvider {
       instructions: buildTranslationInstructions(request),
       items: request.items,
       modelId: request.modelId,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
   }
@@ -132,6 +133,7 @@ export class CodexCliProvider extends LocalCliProvider {
       instructions: buildPolishInstructions(request),
       items: request.items,
       modelId: request.modelId,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
   }
@@ -160,6 +162,7 @@ export class CodexCliProvider extends LocalCliProvider {
     instructions: string;
     items: ProviderTextItem[];
     modelId?: string;
+    reasoningEffort?: ReasoningEffort;
     signal?: AbortSignal;
   }): Promise<ProviderTextItem[]> {
     const executable = await this.requireExecutable();
@@ -176,6 +179,7 @@ export class CodexCliProvider extends LocalCliProvider {
         outputSchemaPath: schemaPath,
         stdin: `${input.instructions}\n\n${buildCaptionItemsInput(input.items)}`,
         modelId: input.modelId,
+        reasoningEffort: input.reasoningEffort,
         signal: input.signal
       });
 

@@ -142,6 +142,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -161,6 +162,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -197,6 +199,7 @@ export class SubtitleWorkflowService {
           maxLinesPerCaption: request.maxLinesPerCaption,
           customInstructions: correction.instructions,
           videoContext: request.videoContext,
+          ...(correction.reasoningEffort ? { reasoningEffort: correction.reasoningEffort } : {}),
           signal: context.signal
         })
       );

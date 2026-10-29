@@ -185,6 +185,22 @@ describe('OpenAI provider requests', () => {
     expect(items).toEqual([{ id: 'c1', text: 'Zdravo' }]);
   });
 
+  it('sends the reasoning effort with caption requests only when it is set', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ output_text: JSON.stringify({ items: [] }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = await connectedProvider();
+    const base = { items: [], sourceLanguage: 'en', targetLanguage: 'sr-Latn', maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
+
+    await provider.translateTexts({ ...base, reasoningEffort: 'high' });
+    await provider.translateTexts(base);
+
+    const bodies = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).map(
+      ([, init]) => JSON.parse(String(init.body)) as Record<string, unknown>
+    );
+    expect(bodies[0].reasoning).toEqual({ effort: 'high' });
+    expect(bodies[1]).not.toHaveProperty('reasoning');
+  });
+
   it('uses the requested polish model and mode in the polish instructions', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ output_text: JSON.stringify({ items: [] }) }));
     vi.stubGlobal('fetch', fetchMock);

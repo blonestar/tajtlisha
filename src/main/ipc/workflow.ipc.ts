@@ -77,8 +77,13 @@ function toCorrectionRequest(value: unknown): TranscriptCorrectionRequest {
   return {
     ...(input.providerId === undefined ? {} : { providerId: requireProviderId(input.providerId) }),
     modelId: summaryModelId(input.modelId),
+    reasoningEffort: optionalReasoningEffort(input.reasoningEffort),
     instructions: instructionsText(input.instructions, 'correction.instructions') ?? ''
   };
+}
+
+function optionalReasoningEffort(value: unknown): ReasoningEffort | undefined {
+  return value === undefined ? undefined : requireOneOf<ReasoningEffort>(value, REASONING_EFFORTS, 'reasoningEffort');
 }
 
 /** Optional user instructions; undefined stays undefined, text is length-checked. */
@@ -115,6 +120,7 @@ function toTranslateRequest(payload: unknown): TranslateCaptionsRequest {
       return { id: requireString(row.id, `captions[${index}].id`), text: requireText(row.text, `captions[${index}].text`) };
     }),
     polish: toPolishMode(input.polish),
+    reasoningEffort: optionalReasoningEffort(input.reasoningEffort),
     instructions: instructionsText(input.instructions, 'instructions'),
     videoContext: videoContextText(input.videoContext),
     maxCharsPerLine: requireFiniteNumber(input.maxCharsPerLine, 'maxCharsPerLine'),
@@ -144,10 +150,7 @@ function toSummarizeRequest(payload: unknown): SummarizeTranscriptRequest {
     jobId: requireJobId(input.jobId),
     providerId: requireProviderId(input.providerId),
     modelId: summaryModelId(input.modelId),
-    reasoningEffort:
-      input.reasoningEffort === undefined
-        ? undefined
-        : requireOneOf<ReasoningEffort>(input.reasoningEffort, REASONING_EFFORTS, 'reasoningEffort'),
+    reasoningEffort: optionalReasoningEffort(input.reasoningEffort),
     systemPrompt,
     language: requireString(input.language, 'language'),
     segments: parsedSegments

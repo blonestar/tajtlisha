@@ -165,6 +165,18 @@ describe('CodexCliProvider detection and sign-in', () => {
 });
 
 describe('CodexCliProvider text requests', () => {
+  it('passes the reasoning effort of a caption request to codex', async () => {
+    const { runner, calls } = fakeRunner(async (input) => {
+      await writeFile(argAfter(input.args, '-o'), JSON.stringify({ items: [{ id: 'c1', text: 'Zdravo.' }] }));
+      return ok();
+    });
+    const provider = new CodexCliProvider({ runner, resolveDeps: installedResolveDeps('codex') });
+
+    await provider.translateTexts({ ...TRANSLATE_REQUEST, reasoningEffort: 'low' });
+
+    expect(argAfter(calls[0].args, '-c')).toBe('model_reasoning_effort="low"');
+  });
+
   it('translates with the exact argv, the schema file, and instructions plus items on stdin', async () => {
     let schemaJson = '';
     const { runner, calls } = fakeRunner(async (input) => {

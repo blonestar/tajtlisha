@@ -124,6 +124,7 @@ export class ClaudeCodeCliProvider extends LocalCliProvider {
       systemPrompt: buildTranslationInstructions(request),
       items: request.items,
       modelId: request.modelId,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
   }
@@ -133,6 +134,7 @@ export class ClaudeCodeCliProvider extends LocalCliProvider {
       systemPrompt: buildPolishInstructions(request),
       items: request.items,
       modelId: request.modelId,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
   }
@@ -172,6 +174,7 @@ export class ClaudeCodeCliProvider extends LocalCliProvider {
     systemPrompt: string;
     items: ProviderTextItem[];
     modelId?: string;
+    reasoningEffort?: ReasoningEffort;
     signal?: AbortSignal;
   }): Promise<ProviderTextItem[]> {
     const executable = await this.requireExecutable();
@@ -179,7 +182,12 @@ export class ClaudeCodeCliProvider extends LocalCliProvider {
     return withCliWorkDir(async (cwd) => {
       const result = await this.exec({
         executable,
-        args: claudeArgs({ systemPrompt: input.systemPrompt, modelId: input.modelId, schema: true }),
+        args: claudeArgs({
+          systemPrompt: input.systemPrompt,
+          modelId: input.modelId,
+          reasoningEffort: input.reasoningEffort,
+          schema: true
+        }),
         stdin: buildCaptionItemsInput(input.items),
         cwd,
         timeoutMs: CLI_TIMEOUT_MS.request,

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';
-import type { AiProviderCapabilities, ProviderModelDescriptor } from '../../shared/types/ai';
+import type { AiProviderCapabilities, ProviderModelDescriptor, ReasoningEffort } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
 import { validatePath } from '../media/contracts';
 import { transcriptionLanguageCode, languageCodeFromSpokenName } from './language';
@@ -171,6 +171,7 @@ export class OpenAiProvider extends BaseAiProvider {
       model: request.modelId ?? OPENAI_DEFAULT_TEXT_MODEL,
       instructions: buildTranslationInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -181,6 +182,7 @@ export class OpenAiProvider extends BaseAiProvider {
       model: request.modelId ?? OPENAI_DEFAULT_TEXT_MODEL,
       instructions: buildPolishInstructions(request),
       items: request.items,
+      reasoningEffort: request.reasoningEffort,
       signal: request.signal
     });
     return parseCaptionItems(text, this.displayName);
@@ -190,6 +192,7 @@ export class OpenAiProvider extends BaseAiProvider {
     model: string;
     instructions: string;
     items: ProviderTextItem[];
+    reasoningEffort?: ReasoningEffort;
     signal?: AbortSignal;
   }): Promise<string> {
     const response = (await this.fetchJson(`${OPENAI_API}/responses`, {
@@ -209,7 +212,8 @@ export class OpenAiProvider extends BaseAiProvider {
             strict: true,
             schema: CAPTION_ITEMS_SCHEMA
           }
-        }
+        },
+        ...(input.reasoningEffort ? { reasoning: { effort: input.reasoningEffort } } : {})
       }),
       signal: input.signal
     })) as OpenAiTextResponse;
