@@ -142,6 +142,24 @@ describe('CodexCliProvider detection and sign-in', () => {
     expect(calls[0]).toMatchObject({ args: ['login', 'status'], timeoutMs: 5_000 });
   });
 
+  it('reads the login status from stderr, where codex-cli 0.165.0 prints it', async () => {
+    const provider = new CodexCliProvider({
+      runner: fakeRunner(() => ok('', 'Logged in using ChatGPT\n')).runner,
+      resolveDeps: installedResolveDeps('codex')
+    });
+
+    await expect(provider.testConnection()).resolves.toMatchObject({ ok: true, message: 'Codex CLI (local) is signed in (ChatGPT).' });
+  });
+
+  it('does not read "Not logged in" with exit code 0 as signed in', async () => {
+    const provider = new CodexCliProvider({
+      runner: fakeRunner(() => ok('', 'Not logged in\n')).runner,
+      resolveDeps: installedResolveDeps('codex')
+    });
+
+    await expect(provider.testConnection()).resolves.toMatchObject({ ok: false });
+  });
+
   it('reports a missing login with the command to run', async () => {
     const provider = new CodexCliProvider({
       runner: fakeRunner(() => failed('Not logged in')).runner,

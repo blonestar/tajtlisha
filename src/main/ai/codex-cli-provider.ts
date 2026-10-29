@@ -91,8 +91,10 @@ export class CodexCliProvider extends LocalCliProvider {
         this.exec({ executable, args: ['login', 'status'], cwd, timeoutMs: CLI_TIMEOUT_MS.status })
       );
 
-      if (result.exitCode === 0 && /logged in/i.test(result.stdout)) {
-        const viaChatGpt = /chatgpt/i.test(result.stdout);
+      // codex-cli 0.165.0 prints the status line on stderr, so both streams are checked.
+      const statusText = `${result.stdout}\n${result.stderr}`;
+      if (result.exitCode === 0 && /logged in/i.test(statusText) && !/not logged in/i.test(statusText)) {
+        const viaChatGpt = /chatgpt/i.test(statusText);
         return {
           ok: true,
           providerId: this.id,
