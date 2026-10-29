@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Fixed
+- Serbian transcripts are now written in Ekavian (mesto, vreme, podsetimo) instead of the Ijekavian forms Whisper often returns (mjesto, vrijeme, podsjetimo). Common words are converted right after transcription, keeping word timing, and AI correction, translation and polish into Serbian follow the same rule. Writing "ijekavica" in the video context or instructions keeps Ijekavian; writing "ekavica" also treats a transcript detected as Bosnian or Croatian as Serbian.
+
 ## [0.8.0] - 2026-10-27
 
 ### Added
