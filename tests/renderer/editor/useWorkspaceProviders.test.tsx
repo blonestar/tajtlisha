@@ -140,6 +140,47 @@ describe('useWorkspace per-task providers', () => {
     expect(translate.mock.calls[0][0]).not.toHaveProperty('reasoningEffort');
   });
 
+  it('translate again sends only the pending rows when some rows still need a translation', async () => {
+    const { hook, translate } = setup({
+      captions: [caption('a', 0, 1000, 'Hello', 'Zdravo'), caption('b', 1000, 2000, 'World', '')]
+    });
+    await ready(hook);
+
+    await act(async () => {
+      hook.result.current.workspace.requestTranslate();
+    });
+
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+    expect(hook.result.current.workspace.confirm).toBeNull();
+    expect(translate.mock.calls[0][0].captions).toEqual([{ id: 'b', text: 'World' }]);
+  });
+
+  it('translate again asks first, then sends every row, when all rows are translated', async () => {
+    const { hook, translate } = setup({
+      captions: [caption('a', 0, 1000, 'Hello', 'Zdravo'), caption('b', 1000, 2000, 'World', 'Svete')]
+    });
+    await ready(hook);
+
+    act(() => {
+      hook.result.current.workspace.requestTranslate();
+    });
+
+    expect(translate).not.toHaveBeenCalled();
+    const pending = hook.result.current.workspace.confirm;
+    expect(pending).toMatchObject({ title: 'Translate again?', confirmLabel: 'Translate' });
+    expect(pending?.description).toContain('2');
+
+    await act(async () => {
+      pending?.onConfirm();
+    });
+
+    await waitFor(() => expect(translate).toHaveBeenCalledTimes(1));
+    expect(translate.mock.calls[0][0].captions).toEqual([
+      { id: 'a', text: 'Hello' },
+      { id: 'b', text: 'World' }
+    ]);
+  });
+
   it('translates with the transcription provider when the stored text provider is not registered', async () => {
     const { hook, translate } = setup({
       connector: { textProviderId: 'openrouter', textModelByProvider: { openai: 'gpt-4.1-mini' } },

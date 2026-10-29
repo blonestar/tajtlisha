@@ -16,6 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 - Serbian translation prompts forbid words from other Slavic languages (for example Polish "ale" instead of "ali").
 
 ### Fixed
+- "Translate again" works when every row is already translated: after a confirmation it translates all rows again (for example with another model), replacing the current translations, manual fixes included. Before, the button stayed disabled.
 - Serbian transcripts are now written in Ekavian (mesto, vreme, podsetimo) instead of the Ijekavian forms Whisper often returns (mjesto, vrijeme, podsjetimo). Common words are converted right after transcription, keeping word timing, and AI correction, translation and polish into Serbian follow the same rule. Writing "ijekavica" in the video context or instructions keeps Ijekavian; writing "ekavica" also treats a transcript detected as Bosnian or Croatian as Serbian.
 
 ## [0.8.0] - 2026-10-27

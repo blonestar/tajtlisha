@@ -133,6 +133,7 @@ export const captionsStrings = {
       translate: 'Translate',
       translateCount: 'Translate {{count}} rows',
       translateAgain: 'Translate again',
+      translateAgainHint: 'Translates every row again and replaces the current translations',
       summarize: 'Summarize',
       summarizeAgain: 'Summarize again',
       showSummary: 'Show summary',
@@ -146,7 +147,6 @@ export const captionsStrings = {
         cannotTranscribe: '{{provider}} cannot transcribe audio',
         cannotTranslate: '{{provider}} cannot translate',
         noCaptions: 'Transcribe the clip first',
-        allTranslated: 'Every row is translated and up to date',
         busy: 'Wait for the current job to finish',
         noTranscript: 'No caption text inside the trim range',
         cannotSummarize: '{{provider}} cannot summarize'
@@ -370,6 +370,7 @@ export const captionsStrings = {
       translate: 'Prevedi',
       translateCount: 'Prevedi redove: {{count}}',
       translateAgain: 'Prevedi ponovo',
+      translateAgainHint: 'Ponovo prevodi sve redove i zamenjuje postojeće prevode',
       summarize: 'Sažmi',
       summarizeAgain: 'Sažmi ponovo',
       showSummary: 'Prikaži sažetak',
@@ -383,7 +384,6 @@ export const captionsStrings = {
         cannotTranscribe: '{{provider}} ne može da transkribuje zvuk',
         cannotTranslate: '{{provider}} ne može da prevodi',
         noCaptions: 'Prvo transkribuj isečak',
-        allTranslated: 'Svi redovi su prevedeni i ažurni',
         busy: 'Sačekaj da se završi trenutni posao',
         noTranscript: 'Nema teksta titlova u opsegu isečka',
         cannotSummarize: '{{provider}} ne može da sažima'
@@ -607,6 +607,7 @@ export const captionsStrings = {
       translate: 'Преведи',
       translateCount: 'Преведи редове: {{count}}',
       translateAgain: 'Преведи поново',
+      translateAgainHint: 'Поново преводи све редове и замењује постојеће преводе',
       summarize: 'Сажми',
       summarizeAgain: 'Сажми поново',
       showSummary: 'Прикажи сажетак',
@@ -620,7 +621,6 @@ export const captionsStrings = {
         cannotTranscribe: '{{provider}} не може да транскрибује звук',
         cannotTranslate: '{{provider}} не може да преводи',
         noCaptions: 'Прво транскрибуј исечак',
-        allTranslated: 'Сви редови су преведени и ажурни',
         busy: 'Сачекај да се заврши тренутни посао',
         noTranscript: 'Нема текста титлова у опсегу исечка',
         cannotSummarize: '{{provider}} не може да сажима'

@@ -65,6 +65,8 @@ export type Workspace = {
   /** Asks for confirmation first when captions exist, because transcription replaces them. */
   requestTranscribe: () => void;
   translate: () => void;
+  /** Translates the pending rows, or, when every row is translated, asks and then translates all rows again. */
+  requestTranslate: () => void;
   /** Summary of the current project. Null after a project change or before the first run. */
   summary: SummaryResult | null;
   summaryOpen: boolean;
@@ -289,14 +291,17 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     });
   }, [t, transcribe]);
 
-  const translate = useCallback(async () => {
+  // scope 'pending' sends empty and stale rows; 'all' sends every row with text, replacing current translations.
+  const runTranslate = useCallback(async (scope: 'pending' | 'all') => {
     const current = projectRef.current;
     const config = settingsRef.current;
     const providerId = providerRolesOf(config, providersRef.current).textId;
     if (!api || !providerId) return;
 
     const pendingIds = new Set(rowsNeedingTranslation(current));
-    const rows = current.captions.filter((caption) => pendingIds.has(caption.id) && caption.original.trim() !== '');
+    const rows = current.captions.filter(
+      (caption) => (scope === 'all' || pendingIds.has(caption.id)) && caption.original.trim() !== ''
+    );
     if (rows.length === 0) {
       setNotice({ tone: 'info', text: t('shell.translate.nothingToDo') });
       return;
@@ -367,6 +372,30 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
           : t('shell.result.translated', { count: translations.length })
     });
   }, [api, dispatch, job, t]);
+
+  const translate = useCallback(() => runTranslate('pending'), [runTranslate]);
+
+  const requestTranslate = useCallback(() => {
+    const current = projectRef.current;
+    const hasPending = rowsNeedingTranslation(current).some(
+      (id) => current.captions.find((caption) => caption.id === id)?.original.trim() !== ''
+    );
+    if (hasPending) {
+      void runTranslate('pending');
+      return;
+    }
+    const count = current.captions.filter((caption) => caption.original.trim() !== '').length;
+    if (count === 0) {
+      setNotice({ tone: 'info', text: t('shell.translate.nothingToDo') });
+      return;
+    }
+    setConfirm({
+      title: t('shell.confirm.translateAgainTitle'),
+      description: t('shell.confirm.translateAgainBody', { count }),
+      confirmLabel: t('shell.confirm.translateAgainAction'),
+      onConfirm: () => void runTranslate('all')
+    });
+  }, [runTranslate, t]);
 
   // The summary is informational, so caption edits during the run keep the result. Only a change of project discards it.
   const summarize = useCallback(async () => {
@@ -482,6 +511,7 @@ export function useWorkspace({ store, settings, providers, job }: WorkspaceOptio
     answerConfirm,
     requestTranscribe,
     translate,
+    requestTranslate,
     summary,
     summaryOpen,
     setSummaryOpen,

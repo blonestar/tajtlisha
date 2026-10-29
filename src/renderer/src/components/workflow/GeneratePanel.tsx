@@ -101,7 +101,6 @@ function transcribeBlock(props: GeneratePanelProps): Reason | null {
 function translateBlock(props: GeneratePanelProps): Reason | null {
   if (props.busy) return { key: 'captions.generate.reason.busy' };
   if (props.captionCount === 0) return { key: 'captions.generate.reason.noCaptions' };
-  if (props.rowsNeedingTranslation === 0) return { key: 'captions.generate.reason.allTranslated' };
   return providerBlock(props.textProvider, 'canTranslate', 'captions.generate.reason.cannotTranslate');
 }
 
@@ -289,6 +288,11 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
             type="button"
             className="btn"
             disabled={translateReason !== null}
+            title={
+              translateReason === null && rowsNeedingTranslation === 0
+                ? t('captions.generate.translateAgainHint')
+                : undefined
+            }
             onClick={onTranslate}
           >
             <Sparkles aria-hidden="true" size={14} />

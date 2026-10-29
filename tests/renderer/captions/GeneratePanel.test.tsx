@@ -153,11 +153,16 @@ describe('GeneratePanel', () => {
     expect(onTranslate).toHaveBeenCalledTimes(1);
   });
 
-  it('disables translate again when every row is up to date and says so', () => {
-    renderWithI18n(<GeneratePanel {...props({ captionCount: 4, rowsNeedingTranslation: 0 })} />);
+  it('keeps translate again enabled when every row is up to date, to retranslate all rows', () => {
+    const onTranslate = vi.fn();
+    renderWithI18n(<GeneratePanel {...props({ captionCount: 4, rowsNeedingTranslation: 0, onTranslate })} />);
 
-    expect(screen.getByRole('button', { name: 'Translate again' })).toBeDisabled();
-    expect(screen.getByText('Every row is translated and up to date')).toBeTruthy();
+    const button = screen.getByRole('button', { name: 'Translate again' });
+    expect(button).toBeEnabled();
+    expect(button.getAttribute('title')).toBe('Translates every row again and replaces the current translations');
+
+    fireEvent.click(button);
+    expect(onTranslate).toHaveBeenCalledTimes(1);
   });
 
   it('disables both actions while a job runs and says why', () => {

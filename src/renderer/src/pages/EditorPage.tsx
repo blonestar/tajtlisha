@@ -253,7 +253,7 @@ export function EditorPage({
             }
             onTargetLanguageChange={(code) => dispatch({ type: 'languages/set', targetLanguage: code })}
             onTranscribe={workspace.requestTranscribe}
-            onTranslate={workspace.translate}
+            onTranslate={workspace.requestTranslate}
             summaryEnabled={settings.summary.enabled}
             summarizableRows={summaryTranscript(project).length}
             hasSummary={workspace.summary !== null}
