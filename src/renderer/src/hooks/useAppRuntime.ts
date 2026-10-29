@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AiProviderCapabilities, AiProviderId, AuthMode, ProviderModelDescriptor, ProviderStatus, TestConnectionResult } from '../../../shared/types/ai';
 import type { TajtlishaApi } from '../../../shared/types/ipc';
+import { isProviderEnabled } from '../../../shared/ai-providers';
 import type { AppSettings, UiLanguage } from '../../../shared/types/settings';
 import { normalizeUiZoom } from '../../../shared/ui-zoom';
 import { resolveUiLanguage } from '../i18n';
@@ -49,7 +50,17 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [settings, setSettingsState] = useState<AppSettings>(fallbackSettings);
   const [allProviders, setAllProviders] = useState<ProviderStatus[]>([]);
-  const providers = useMemo(() => allProviders.filter((provider) => provider.enabled !== false), [allProviders]);
+  // A connector counts as on only when both its last status and the current settings say so, so a late status
+  // reply can never bring back a connector the user just turned off.
+  const providers = useMemo(
+    () =>
+      allProviders.filter(
+        (provider) => provider.enabled !== false && isProviderEnabled(settings.aiConnector, provider.id)
+      ),
+    [allProviders, settings.aiConnector]
+  );
+  // Only the newest status refresh may apply its result.
+  const refreshSeqRef = useRef(0);
   const [attempt, setAttempt] = useState(0);
   // Latest settings for callbacks that build the next patch. Updated synchronously, before re-render.
   const settingsRef = useRef(settings);
@@ -138,8 +149,11 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
   const refreshProviders = useCallback(async () => {
     const api = getApi();
     if (!api) return;
+    const seq = ++refreshSeqRef.current;
     const summaries = await api.ai.listProviders();
-    setAllProviders(await Promise.all(summaries.map((provider) => api.ai.getProviderStatus(provider.id))));
+    const statuses = await Promise.all(summaries.map((provider) => api.ai.getProviderStatus(provider.id)));
+    if (seq !== refreshSeqRef.current) return;
+    setAllProviders(statuses);
   }, []);
 
   const connectProvider = useCallback(

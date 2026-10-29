@@ -31,6 +31,11 @@ const claudeStatus: ProviderStatus = {
 
 const summaries: ProviderSummary[] = [mockProviderStatuses[0], claudeStatus];
 
+const claudeOnSettings = {
+  ...mockSettings,
+  aiConnector: { ...mockSettings.aiConnector, enabledProviders: { claude_code_cli: true } }
+};
+
 describe('useAppRuntime provider lists', () => {
   it('exposes only turned-on connectors as providers, and every connector as allProviders', async () => {
     installFakeApi({
@@ -67,7 +72,7 @@ describe('useAppRuntime provider lists', () => {
     let claudeEnabled = true;
     const claudeWhenOn: ProviderStatus = { ...claudeStatus, enabled: true, connected: true, message: undefined };
     installFakeApi({
-      settings: { get: async () => mockSettings, update: async (patch: object) => ({ ...mockSettings, ...patch }) },
+      settings: { get: async () => claudeOnSettings, update: async (patch: object) => ({ ...claudeOnSettings, ...patch }) },
       ai: {
         listProviders: async () => summaries,
         getProviderStatus: async (providerId: string) =>
@@ -85,5 +90,58 @@ describe('useAppRuntime provider lists', () => {
       await result.current.refreshProviders();
     });
     expect(result.current.providers.map((provider) => provider.id)).toEqual(['openai']);
+  });
+
+  it('ignores an older status refresh that finishes after the connector was turned off', async () => {
+    const claudeWhenOn: ProviderStatus = { ...claudeStatus, enabled: true, connected: true, message: undefined };
+    let current = claudeOnSettings;
+    let releaseOld: (status: ProviderStatus) => void = () => undefined;
+    let claudeCalls = 0;
+    installFakeApi({
+      settings: {
+        get: async () => current,
+        update: async (patch: object) => {
+          current = { ...current, ...patch };
+          return current;
+        }
+      },
+      ai: {
+        listProviders: async () => summaries,
+        getProviderStatus: (providerId: string) => {
+          if (providerId !== 'claude_code_cli') return Promise.resolve(mockProviderStatuses[0]);
+          claudeCalls += 1;
+          // Call 1: initial load. Call 2: the slow refresh. Later calls: the connector is off.
+          if (claudeCalls === 1) return Promise.resolve(claudeWhenOn);
+          if (claudeCalls === 2) return new Promise<ProviderStatus>((resolve) => (releaseOld = resolve));
+          return Promise.resolve(claudeStatus);
+        }
+      },
+      app: { setZoomFactor: vi.fn() }
+    });
+
+    const { result } = renderHook(() => useAppRuntime(claudeOnSettings), { wrapper });
+    await waitFor(() => expect(result.current.phase).toBe('ready'));
+    expect(result.current.providers.map((provider) => provider.id)).toEqual(['openai', 'claude_code_cli']);
+
+    let slowRefresh: Promise<void> = Promise.resolve();
+    act(() => {
+      slowRefresh = result.current.refreshProviders();
+    });
+    await waitFor(() => expect(claudeCalls).toBe(2));
+
+    await act(async () => {
+      await result.current.updateSettings({
+        aiConnector: { ...claudeOnSettings.aiConnector, enabledProviders: { claude_code_cli: false } }
+      });
+      await result.current.refreshProviders();
+    });
+    expect(result.current.providers.map((provider) => provider.id)).toEqual(['openai']);
+
+    await act(async () => {
+      releaseOld(claudeWhenOn);
+      await slowRefresh;
+    });
+    expect(result.current.providers.map((provider) => provider.id)).toEqual(['openai']);
+    expect(result.current.allProviders.find((provider) => provider.id === 'claude_code_cli')?.enabled).toBe(false);
   });
 });
