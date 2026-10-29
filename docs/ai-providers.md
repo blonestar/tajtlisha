@@ -272,6 +272,14 @@ Ako provider vrati samo tekst bez segment ili word timestamp-a:
 3. UI jasno dozvoljava rucno popravljanje timing-a.
 4. Export ne sme da puca zbog nedostatka provider timestamp-a.
 
+## Srpski: ekavica i ijekavica
+
+Whisper mesa srpski, hrvatski i bosanski i ekavski govor cesto pise ijekavski (mjesto, podsjetimo), a ponekad ga oznaci kao bosanski ili hrvatski. Transcription prompt to ne popravlja pouzdano (provereno na stvarnom klipu sa `whisper-1`).
+
+- Srpski transkript (`sr-Latn`, `sr-Cyrl`) se odmah posle transkripcije konvertuje u ekavicu preko recnika cestih jat osnova (`src/main/ai/serbian-variant.ts`). Menja se tekst reci, ne timing; vlastita imena sa velikim slovom (Rijeka, Bijeljina, Prijedor) ostaju.
+- AI korekcija, prevod i polish na srpski dobijaju eksplicitno ekavsko pravilo; korekcija tretira ijekavske oblike kao gresku pisanja.
+- Ako video kontekst ili korisnicke instrukcije pominju ijekavicu, sve ostaje ijekavski. Ako pominju ekavicu, transkript prepoznat kao `bs` ili `hr` se tretira kao srpski.
+
 ## Auth spike acceptance criteria
 
 OpenAI OAuth/login moze postati default samo ako:

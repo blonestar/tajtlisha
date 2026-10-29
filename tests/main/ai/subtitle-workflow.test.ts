@@ -178,6 +178,54 @@ describe('SubtitleWorkflowService.transcribe', () => {
     expect(result.captions[0].original).toBe('Привет, мир.');
   });
 
+  it('converts Ijekavian Serbian to Ekavian in the caption text and the timed words', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'sr-Latn',
+        text: 'Da se podsjetimo gdje.',
+        words: [
+          { text: 'Da', startMs: 0, endMs: 200 },
+          { text: 'se', startMs: 200, endMs: 300 },
+          { text: 'podsjetimo', startMs: 300, endMs: 800 },
+          { text: 'gdje', startMs: 800, endMs: 1000 }
+        ]
+      }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Latn' }));
+
+    expect(result.captions[0].original).toBe('Da se podsetimo gde');
+    expect(result.captions[0].words?.map((word) => word.text)).toEqual(['Da', 'se', 'podsetimo', 'gde']);
+  });
+
+  it('keeps Ijekavian Serbian when the video context asks for it', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({ language: 'sr-Latn', text: 'Uvijek isto mjesto.', segments: [{ text: 'Uvijek isto mjesto.', startMs: 0, endMs: 800 }] }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Latn', videoContext: 'Srpska ijekavica, Banjaluka.' }));
+
+    expect(result.captions[0].original).toBe('Uvijek isto mjesto.');
+  });
+
+  it('relabels a Bosnian or Croatian transcript as Ekavian Serbian only when the user named Ekavian', async () => {
+    for (const language of ['bs', 'hr']) {
+      const transcribe = vi.fn(async () => ({ language, text: 'Uvijek isto mjesto.', segments: [{ text: 'Uvijek isto mjesto.', startMs: 0, endMs: 800 }] }));
+      const named = createService({ registry: fakeRegistry({ transcribe } as never) });
+      const plain = createService({ registry: fakeRegistry({ transcribe } as never) });
+
+      const relabeled = await named.service.transcribe(createRequest({ videoContext: 'SRPSKA EKAVICA!!!' }));
+      const untouched = await plain.service.transcribe(createRequest());
+
+      expect(relabeled).toMatchObject({ language: 'sr-Latn' });
+      expect(relabeled.captions[0].original).toBe('Uvek isto mesto.');
+      expect(untouched).toMatchObject({ language });
+      expect(untouched.captions[0].original).toBe('Uvijek isto mjesto.');
+    }
+  });
+
   it('keeps Cyrillic transcription text when the language is sr-Cyrl', async () => {
     const registry = fakeRegistry({
       transcribe: vi.fn(async () => ({ language: 'sr-Cyrl', text: 'Здраво', segments: [{ text: 'Здраво', startMs: 0, endMs: 800 }] }))

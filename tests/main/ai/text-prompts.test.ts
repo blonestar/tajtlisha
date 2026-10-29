@@ -75,6 +75,38 @@ describe('script instructions', () => {
   });
 });
 
+describe('Serbian variant instructions', () => {
+  const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
+  const EKAVIAN = 'Write Serbian in the standard Ekavian variant';
+  const IJEKAVIAN = 'Write Serbian in the Ijekavian variant';
+
+  it('asks for Ekavian Serbian in translation, polish and correction by default', () => {
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn' })).toContain(EKAVIAN);
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Cyrl' })).toContain(EKAVIAN);
+    expect(buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'social_caption' })).toContain(EKAVIAN);
+    const correction = buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'transcript_correction' });
+    expect(correction).toContain(EKAVIAN);
+    expect(correction).toContain('change them to Ekavian');
+  });
+
+  it('asks for Ijekavian when the video context or the instructions name it', () => {
+    expect(
+      buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'transcript_correction', videoContext: 'Srpska ijekavica.' })
+    ).toContain(IJEKAVIAN);
+    expect(
+      buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn', customInstructions: 'Piši ijekavski.' })
+    ).toContain(IJEKAVIAN);
+  });
+
+  it('adds no variant rule for other languages', () => {
+    for (const language of ['hr', 'bs', 'en', 'und']) {
+      const prompt = buildPolishInstructions({ ...limits, language, mode: 'transcript_correction' });
+      expect(prompt).not.toContain('Ekavian');
+      expect(prompt).not.toContain('Ijekavian');
+    }
+  });
+});
+
 describe('transcript correction instructions', () => {
   const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
   const correction = (language: string, extra: Partial<Parameters<typeof buildPolishInstructions>[0]> = {}) =>

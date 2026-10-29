@@ -1,5 +1,6 @@
 import { AppError } from '../../shared/errors';
 import { languageDisplayName } from './language';
+import { isSerbianLanguage, serbianVariant } from './serbian-variant';
 import type { ProviderPolishMode, ProviderTextItem } from './provider';
 
 export type SummarySegmentInput = {
@@ -50,6 +51,7 @@ export function buildTranslationInstructions(
     layoutInstruction(input),
     'Return exactly one output item for each input id, with the same id. Do not merge or split items.',
     scriptInstruction(input.targetLanguage),
+    serbianVariantInstruction(input.targetLanguage, input),
     'Return only the JSON object described by the schema.'
   ]
     .filter(Boolean)
@@ -76,6 +78,7 @@ export function buildPolishInstructions(
     layoutInstruction(input),
     'Return exactly one output item for each input id, with the same id. Do not merge or split items.',
     scriptInstruction(input.language),
+    serbianVariantInstruction(input.language, input),
     'Return only the JSON object described by the schema.'
   ]
     .filter(Boolean)
@@ -105,6 +108,7 @@ function buildCorrectionInstructions(input: CaptionLimits & { language: string }
     layoutInstruction(input),
     'Return exactly one output item for each input id, with the same id. Do not merge or split items, and never return an empty text.',
     scriptInstruction(input.language),
+    serbianVariantInstruction(input.language, input, { correction: true }),
     'Return only the JSON object described by the schema.'
   ]
     .filter(Boolean)
@@ -215,6 +219,28 @@ function scriptInstruction(language: string): string {
     return `Write Serbian only in Cyrillic script. Never use Latin letters for Serbian words. ${SERBIAN_VOCABULARY_RULE}`;
   }
   return '';
+}
+
+/**
+ * Ekavian or Ijekavian Serbian; empty for other languages. Ekavian unless the
+ * video context or the user's instructions name Ijekavian. In correction, the
+ * recognizer's Ijekavian forms count as spelling mistakes.
+ */
+function serbianVariantInstruction(language: string, extras: PromptExtras, options: { correction?: boolean } = {}): string {
+  if (!isSerbianLanguage(language)) return '';
+
+  if (serbianVariant(extras.videoContext, extras.customInstructions) === 'ijekavian') {
+    return 'Write Serbian in the Ijekavian variant (for example mjesto, vrijeme, uvijek, riječ, djeca, gdje, poslije), as the user asked.';
+  }
+
+  return [
+    'Write Serbian in the standard Ekavian variant used in Serbia (for example mesto, vreme, uvek, reč, deca, gde, posle, podsetiti, izveštavati), never in Ijekavian forms (mjesto, vrijeme, uvijek, riječ, djeca, gdje, poslije, podsjetiti, izvještavati), and use Serbian words rather than Croatian or Bosnian ones.',
+    options.correction
+      ? 'Speech recognition often writes Serbian in Ijekavian forms: change them to Ekavian. This is a spelling fix, not rewording.'
+      : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function layoutInstruction({ maxCharsPerLine, maxLinesPerCaption }: CaptionLimits): string {
