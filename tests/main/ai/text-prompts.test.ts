@@ -44,6 +44,17 @@ describe('buildSummaryTranscript', () => {
 describe('script instructions', () => {
   const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
 
+  it('asks for standard Serbian vocabulary for both Serbian scripts', () => {
+    for (const targetLanguage of ['sr-Latn', 'sr-Cyrl']) {
+      expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage })).toContain(
+        'Use natural Serbian vocabulary and grammar'
+      );
+    }
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'sr-Latn', targetLanguage: 'en' })).not.toContain(
+      'natural Serbian'
+    );
+  });
+
   it('asks for Latin script for an sr-Latn translation and polish', () => {
     expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn' })).toContain(
       'Never use Cyrillic letters.'
@@ -61,6 +72,38 @@ describe('script instructions', () => {
 
   it('adds no script rule for other languages', () => {
     expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'sr-Latn', targetLanguage: 'de' })).not.toMatch(/Never use/);
+  });
+});
+
+describe('Serbian variant instructions', () => {
+  const limits = { maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
+  const EKAVIAN = 'Write Serbian in the standard Ekavian variant';
+  const IJEKAVIAN = 'Write Serbian in the Ijekavian variant';
+
+  it('asks for Ekavian Serbian in translation, polish and correction by default', () => {
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn' })).toContain(EKAVIAN);
+    expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Cyrl' })).toContain(EKAVIAN);
+    expect(buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'social_caption' })).toContain(EKAVIAN);
+    const correction = buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'transcript_correction' });
+    expect(correction).toContain(EKAVIAN);
+    expect(correction).toContain('change them to Ekavian');
+  });
+
+  it('asks for Ijekavian when the video context or the instructions name it', () => {
+    expect(
+      buildPolishInstructions({ ...limits, language: 'sr-Latn', mode: 'transcript_correction', videoContext: 'Srpska ijekavica.' })
+    ).toContain(IJEKAVIAN);
+    expect(
+      buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage: 'sr-Latn', customInstructions: 'Piši ijekavski.' })
+    ).toContain(IJEKAVIAN);
+  });
+
+  it('adds no variant rule for other languages', () => {
+    for (const language of ['hr', 'bs', 'en', 'und']) {
+      const prompt = buildPolishInstructions({ ...limits, language, mode: 'transcript_correction' });
+      expect(prompt).not.toContain('Ekavian');
+      expect(prompt).not.toContain('Ijekavian');
+    }
   });
 });
 

@@ -1,12 +1,18 @@
 import { MemoryCredentialStore } from '../credentials/memory-credential-store';
 import type { CredentialStore } from '../credentials/credential-store';
-import { AiProviderRegistry, createProviders } from './provider-registry';
+import { AiProviderRegistry, createProviders, type CreateProvidersOptions } from './provider-registry';
 
-export function createDefaultAiProviderRegistry(credentialStore: CredentialStore = new MemoryCredentialStore()): AiProviderRegistry {
-  return new AiProviderRegistry(createProviders(credentialStore), credentialStore);
+export function createDefaultAiProviderRegistry(
+  credentialStore: CredentialStore = new MemoryCredentialStore(),
+  options: CreateProvidersOptions = { enableClaudeCode: false }
+): AiProviderRegistry {
+  return new AiProviderRegistry(createProviders(credentialStore, options), credentialStore);
 }
 
-export { AiProviderRegistry } from './provider-registry';
+export { AiProviderRegistry, type CreateProvidersOptions } from './provider-registry';
+export { CodexCliProvider } from './codex-cli-provider';
+export { ClaudeCodeCliProvider } from './claude-code-cli-provider';
+export { LocalCliProvider } from './local-cli-provider';
 export { SubtitleWorkflowService } from './subtitle-workflow';
 export type {
   AiProvider,

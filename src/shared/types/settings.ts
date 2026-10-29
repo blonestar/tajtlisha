@@ -13,7 +13,19 @@ export type ExportSettings = {
 };
 
 export type AiConnectorSettings = {
+  /** Provider for transcription. Also the text provider when textProviderId is not set. */
   activeProviderId?: AiProviderId;
+  /**
+   * Provider for translation, polish, transcript correction, and summary.
+   * Undefined, or a provider that is not registered, = activeProviderId.
+   * Resolve it with resolveTextProviderId.
+   */
+  textProviderId?: AiProviderId;
+  /**
+   * Thinking effort for translation, polish, and transcript correction.
+   * 'default' sends no reasoning parameter, so non-reasoning models keep working.
+   */
+  textReasoningEffort: 'default' | ReasoningEffort;
   authModeByProvider: Partial<Record<AiProviderId, AuthMode>>;
   transcriptionModelByProvider: Partial<Record<AiProviderId, string>>;
   textModelByProvider: Partial<Record<AiProviderId, string>>;
@@ -38,6 +50,11 @@ export type AiConnectorSettings = {
  */
 export type SummarySettings = {
   enabled: boolean;
+  /**
+   * Provider for the summary. Undefined, or a provider that is not registered,
+   * = the text provider. Resolve it with resolveSummaryProviderId.
+   */
+  providerId?: AiProviderId;
   /** System prompt the model receives. Blank is normalized back to DEFAULT_SUMMARY_PROMPT. */
   systemPrompt: string;
   /** '' or missing = use the provider's text model (textModelByProvider), then the provider default. */

@@ -1,4 +1,4 @@
-import type { AiProviderId } from '../../shared/types/ai';
+import { LOCAL_CLI_PROVIDER_IDS, type AiProviderId } from '../../shared/types/ai';
 import { AppError } from '../../shared/errors';
 import {
   WATERMARK_BACKGROUNDS,
@@ -64,7 +64,8 @@ export function requireOneOf<T extends string>(value: unknown, allowed: readonly
 }
 
 export function requireProviderId(value: unknown): AiProviderId {
-  return requireOneOf<AiProviderId>(value, ['openai', 'openrouter'], 'providerId');
+  const providerIds: readonly AiProviderId[] = ['openai', 'openrouter', ...LOCAL_CLI_PROVIDER_IDS];
+  return requireOneOf<AiProviderId>(value, providerIds, 'providerId');
 }
 
 export function requireTimeRange(value: unknown, field: string): { startMs: number; endMs: number } {

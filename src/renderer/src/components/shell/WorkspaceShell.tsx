@@ -267,10 +267,10 @@ export function WorkspaceShell({ runtime }: WorkspaceShellProps): ReactElement {
           providers={runtime.providers}
           onLanguageChange={runtime.changeLanguage}
           onSettingsChange={(patch) => void runtime.updateSettings(patch)}
-          onActiveProviderChange={runtime.setActiveProvider}
           onConnectProvider={runtime.connectProvider}
           onDisconnectProvider={runtime.disconnectProvider}
           onTestProvider={runtime.testProvider}
+          onRefreshProviders={runtime.refreshProviders}
           onListModels={runtime.listModels}
           onClose={() => setSettingsOpen(false)}
         />

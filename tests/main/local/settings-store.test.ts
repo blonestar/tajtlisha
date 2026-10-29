@@ -211,6 +211,21 @@ describe('SettingsStore', () => {
       }
     });
 
+    it('normalizes the text reasoning effort and keeps a summary provider id', async () => {
+      await withSettingsFile({ aiConnector: { textReasoningEffort: 'ultra' } }, async (store) => {
+        expect((await store.get()).aiConnector.textReasoningEffort).toBe('default');
+      });
+      await withSettingsFile({ aiConnector: { textReasoningEffort: 'high' } }, async (store) => {
+        expect((await store.get()).aiConnector.textReasoningEffort).toBe('high');
+      });
+      await withSettingsFile({ summary: { providerId: 'codex_cli' } }, async (store) => {
+        expect((await store.get()).summary.providerId).toBe('codex_cli');
+      });
+      await withSettingsFile({ summary: { providerId: '' } }, async (store) => {
+        expect((await store.get()).summary).not.toHaveProperty('providerId');
+      });
+    });
+
     it('keeps only string model ids per provider', async () => {
       await withSettingsFile(
         { summary: { modelByProvider: { openai: 'gpt-4.1', openrouter: 7, extra: { nested: true }, blank: '' } } },

@@ -12,7 +12,7 @@ export type AiIpcDeps = {
   >;
 };
 
-const AUTH_MODES: readonly AuthMode[] = ['api_key', 'codex_auth_experimental'];
+const AUTH_MODES: readonly AuthMode[] = ['api_key', 'codex_auth_experimental', 'local_cli'];
 const CAPABILITIES: ReadonlyArray<keyof AiProviderCapabilities> = [
   'detectLanguage',
   'transcription',

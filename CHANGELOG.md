@@ -6,6 +6,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
+### Added
+- Experimental local CLI connectors: Codex CLI uses the installed `codex` and its ChatGPT login for translation, polish, transcript correction and summary, without an API key. Claude Code works the same way in development builds (or with `TAJTLISHA_ENABLE_CLAUDE_CODE=1`). Tajtlisha never reads the CLIs' auth files.
+- Separate provider, model and thinking effort per task: the Transcription, Translation and Summary tabs each choose their own. The translation thinking effort also applies to polish and transcript correction.
+
+### Changed
+- Settings > Connectors is only for connecting providers; model choices moved to the Transcription, Translation and Summary tabs.
+- The OpenAI translation model list is loaded live from the account, so newer models appear without an app update; legacy models without structured output are hidden.
+- Serbian translation prompts forbid words from other Slavic languages (for example Polish "ale" instead of "ali").
+
+### Fixed
+- "Translate again" works when every row is already translated: after a confirmation it translates all rows again (for example with another model), replacing the current translations, manual fixes included. Before, the button stayed disabled.
+- Serbian transcripts are now written in Ekavian (mesto, vreme, podsetimo) instead of the Ijekavian forms Whisper often returns (mjesto, vrijeme, podsjetimo). Common words are converted right after transcription, keeping word timing, and AI correction, translation and polish into Serbian follow the same rule. Writing "ijekavica" in the video context or instructions keeps Ijekavian; writing "ekavica" also treats a transcript detected as Bosnian or Croatian as Serbian.
+
 ## [0.8.0] - 2026-10-27
 
 ### Added
@@ -181,7 +196,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.9.0...develop
+[0.9.0]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0

@@ -178,6 +178,54 @@ describe('SubtitleWorkflowService.transcribe', () => {
     expect(result.captions[0].original).toBe('Привет, мир.');
   });
 
+  it('converts Ijekavian Serbian to Ekavian in the caption text and the timed words', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({
+        language: 'sr-Latn',
+        text: 'Da se podsjetimo gdje.',
+        words: [
+          { text: 'Da', startMs: 0, endMs: 200 },
+          { text: 'se', startMs: 200, endMs: 300 },
+          { text: 'podsjetimo', startMs: 300, endMs: 800 },
+          { text: 'gdje', startMs: 800, endMs: 1000 }
+        ]
+      }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Latn' }));
+
+    expect(result.captions[0].original).toBe('Da se podsetimo gde');
+    expect(result.captions[0].words?.map((word) => word.text)).toEqual(['Da', 'se', 'podsetimo', 'gde']);
+  });
+
+  it('keeps Ijekavian Serbian when the video context asks for it', async () => {
+    const registry = fakeRegistry({
+      transcribe: vi.fn(async () => ({ language: 'sr-Latn', text: 'Uvijek isto mjesto.', segments: [{ text: 'Uvijek isto mjesto.', startMs: 0, endMs: 800 }] }))
+    } as never);
+    const { service } = createService({ registry });
+
+    const result = await service.transcribe(createRequest({ language: 'sr-Latn', videoContext: 'Srpska ijekavica, Banjaluka.' }));
+
+    expect(result.captions[0].original).toBe('Uvijek isto mjesto.');
+  });
+
+  it('relabels a Bosnian or Croatian transcript as Ekavian Serbian only when the user named Ekavian', async () => {
+    for (const language of ['bs', 'hr']) {
+      const transcribe = vi.fn(async () => ({ language, text: 'Uvijek isto mjesto.', segments: [{ text: 'Uvijek isto mjesto.', startMs: 0, endMs: 800 }] }));
+      const named = createService({ registry: fakeRegistry({ transcribe } as never) });
+      const plain = createService({ registry: fakeRegistry({ transcribe } as never) });
+
+      const relabeled = await named.service.transcribe(createRequest({ videoContext: 'SRPSKA EKAVICA!!!' }));
+      const untouched = await plain.service.transcribe(createRequest());
+
+      expect(relabeled).toMatchObject({ language: 'sr-Latn' });
+      expect(relabeled.captions[0].original).toBe('Uvek isto mesto.');
+      expect(untouched).toMatchObject({ language });
+      expect(untouched.captions[0].original).toBe('Uvijek isto mjesto.');
+    }
+  });
+
   it('keeps Cyrillic transcription text when the language is sr-Cyrl', async () => {
     const registry = fakeRegistry({
       transcribe: vi.fn(async () => ({ language: 'sr-Cyrl', text: 'Здраво', segments: [{ text: 'Здраво', startMs: 0, endMs: 800 }] }))
@@ -541,6 +589,16 @@ describe('SubtitleWorkflowService.translate', () => {
     expect(stagesOf(progress.events)).toEqual(['translating', 'polishing']);
   });
 
+  it('sends the reasoning effort to translation and polish', async () => {
+    const registry = fakeRegistry();
+    const { service } = createService({ registry });
+
+    await service.translate(translateRequest({ polish: 'conservative', reasoningEffort: 'high' }));
+
+    expect(registry.translateTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+    expect(registry.polishTexts).toHaveBeenCalledWith('openai', expect.objectContaining({ reasoningEffort: 'high' }));
+  });
+
   it('does not call polish when polish is none', async () => {
     const registry = fakeRegistry();
     const { service } = createService({ registry });
@@ -809,6 +867,18 @@ describe('SubtitleWorkflowService.transcribe with transcript correction', () => 
     const request = (registry.polishTexts.mock.calls[0] as [string, ProviderPolishRequest])[1];
     expect(request.modelId).toBeUndefined();
     expect(request.customInstructions).toBe('');
+  });
+
+  it('sends the correction reasoning effort, and none when it is not set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ correction: { instructions: '', reasoningEffort: 'medium' } }));
+    await service.transcribe(createRequest({ correction: { instructions: '' } }));
+
+    const [first, second] = (registry.polishTexts.mock.calls as Array<[string, ProviderPolishRequest]>).map(([, request]) => request);
+    expect(first.reasoningEffort).toBe('medium');
+    expect(second).not.toHaveProperty('reasoningEffort');
   });
 
   it('matches corrected text to captions by id, even when the provider reverses the order', async () => {
@@ -1093,6 +1163,31 @@ describe('SubtitleWorkflowService video context', () => {
       'openai',
       expect.objectContaining({ videoContext: CONTEXT, customInstructions: 'Fix names.' })
     );
+  });
+
+  it('sends the correction pass to its own text provider when one is set, and keeps translation on the request provider', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(
+      createRequest({
+        providerId: 'openai',
+        correction: { providerId: 'codex_cli', modelId: 'gpt-fix', instructions: 'Fix names.' }
+      })
+    );
+
+    expect(registry.transcribe).toHaveBeenCalledWith('openai', expect.anything());
+    expect(registry.polishTexts).toHaveBeenCalledWith('codex_cli', expect.objectContaining({ mode: 'transcript_correction' }));
+    expect(registry.polishTexts).not.toHaveBeenCalledWith('openai', expect.anything());
+  });
+
+  it('uses the request provider for the correction pass when no correction provider is set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ providerId: 'openrouter', correction: { instructions: '' } }));
+
+    expect(registry.polishTexts).toHaveBeenCalledWith('openrouter', expect.objectContaining({ mode: 'transcript_correction' }));
   });
 
   it('sends no video context to polish when the transcript is not corrected', async () => {

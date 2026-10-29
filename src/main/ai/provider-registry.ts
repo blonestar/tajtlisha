@@ -11,6 +11,8 @@ import { AppError } from '../../shared/errors';
 import type { CredentialStore } from '../credentials/credential-store';
 import { OpenAiProvider } from './openai-provider';
 import { OpenRouterProvider } from './openrouter-provider';
+import { CodexCliProvider } from './codex-cli-provider';
+import { ClaudeCodeCliProvider } from './claude-code-cli-provider';
 import type {
   AiProvider,
   ProviderPolishRequest,
@@ -39,6 +41,10 @@ export class AiProviderRegistry {
 
   async getProviderStatus(providerId: AiProviderId): Promise<ProviderStatus> {
     const provider = this.requireProvider(providerId);
+    if (isLocalCliProvider(provider)) {
+      return this.getLocalCliStatus(provider);
+    }
+
     const credential = await this.credentialStore.get(providerId);
 
     return {
@@ -61,6 +67,11 @@ export class AiProviderRegistry {
       throw new Error(`${provider.displayName} does not support auth mode ${input.authMode}.`);
     }
 
+    // The CLI keeps its own login, so there is nothing to store. Only detection runs.
+    if (input.authMode === 'local_cli') {
+      return this.getProviderStatus(input.providerId);
+    }
+
     const secret = input.secret?.trim();
     if (!secret) {
       throw new Error(`${provider.displayName} requires a credential secret for ${input.authMode}.`);
@@ -76,8 +87,10 @@ export class AiProviderRegistry {
   }
 
   async disconnectProvider(providerId: AiProviderId): Promise<ProviderStatus> {
-    this.requireProvider(providerId);
-    await this.credentialStore.delete(providerId);
+    const provider = this.requireProvider(providerId);
+    if (!isLocalCliProvider(provider)) {
+      await this.credentialStore.delete(providerId);
+    }
     return this.getProviderStatus(providerId);
   }
 
@@ -126,12 +139,27 @@ export class AiProviderRegistry {
     return provider;
   }
 
+  /** A local CLI counts as connected when its executable is found; no credential is read. */
+  private async getLocalCliStatus(provider: AiProvider): Promise<ProviderStatus> {
+    const detected = await provider.detectLocalCli?.();
+
+    return {
+      ...this.toSummary(provider),
+      connected: Boolean(detected),
+      activeAuthMode: detected ? 'local_cli' : undefined,
+      cliVersion: detected?.version,
+      cliPath: detected?.path,
+      message: detected ? `${provider.displayName} found (${detected.version}).` : `${provider.displayName} was not found on this computer.`
+    };
+  }
+
   private toSummary(provider: AiProvider): ProviderSummary {
     return {
       id: provider.id,
       displayName: provider.displayName,
       authModes: [...provider.authModes],
-      capabilities: { ...provider.capabilities }
+      capabilities: { ...provider.capabilities },
+      experimental: provider.experimental
     };
   }
 
@@ -140,6 +168,24 @@ export class AiProviderRegistry {
   }
 }
 
-export function createProviders(credentialStore: CredentialStore): AiProvider[] {
-  return [new OpenAiProvider({ credentialStore }), new OpenRouterProvider({ credentialStore })];
+export type CreateProvidersOptions = {
+  /**
+   * Shows Claude Code (local). Public builds keep it off: Anthropic does not allow
+   * third-party products to offer Claude subscription use without approval.
+   */
+  enableClaudeCode: boolean;
+};
+
+export function createProviders(credentialStore: CredentialStore, options: CreateProvidersOptions): AiProvider[] {
+  return [
+    new OpenAiProvider({ credentialStore }),
+    new OpenRouterProvider({ credentialStore }),
+    new CodexCliProvider(),
+    ...(options.enableClaudeCode ? [new ClaudeCodeCliProvider()] : [])
+  ];
+}
+
+/** Providers that run a local CLI (they expose detectLocalCli) and never use the credential store. */
+function isLocalCliProvider(provider: AiProvider): boolean {
+  return typeof provider.detectLocalCli === 'function';
 }

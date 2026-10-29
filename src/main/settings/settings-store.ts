@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
-import { REASONING_EFFORTS } from '../../shared/types/ai';
+import { REASONING_EFFORTS, type AiProviderId } from '../../shared/types/ai';
 import type { AppSettings, SummarySettings } from '../../shared/types/settings';
 import { MAX_AI_INSTRUCTIONS_CHARS } from '../../shared/ai-instructions';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../shared/summary';
@@ -120,7 +120,9 @@ function normalizeSettings(settings: AppSettings): AppSettings {
       maxLinesPerCaption: settings.aiConnector.maxLinesPerCaption === 1 ? 1 : 2,
       correctTranscript: settings.aiConnector.correctTranscript === true,
       transcriptCorrectionInstructions: normalizeInstructions(settings.aiConnector.transcriptCorrectionInstructions),
-      translationInstructions: normalizeInstructions(settings.aiConnector.translationInstructions)
+      translationInstructions: normalizeInstructions(settings.aiConnector.translationInstructions),
+      textReasoningEffort:
+        REASONING_EFFORT_SETTINGS.find((effort) => effort === settings.aiConnector.textReasoningEffort) ?? 'default'
     },
     summary: normalizeSummary(settings.summary),
     watermark: normalizeWatermark(settings.watermark)
@@ -135,6 +137,9 @@ function normalizeSummary(value: unknown): SummarySettings {
   return {
     enabled: summary.enabled === true,
     systemPrompt: normalizeSummaryPrompt(summary.systemPrompt),
+    ...(typeof summary.providerId === 'string' && summary.providerId !== ''
+      ? { providerId: summary.providerId as AiProviderId }
+      : {}),
     modelByProvider: normalizeModelByProvider(summary.modelByProvider),
     reasoningEffort: REASONING_EFFORT_SETTINGS.find((effort) => effort === summary.reasoningEffort) ?? 'default'
   };

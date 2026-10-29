@@ -23,6 +23,7 @@ import { buildCaptionsFromSegments, buildCaptionsFromSpeechRegions, buildCaption
 import type { AiProviderRegistry } from './provider-registry';
 import type { ProviderTextItem, ProviderTranscribeResult } from './provider';
 import { looksLikeSerbianCyrillic, requiresSerbianLatin, serbianCyrillicToLatin } from './serbian-script';
+import { isSerbianLanguage, requestedSerbianVariant, serbianVariant, toEkavian } from './serbian-variant';
 import { detectSpeechRegions } from './speech-regions';
 import { buildSummaryTranscript } from './text-prompts';
 
@@ -78,15 +79,18 @@ export class SubtitleWorkflowService {
 
       throwIfCanceled(context.signal);
       context.onProgress?.({ stage: 'transcribing' });
-      const transcription = toRequestedScript(
-        await this.registry.transcribe(request.providerId, {
-          audioPath,
-          audioFormat: 'mp3',
-          modelId: request.modelId,
-          language: request.language,
-          prompt: transcriptionPrompt(request),
-          signal: context.signal
-        })
+      const transcription = toRequestedSerbian(
+        toRequestedScript(
+          await this.registry.transcribe(request.providerId, {
+            audioPath,
+            audioFormat: 'mp3',
+            modelId: request.modelId,
+            language: request.language,
+            prompt: transcriptionPrompt(request),
+            signal: context.signal
+          })
+        ),
+        request
       );
 
       if (!transcription.text.trim()) {
@@ -142,6 +146,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -161,6 +166,7 @@ export class SubtitleWorkflowService {
         maxLinesPerCaption: request.maxLinesPerCaption,
         customInstructions: request.instructions,
         videoContext: request.videoContext,
+        ...(request.reasoningEffort ? { reasoningEffort: request.reasoningEffort } : {}),
         signal: context.signal
       })
     );
@@ -188,7 +194,7 @@ export class SubtitleWorkflowService {
 
     try {
       const corrected = await this.runTextStage(items, 'correcting', context, (batch) =>
-        this.registry.polishTexts(request.providerId, {
+        this.registry.polishTexts(correction.providerId ?? request.providerId, {
           items: batch,
           language,
           mode: 'transcript_correction',
@@ -197,6 +203,7 @@ export class SubtitleWorkflowService {
           maxLinesPerCaption: request.maxLinesPerCaption,
           customInstructions: correction.instructions,
           videoContext: request.videoContext,
+          ...(correction.reasoningEffort ? { reasoningEffort: correction.reasoningEffort } : {}),
           signal: context.signal
         })
       );
@@ -374,6 +381,30 @@ function toRequestedScript(transcription: ProviderTranscribeResult): ProviderTra
   return {
     ...result,
     text: serbianCyrillicToLatin(result.text),
+    ...(result.words ? { words: convert(result.words) } : {}),
+    ...(result.segments ? { segments: convert(result.segments) } : {})
+  };
+}
+
+/**
+ * Whisper writes Ekavian Serbian speech in Ijekavian forms (mjesto, podsjetiti)
+ * and may label it Bosnian or Croatian. Serbian output is converted to Ekavian
+ * unless the user asked for Ijekavian; Bosnian or Croatian output is relabeled
+ * Serbian only when the user named Ekavian. Word timing stays as it is.
+ */
+function toRequestedSerbian(transcription: ProviderTranscribeResult, request: TranscribeClipRequest): ProviderTranscribeResult {
+  const hints = [request.videoContext, request.correction?.instructions];
+  const requested = requestedSerbianVariant(...hints);
+  const relabel = requested === 'ekavian' && ['bs', 'hr'].includes(transcription.language.trim());
+  const result = relabel ? { ...transcription, language: 'sr-Latn' } : transcription;
+  if (!isSerbianLanguage(result.language) || serbianVariant(...hints) !== 'ekavian') return result;
+
+  const convert = <T extends { text: string }>(items: T[] | undefined): T[] | undefined =>
+    items?.map((item) => ({ ...item, text: toEkavian(item.text) }));
+
+  return {
+    ...result,
+    text: toEkavian(result.text),
     ...(result.words ? { words: convert(result.words) } : {}),
     ...(result.segments ? { segments: convert(result.segments) } : {})
   };

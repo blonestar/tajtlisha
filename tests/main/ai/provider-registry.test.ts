@@ -6,9 +6,12 @@ import { MemoryCredentialStore } from '../../../src/main/credentials/memory-cred
 import { OpenAiProvider } from '../../../src/main/ai/openai-provider';
 import { OpenRouterProvider } from '../../../src/main/ai/openrouter-provider';
 import { AiProviderRegistry, createDefaultAiProviderRegistry } from '../../../src/main/ai';
+import { ClaudeCodeCliProvider } from '../../../src/main/ai/claude-code-cli-provider';
+import { CodexCliProvider } from '../../../src/main/ai/codex-cli-provider';
 import type { AiProvider } from '../../../src/main/ai/provider';
 import type { AiProviderCapabilities, ProviderSummary } from '../../../src/shared/types/ai';
 import { AppError } from '../../../src/shared/errors';
+import { failed, fakeRunner, installedResolveDeps, missingResolveDeps, ok } from './local-cli-fakes';
 
 function createRegistry(store = new MemoryCredentialStore()): AiProviderRegistry {
   return createDefaultAiProviderRegistry(store);
@@ -23,16 +26,105 @@ afterEach(() => {
 });
 
 describe('AI provider registry', () => {
-  it('lists OpenAI and OpenRouter with truthful capability flags', async () => {
+  it('lists OpenAI, OpenRouter, and Codex CLI with truthful capability flags', async () => {
     const providers = await createRegistry().listProviders();
 
-    expect(providers.map((provider) => provider.id)).toEqual(['openai', 'openrouter']);
+    expect(providers.map((provider) => provider.id)).toEqual(['openai', 'openrouter', 'codex_cli']);
     expect(providers.find((provider) => provider.id === 'openrouter')?.capabilities).toMatchObject({
       transcription: true,
       wordTimestamps: false,
       segmentTimestamps: false,
       translation: true
     });
+    expect(providers.find((provider) => provider.id === 'codex_cli')).toMatchObject({
+      displayName: 'Codex CLI (local)',
+      authModes: ['local_cli'],
+      experimental: true,
+      capabilities: { transcription: false, translation: true, subtitlePolish: true, summary: true }
+    });
+  });
+
+  it('hides Claude Code (local) unless enableClaudeCode is set', async () => {
+    const hidden = await createDefaultAiProviderRegistry(new MemoryCredentialStore(), { enableClaudeCode: false }).listProviders();
+    const shown = await createDefaultAiProviderRegistry(new MemoryCredentialStore(), { enableClaudeCode: true }).listProviders();
+
+    expect(hidden.map((provider) => provider.id)).not.toContain('claude_code_cli');
+    expect(shown.find((provider) => provider.id === 'claude_code_cli')).toMatchObject({
+      displayName: 'Claude Code (local)',
+      authModes: ['local_cli'],
+      experimental: true
+    });
+  });
+
+  it('reports a found local CLI as connected from detection, without reading the credential store', async () => {
+    const store = new MemoryCredentialStore();
+    const getSpy = vi.spyOn(store, 'get');
+    const registry = new AiProviderRegistry(
+      [new CodexCliProvider({ runner: fakeRunner(() => ok('codex-cli 0.165.0\n')).runner, resolveDeps: installedResolveDeps('codex') })],
+      store
+    );
+
+    const status = await registry.getProviderStatus('codex_cli');
+
+    expect(status).toMatchObject({
+      connected: true,
+      activeAuthMode: 'local_cli',
+      cliVersion: 'codex-cli 0.165.0',
+      cliPath: '/opt/bin/codex',
+      message: 'Codex CLI (local) found (codex-cli 0.165.0).',
+      experimental: true
+    });
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing local CLI as not connected', async () => {
+    const registry = new AiProviderRegistry(
+      [new ClaudeCodeCliProvider({ runner: fakeRunner().runner, resolveDeps: missingResolveDeps() })],
+      new MemoryCredentialStore()
+    );
+
+    await expect(registry.getProviderStatus('claude_code_cli')).resolves.toMatchObject({
+      connected: false,
+      activeAuthMode: undefined,
+      cliVersion: undefined,
+      cliPath: undefined,
+      message: 'Claude Code (local) was not found on this computer.'
+    });
+  });
+
+  it('connects and disconnects a local CLI without storing or deleting any credential', async () => {
+    const store = new MemoryCredentialStore();
+    const setSpy = vi.spyOn(store, 'set');
+    const deleteSpy = vi.spyOn(store, 'delete');
+    const registry = new AiProviderRegistry(
+      [new CodexCliProvider({ runner: fakeRunner(() => ok('codex-cli 0.165.0')).runner, resolveDeps: installedResolveDeps('codex') })],
+      store
+    );
+
+    const connected = await registry.connectProvider({ providerId: 'codex_cli', authMode: 'local_cli', secret: 'ignored' });
+    const disconnected = await registry.disconnectProvider('codex_cli');
+
+    expect(connected).toMatchObject({ connected: true, activeAuthMode: 'local_cli' });
+    expect(disconnected).toMatchObject({ connected: true, activeAuthMode: 'local_cli' });
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects local_cli auth for an API-key provider', async () => {
+    await expect(
+      createRegistry().connectProvider({ providerId: 'openai', authMode: 'local_cli' })
+    ).rejects.toThrow('OpenAI does not support auth mode local_cli.');
+  });
+
+  it('routes text requests for a local CLI and reports its failure as an AppError', async () => {
+    const registry = new AiProviderRegistry(
+      [new CodexCliProvider({ runner: fakeRunner(() => failed('Not logged in')).runner, resolveDeps: installedResolveDeps('codex') })],
+      new MemoryCredentialStore()
+    );
+
+    await expect(
+      registry.summarizeText('codex_cli', { systemPrompt: 'Summarize.', transcript: '[0:00] Hi' })
+    ).rejects.toMatchObject({ code: 'PROVIDER_AUTH_FAILED' });
   });
 
   it('connects, masks status, tests, and disconnects without exposing raw secrets', async () => {

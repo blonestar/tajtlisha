@@ -23,6 +23,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     // whisper-1 is the only OpenAI transcription model with word timestamps.
     transcriptionModelByProvider: { openai: 'whisper-1' },
     textModelByProvider: { openai: 'gpt-4.1-mini' },
+    textReasoningEffort: 'default',
     defaultTargetLanguage: 'sr-Latn',
     autoDetectInputLanguage: true,
     conservativePolish: true,

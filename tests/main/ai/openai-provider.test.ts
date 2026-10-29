@@ -185,6 +185,22 @@ describe('OpenAI provider requests', () => {
     expect(items).toEqual([{ id: 'c1', text: 'Zdravo' }]);
   });
 
+  it('sends the reasoning effort with caption requests only when it is set', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ output_text: JSON.stringify({ items: [] }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = await connectedProvider();
+    const base = { items: [], sourceLanguage: 'en', targetLanguage: 'sr-Latn', maxCharsPerLine: 42, maxLinesPerCaption: 2 as const };
+
+    await provider.translateTexts({ ...base, reasoningEffort: 'high' });
+    await provider.translateTexts(base);
+
+    const bodies = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).map(
+      ([, init]) => JSON.parse(String(init.body)) as Record<string, unknown>
+    );
+    expect(bodies[0].reasoning).toEqual({ effort: 'high' });
+    expect(bodies[1]).not.toHaveProperty('reasoning');
+  });
+
   it('uses the requested polish model and mode in the polish instructions', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ output_text: JSON.stringify({ items: [] }) }));
     vi.stubGlobal('fetch', fetchMock);
@@ -458,6 +474,42 @@ describe('OpenAI summary', () => {
       { id: 'gpt-4o', label: 'gpt-4o', capability: 'summary' },
       { id: 'o3-mini', label: 'o3-mini', capability: 'summary' }
     ]);
+  });
+
+  it('lists live translation and polish models without legacy models that lack structured output', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          data: [
+            { id: 'gpt-5' },
+            { id: 'gpt-4.1' },
+            { id: 'gpt-4o' },
+            { id: 'gpt-4' },
+            { id: 'gpt-4-turbo' },
+            { id: 'gpt-3.5-turbo' },
+            { id: 'chatgpt-4o-latest' },
+            { id: 'whisper-1' }
+          ]
+        })
+      )
+    );
+    const provider = await connectedProvider();
+
+    for (const capability of ['translation', 'subtitlePolish'] as const) {
+      await expect(provider.listModels(capability)).resolves.toEqual([
+        { id: 'gpt-4.1', label: 'gpt-4.1', capability },
+        { id: 'gpt-4o', label: 'gpt-4o', capability },
+        { id: 'gpt-5', label: 'gpt-5', capability }
+      ]);
+    }
+  });
+
+  it('falls back to the static translation models when the live list fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    const models = await (await connectedProvider()).listModels('translation');
+    expect(models.map((model) => model.id)).toEqual(['gpt-4.1-mini', 'gpt-4.1']);
   });
 
   it('falls back to the static summary models when the live list fails', async () => {
