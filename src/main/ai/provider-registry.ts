@@ -23,12 +23,19 @@ import type {
   ProviderTranslateRequest
 } from './provider';
 
+export type AiProviderRegistryOptions = {
+  /** Whether the user turned the connector on. Defaults to on for every provider. */
+  isProviderEnabled?: (providerId: AiProviderId) => Promise<boolean> | boolean;
+};
+
 export class AiProviderRegistry {
   private readonly providers = new Map<AiProviderId, AiProvider>();
   private readonly credentialStore: CredentialStore;
+  private readonly isProviderEnabled: (providerId: AiProviderId) => Promise<boolean> | boolean;
 
-  constructor(providers: AiProvider[], credentialStore: CredentialStore) {
+  constructor(providers: AiProvider[], credentialStore: CredentialStore, options: AiProviderRegistryOptions = {}) {
     this.credentialStore = credentialStore;
+    this.isProviderEnabled = options.isProviderEnabled ?? (() => true);
 
     for (const provider of providers) {
       this.providers.set(provider.id, provider);
@@ -41,6 +48,15 @@ export class AiProviderRegistry {
 
   async getProviderStatus(providerId: AiProviderId): Promise<ProviderStatus> {
     const provider = this.requireProvider(providerId);
+    // A turned-off connector reports nothing: no CLI detection and no credential read.
+    if (!(await this.isProviderEnabled(providerId))) {
+      return {
+        ...this.toSummary(provider),
+        enabled: false,
+        connected: false,
+        message: `${provider.displayName} is turned off.`
+      };
+    }
     if (isLocalCliProvider(provider)) {
       return this.getLocalCliStatus(provider);
     }
@@ -49,6 +65,7 @@ export class AiProviderRegistry {
 
     return {
       ...this.toSummary(provider),
+      enabled: true,
       connected: Boolean(credential),
       activeAuthMode: credential?.authMode,
       maskedCredential: credential ? await this.maskedCredential(providerId) : undefined,
@@ -57,7 +74,7 @@ export class AiProviderRegistry {
   }
 
   async connectProvider(input: ConnectProviderInput): Promise<ProviderStatus> {
-    const provider = this.requireProvider(input.providerId);
+    const provider = await this.requireEnabled(this.requireProvider(input.providerId));
 
     if (input.authMode === 'codex_auth_experimental') {
       throw new Error('Codex auth reuse is not supported. Tajtlisha will not read ~/.codex/auth.json.');
@@ -95,36 +112,44 @@ export class AiProviderRegistry {
   }
 
   async testConnection(providerId: AiProviderId): Promise<TestConnectionResult> {
-    return this.requireProvider(providerId).testConnection();
+    return (await this.requireEnabled(this.requireProvider(providerId))).testConnection();
   }
 
   async listModels(
     providerId: AiProviderId,
     capability: keyof AiProviderCapabilities
   ): Promise<ProviderModelDescriptor[]> {
-    return this.requireProvider(providerId).listModels(capability);
+    return (await this.requireEnabled(this.requireProvider(providerId))).listModels(capability);
   }
 
   async transcribe(providerId: AiProviderId, request: ProviderTranscribeRequest): Promise<ProviderTranscribeResult> {
-    return this.requireCapable(providerId, 'transcription').transcribe(request);
+    return (await this.requireCapable(providerId, 'transcription')).transcribe(request);
   }
 
   async translateTexts(providerId: AiProviderId, request: ProviderTranslateRequest): Promise<ProviderTextItem[]> {
-    return this.requireCapable(providerId, 'translation').translateTexts(request);
+    return (await this.requireCapable(providerId, 'translation')).translateTexts(request);
   }
 
   async polishTexts(providerId: AiProviderId, request: ProviderPolishRequest): Promise<ProviderTextItem[]> {
-    return this.requireCapable(providerId, 'subtitlePolish').polishTexts(request);
+    return (await this.requireCapable(providerId, 'subtitlePolish')).polishTexts(request);
   }
 
   async summarizeText(providerId: AiProviderId, request: ProviderSummarizeRequest): Promise<string> {
-    return this.requireCapable(providerId, 'summary').summarizeText(request);
+    return (await this.requireCapable(providerId, 'summary')).summarizeText(request);
   }
 
-  private requireCapable(providerId: AiProviderId, capability: keyof AiProviderCapabilities): AiProvider {
-    const provider = this.requireProvider(providerId);
+  private async requireCapable(providerId: AiProviderId, capability: keyof AiProviderCapabilities): Promise<AiProvider> {
+    const provider = await this.requireEnabled(this.requireProvider(providerId));
     if (!provider.capabilities[capability]) {
       throw new AppError('PROVIDER_UNSUPPORTED', `${provider.displayName} does not support ${capability}.`);
+    }
+
+    return provider;
+  }
+
+  private async requireEnabled(provider: AiProvider): Promise<AiProvider> {
+    if (!(await this.isProviderEnabled(provider.id))) {
+      throw new AppError('PROVIDER_DISABLED', `${provider.displayName} is turned off in Settings > Connectors.`);
     }
 
     return provider;
@@ -145,6 +170,7 @@ export class AiProviderRegistry {
 
     return {
       ...this.toSummary(provider),
+      enabled: true,
       connected: Boolean(detected),
       activeAuthMode: detected ? 'local_cli' : undefined,
       cliVersion: detected?.version,
@@ -168,20 +194,16 @@ export class AiProviderRegistry {
   }
 }
 
-export type CreateProvidersOptions = {
-  /**
-   * Shows Claude Code (local). Public builds keep it off: Anthropic does not allow
-   * third-party products to offer Claude subscription use without approval.
-   */
-  enableClaudeCode: boolean;
-};
-
-export function createProviders(credentialStore: CredentialStore, options: CreateProvidersOptions): AiProvider[] {
+/**
+ * Every provider is always registered. Whether one may run is decided per
+ * connector by the user's settings (see AiProviderRegistryOptions).
+ */
+export function createProviders(credentialStore: CredentialStore): AiProvider[] {
   return [
     new OpenAiProvider({ credentialStore }),
     new OpenRouterProvider({ credentialStore }),
     new CodexCliProvider(),
-    ...(options.enableClaudeCode ? [new ClaudeCodeCliProvider()] : [])
+    new ClaudeCodeCliProvider()
   ];
 }
 

@@ -27,6 +27,11 @@ export type AiConnectorSettings = {
    */
   textReasoningEffort: 'default' | ReasoningEffort;
   authModeByProvider: Partial<Record<AiProviderId, AuthMode>>;
+  /**
+   * Turn-on state of each connector set in Settings > Connectors. A missing entry
+   * means the provider default (see isProviderEnabled): on, except Claude Code.
+   */
+  enabledProviders: Partial<Record<AiProviderId, boolean>>;
   transcriptionModelByProvider: Partial<Record<AiProviderId, string>>;
   textModelByProvider: Partial<Record<AiProviderId, string>>;
   defaultTargetLanguage?: string;

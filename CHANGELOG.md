@@ -6,6 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+- Settings > Connectors > Enabled connectors: turn each AI connector on or off; turned-off connectors are hidden and never run.
+
+### Changed
+- Claude Code (local) is available in all builds, off by default, with a warning about Anthropic's terms; the TAJTLISHA_ENABLE_CLAUDE_CODE variable is gone.
+
 ## [0.9.0] - 2026-10-29
 
 ### Added

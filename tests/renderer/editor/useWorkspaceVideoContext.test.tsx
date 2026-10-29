@@ -8,7 +8,7 @@ import { useWorkspace } from '../../../src/renderer/src/hooks/useWorkspace';
 import type { JobRunner } from '../../../src/renderer/src/state/useJobRunner';
 import { useProjectStore } from '../../../src/renderer/src/state/useProjectStore';
 import { createI18n } from '../../../src/renderer/src/i18n';
-import { caption, makeProject, SETTINGS } from './fixtures';
+import { caption, makeProject, OPENAI_STATUS, SETTINGS } from './fixtures';
 import { createFakeApi } from '../state/fakeApi';
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -43,7 +43,7 @@ function setup(overrides: Partial<ProjectDocument>) {
   const hook = renderHook(
     () => {
       const store = useProjectStore({ targetLanguage: 'en', api: fake.api });
-      const workspace = useWorkspace({ store, settings: SETTINGS, providers: [], job: directJobRunner() });
+      const workspace = useWorkspace({ store, settings: SETTINGS, providers: [OPENAI_STATUS], job: directJobRunner() });
       return { store, workspace };
     },
     { wrapper }

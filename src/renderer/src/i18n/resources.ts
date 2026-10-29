@@ -45,6 +45,10 @@ const baseResources = {
         ai: {
           providers: 'Providers',
           noProviders: 'No AI providers are available in this version.',
+          enabledConnectors: 'Enabled connectors',
+          enabledConnectorsHint: 'Turned-off connectors are hidden everywhere and never run.',
+          claudeCodeWarning:
+            "Claude Code uses your Claude subscription through the claude CLI installed on this computer. Anthropic's terms may not allow subscription use from third-party apps, and Anthropic may limit or close your account. Turning this on is your own decision and responsibility; Tajtlisha takes no responsibility for any consequences.",
           providerAndModel: 'Provider and model',
           transcriptionProvider: 'Transcription provider',
           transcriptionProviderHint: 'Transcribes the speech. Only connected providers that can transcribe are listed.',
@@ -305,6 +309,10 @@ const baseResources = {
         ai: {
           providers: 'Provajderi',
           noProviders: 'Ni jedan AI provajder nije dostupan u ovoj verziji.',
+          enabledConnectors: 'Uključeni konektori',
+          enabledConnectorsHint: 'Isključeni konektori su skriveni svuda i nikad se ne pokreću.',
+          claudeCodeWarning:
+            'Claude Code koristi vašu Claude pretplatu preko claude CLI-ja instaliranog na ovom računaru. Anthropic-ovi uslovi možda ne dozvoljavaju korišćenje pretplate iz aplikacija trećih strana i Anthropic može da ograniči ili ugasi vaš nalog. Uključivanje je vaša odluka i vaša odgovornost; Tajtlisha ne snosi odgovornost ni za kakve posledice.',
           providerAndModel: 'Provajder i model',
           transcriptionProvider: 'Provajder za transkripciju',
           transcriptionProviderHint: 'Pretvara govor u tekst. Prikazani su samo povezani provajderi koji mogu da transkribuju.',
@@ -566,6 +574,10 @@ const baseResources = {
         ai: {
           providers: 'Провајдери',
           noProviders: 'Ни један AI провајдер није доступан у овој верзији.',
+          enabledConnectors: 'Укључени конектори',
+          enabledConnectorsHint: 'Искључени конектори су скривени свуда и никад се не покрећу.',
+          claudeCodeWarning:
+            'Claude Code користи вашу Claude претплату преко claude CLI-ја инсталираног на овом рачунару. Anthropic-ови услови можда не дозвољавају коришћење претплате из апликација трећих страна и Anthropic може да ограничи или угаси ваш налог. Укључивање је ваша одлука и ваша одговорност; Tajtlisha не сноси одговорност ни за какве последице.',
           providerAndModel: 'Провајдер и модел',
           transcriptionProvider: 'Провајдер за транскрипцију',
           transcriptionProviderHint: 'Претвара говор у текст. Приказани су само повезани провајдери који могу да транскрибују.',

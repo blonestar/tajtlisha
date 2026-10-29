@@ -71,7 +71,7 @@ AI opcije su u UI-u podeljene u tabove:
   thinking effort (`aiConnector.textReasoningEffort`), dorada prevoda, uputstva za prevod.
 - Summary: zaseban provider (`summary.providerId`, prazno = isto kao za prevod), model, thinking effort, prompt.
 
-Provider koji nije registrovan u ovom build-u (npr. Claude Code u javnom izdanju) pada nazad: tekst na provider
+Provider koji je iskljucen ili nije registrovan pada nazad: tekst na provider
 za transkripciju, sazetak na provider za tekst (`src/shared/ai-providers.ts`). Povezivanje novog API provider-a
 preuzima transkripciju samo ako nijedan povezan provider za transkripciju nije izabran.
 
@@ -82,10 +82,18 @@ Provider-i:
 - OpenAI,
 - OpenRouter,
 - Codex CLI (lokalno, experimental; samo tekst),
-- Claude Code (lokalno, experimental; samo tekst; samo dev build ili `TAJTLISHA_ENABLE_CLAUDE_CODE=1`).
+- Claude Code (lokalno, experimental; samo tekst; uvek dostupan, podrazumevano iskljucen; vidi `Enabled connectors`).
 
 Lokalni CLI provider-i nemaju kljuc: kartica pokazuje Found / Not found, panel pokazuje verziju i putanju
 CLI-ja, dugmad Check again i Test connection (proverava login CLI-ja). Detalji su u `docs/ai-providers.md`.
+
+### Enabled connectors
+
+Na dnu taba Connectors je odeljak `Enabled connectors`: jedan checkbox po provider-u (ukljucujuci iskljucene). Iskljuceni konektor se skriva svuda (kartice, izbor provider-a za transkripciju, prevod, sazetak, generisanje) i nikad se ne pokrece. Uloge koje je pokazivao iskljuceni provider ostaju sacuvane u settings-u i vracaju se kad se konektor ukljuci.
+
+- Podrazumevano: svi provider-i su ukljuceni, osim Claude Code (lokalno), koji je iskljucen.
+- Claude Code ima upozorenje ispod svog reda, uvek vidljivo, o uslovima Anthropic-a i odgovornosti (vidi `docs/ai-providers.md`).
+- Promena se cuva u `aiConnector.enabledProviders` (samo boolean po provider id-u; nedostajuci unos znaci podrazumevano), a zatim se osvezavaju statusi provider-a.
 
 UI mora da prikaze:
 

@@ -15,6 +15,7 @@ const OPENROUTER_DISCONNECTED: ProviderStatus = {
   ...OPENAI_STATUS,
   id: 'openrouter',
   displayName: 'OpenRouter',
+  enabled: true,
   connected: false,
   maskedCredential: undefined
 };

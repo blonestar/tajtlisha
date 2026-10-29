@@ -5,6 +5,8 @@
  */
 export type AiProviderId = 'openai' | 'openrouter' | 'codex_cli' | 'claude_code_cli';
 
+export const AI_PROVIDER_IDS = ['openai', 'openrouter', 'codex_cli', 'claude_code_cli'] as const satisfies readonly AiProviderId[];
+
 export const LOCAL_CLI_PROVIDER_IDS = ['codex_cli', 'claude_code_cli'] as const satisfies readonly AiProviderId[];
 
 /**
@@ -43,6 +45,8 @@ export type ProviderSummary = {
 };
 
 export type ProviderStatus = ProviderSummary & {
+  /** False when the user turned the connector off in Settings > Connectors. A turned-off connector never runs. */
+  enabled: boolean;
   connected: boolean;
   activeAuthMode?: AuthMode;
   maskedCredential?: string;
