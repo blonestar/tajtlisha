@@ -38,7 +38,8 @@ export const mockSettings: AppSettings = {
     maxLinesPerCaption: 2,
     correctTranscript: false,
     transcriptCorrectionInstructions: '',
-    translationInstructions: ''
+    translationInstructions: '',
+    textReasoningEffort: 'default'
   },
   summary: {
     enabled: false,

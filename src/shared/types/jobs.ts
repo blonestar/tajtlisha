@@ -59,6 +59,8 @@ export type TranscriptCorrectionRequest = {
   providerId?: AiProviderId;
   /** Text model id; undefined = provider default text model. */
   modelId?: string;
+  /** Undefined = send no reasoning parameter. */
+  reasoningEffort?: ReasoningEffort;
   /** User instructions; '' = none. At most MAX_AI_INSTRUCTIONS_CHARS. */
   instructions: string;
 };
@@ -89,6 +91,8 @@ export type TranslateCaptionsRequest = {
   targetLanguage: string;
   captions: Array<{ id: string; text: string }>;
   polish: PolishMode;
+  /** Thinking effort for translation and its polish pass. Undefined = send no reasoning parameter. */
+  reasoningEffort?: ReasoningEffort;
   /** User instructions for translation and its polish pass. Undefined or '' = none. */
   instructions?: string;
   /** The project's video context. Undefined or '' = none. At most MAX_VIDEO_CONTEXT_CHARS. */
