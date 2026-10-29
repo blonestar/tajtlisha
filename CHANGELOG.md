@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
 ### Added
 - Experimental local CLI connectors: Codex CLI uses the installed `codex` and its ChatGPT login for translation, polish, transcript correction and summary, without an API key. Claude Code works the same way in development builds (or with `TAJTLISHA_ENABLE_CLAUDE_CODE=1`). Tajtlisha never reads the CLIs' auth files.
 - Separate provider, model and thinking effort per task: the Transcription, Translation and Summary tabs each choose their own. The translation thinking effort also applies to polish and transcript correction.
@@ -194,7 +196,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.9.0...develop
+[0.9.0]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
