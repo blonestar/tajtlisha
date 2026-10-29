@@ -6,6 +6,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-29
+
 ### Fixed
 - Serbian transcripts are now written in Ekavian (mesto, vreme, podsetimo) instead of the Ijekavian forms Whisper often returns (mjesto, vrijeme, podsjetimo). Common words are converted right after transcription, keeping word timing, and AI correction, translation and polish into Serbian follow the same rule. Writing "ijekavica" in the video context or instructions keeps Ijekavian; writing "ekavica" also treats a transcript detected as Bosnian or Croatian as Serbian.
 
@@ -184,7 +186,8 @@ Settings and restarts, and there are Windows and Linux installers with in-app up
 - Default OpenAI transcription model does not return timestamps.
 - Opening Settings discards the current project.
 
-[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...develop
+[Unreleased]: https://github.com/blonestar/tajtlisha/compare/v0.8.1...develop
+[0.8.1]: https://github.com/blonestar/tajtlisha/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/blonestar/tajtlisha/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/blonestar/tajtlisha/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/blonestar/tajtlisha/compare/v0.6.1...v0.7.0
