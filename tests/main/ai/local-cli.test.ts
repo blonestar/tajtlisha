@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
-import { constants, existsSync } from 'node:fs';
+import { constants, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from 'node:child_process';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -125,6 +126,7 @@ type FakeChild = EventEmitter & {
   stdout: EventEmitter;
   stderr: EventEmitter;
   kill: ReturnType<typeof vi.fn>;
+  pid: number | undefined;
 };
 
 function fakeChild(): FakeChild {
@@ -133,8 +135,14 @@ function fakeChild(): FakeChild {
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
   child.kill = vi.fn(() => true);
+  child.pid = 4242;
   return child;
 }
+
+/** Test kill: records the signal on the fake child instead of signalling a real process group. */
+const killTree = (child: ChildProcessWithoutNullStreams, signal: 'SIGTERM' | 'SIGKILL'): void => {
+  child.kill(signal);
+};
 
 function spawnReturning(child: FakeChild) {
   return vi.fn((_command: string, _args: string[], _options: SpawnOptionsWithoutStdio) => child as unknown as ChildProcessWithoutNullStreams);
@@ -155,6 +163,8 @@ describe('runCli', () => {
 
     const pending = runCli(baseInput, {
       spawn,
+      killTree,
+      platform: 'linux',
       env: { PATH: '/usr/bin', ELECTRON_RUN_AS_NODE: '1' }
     });
     child.stdout.emit('data', Buffer.from('answer'));
@@ -169,6 +179,7 @@ describe('runCli', () => {
         cwd: '/tmp/tajtlisha-cli-test',
         shell: false,
         windowsHide: true,
+        detached: true,
         env: expect.objectContaining({ PATH: '/home/tester/.local/bin:/usr/bin' })
       })
     );
@@ -179,7 +190,7 @@ describe('runCli', () => {
 
   it('returns a non-zero exit code without rejecting', async () => {
     const child = fakeChild();
-    const pending = runCli(baseInput, { spawn: spawnReturning(child) });
+    const pending = runCli(baseInput, { spawn: spawnReturning(child), killTree });
 
     child.stderr.emit('data', Buffer.from('Not logged in'));
     child.emit('close', 1);
@@ -189,7 +200,8 @@ describe('runCli', () => {
 
   it('maps a spawn error (ENOENT) to PROVIDER_NOT_CONNECTED', async () => {
     const child = fakeChild();
-    const pending = runCli({ ...baseInput, displayName: 'Codex CLI (local)' }, { spawn: spawnReturning(child) });
+    child.pid = undefined;
+    const pending = runCli({ ...baseInput, displayName: 'Codex CLI (local)' }, { spawn: spawnReturning(child), killTree });
 
     child.emit('error', new Error('spawn codex ENOENT'));
 
@@ -197,35 +209,56 @@ describe('runCli', () => {
     await expect(pending).rejects.toThrow('Codex CLI (local) could not be started');
   });
 
-  it('rejects with JOB_CANCELED and kills the child on abort, then SIGKILL after the grace period', async () => {
+  it('kills on abort, sends SIGKILL after the grace period, and rejects only once the child has closed', async () => {
     vi.useFakeTimers();
     const child = fakeChild();
     const controller = new AbortController();
-    const pending = runCli({ ...baseInput, signal: controller.signal }, { spawn: spawnReturning(child) });
-    const rejection = expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+    const pending = runCli({ ...baseInput, signal: controller.signal }, { spawn: spawnReturning(child), killTree });
+    let settled = false;
+    pending.then(
+      () => (settled = true),
+      () => (settled = true)
+    );
 
     controller.abort();
-    await rejection;
-
+    await vi.advanceTimersByTimeAsync(0);
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
     expect(child.kill).not.toHaveBeenCalledWith('SIGKILL');
-    vi.advanceTimersByTime(CLI_KILL_GRACE_MS);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(CLI_KILL_GRACE_MS);
     expect(child.kill).toHaveBeenLastCalledWith('SIGKILL');
+    expect(settled).toBe(false);
+
+    child.emit('close', null);
+    await expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
   });
 
   it('does not send SIGKILL when the child exits after SIGTERM', async () => {
     vi.useFakeTimers();
     const child = fakeChild();
     const controller = new AbortController();
-    const pending = runCli({ ...baseInput, signal: controller.signal }, { spawn: spawnReturning(child) });
-    const rejection = expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+    const pending = runCli({ ...baseInput, signal: controller.signal }, { spawn: spawnReturning(child), killTree });
 
     controller.abort();
-    await rejection;
     child.emit('close', null);
+    await expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
     vi.advanceTimersByTime(CLI_KILL_GRACE_MS);
 
     expect(child.kill.mock.calls).toEqual([['SIGTERM']]);
+  });
+
+  it('settles anyway when no close event arrives after SIGKILL', async () => {
+    vi.useFakeTimers();
+    const child = fakeChild();
+    const controller = new AbortController();
+    const pending = runCli({ ...baseInput, signal: controller.signal }, { spawn: spawnReturning(child), killTree });
+    const rejection = expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(CLI_KILL_GRACE_MS + 3_000);
+
+    await rejection;
   });
 
   it('does not spawn when the signal is already aborted', async () => {
@@ -240,10 +273,11 @@ describe('runCli', () => {
   it('rejects with PROVIDER_REQUEST_FAILED and kills the child on timeout', async () => {
     vi.useFakeTimers();
     const child = fakeChild();
-    const pending = runCli({ ...baseInput, timeoutMs: 1_000, displayName: 'Claude Code (local)' }, { spawn: spawnReturning(child) });
+    const pending = runCli({ ...baseInput, timeoutMs: 1_000, displayName: 'Claude Code (local)' }, { spawn: spawnReturning(child), killTree });
     const rejection = expect(pending).rejects.toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
 
     vi.advanceTimersByTime(1_000);
+    child.emit('close', null);
 
     await rejection;
     await expect(pending).rejects.toThrow('Claude Code (local) timed out after 1 s.');
@@ -252,19 +286,22 @@ describe('runCli', () => {
 
   it('names the executable file in messages when no display name is given', async () => {
     vi.useFakeTimers();
-    const pending = runCli({ ...baseInput, timeoutMs: 2_000 }, { spawn: spawnReturning(fakeChild()) });
+    const child = fakeChild();
+    const pending = runCli({ ...baseInput, timeoutMs: 2_000 }, { spawn: spawnReturning(child), killTree });
     const rejection = expect(pending).rejects.toThrow('codex timed out after 2 s.');
 
     vi.advanceTimersByTime(2_000);
+    child.emit('close', null);
 
     await rejection;
   });
 
   it('rejects output above the 10 MB cap and kills the child', async () => {
     const child = fakeChild();
-    const pending = runCli({ ...baseInput, displayName: 'Codex CLI (local)' }, { spawn: spawnReturning(child) });
+    const pending = runCli({ ...baseInput, displayName: 'Codex CLI (local)' }, { spawn: spawnReturning(child), killTree });
 
     child.stdout.emit('data', Buffer.alloc(CLI_MAX_OUTPUT_BYTES + 1));
+    child.emit('close', null);
 
     await expect(pending).rejects.toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
     await expect(pending).rejects.toThrow('Codex CLI (local) produced too much output.');
@@ -273,13 +310,56 @@ describe('runCli', () => {
 
   it('keeps output at exactly the cap', async () => {
     const child = fakeChild();
-    const pending = runCli(baseInput, { spawn: spawnReturning(child) });
+    const pending = runCli(baseInput, { spawn: spawnReturning(child), killTree });
 
     child.stdout.emit('data', Buffer.alloc(CLI_MAX_OUTPUT_BYTES));
     child.emit('close', 0);
 
     await expect(pending).resolves.toMatchObject({ exitCode: 0 });
   });
+});
+
+describe.skipIf(process.platform === 'win32')('runCli with real processes', () => {
+  function isAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  it('kills the processes the CLI started, and keeps the work directory until the CLI has exited', async () => {
+    await withCliWorkDir(async (cwd) => {
+      const pidFile = join(cwd, 'grandchild.pid');
+      // A launcher that ignores SIGTERM and starts a long-running grandchild, like an npm shim.
+      const launcher = [
+        "process.on('SIGTERM', () => {});",
+        "const { spawn } = require('node:child_process');",
+        "const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+        `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid));`,
+        'setInterval(() => {}, 1000);'
+      ].join('\n');
+      const controller = new AbortController();
+      const pending = runCli({ executable: process.execPath, args: ['-e', launcher], cwd, timeoutMs: 30_000, signal: controller.signal });
+
+      let grandchildPid = 0;
+      for (let attempt = 0; attempt < 100 && grandchildPid === 0; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        grandchildPid = existsSync(pidFile) ? Number(readFileSync(pidFile, 'utf8')) || 0 : 0;
+      }
+      expect(grandchildPid).toBeGreaterThan(0);
+
+      controller.abort();
+      await expect(pending).rejects.toMatchObject({ code: 'JOB_CANCELED' });
+      expect(existsSync(cwd)).toBe(true);
+
+      for (let attempt = 0; attempt < 40 && isAlive(grandchildPid); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(isAlive(grandchildPid)).toBe(false);
+    });
+  }, 20_000);
 });
 
 describe('cliFailureError', () => {
@@ -298,25 +378,23 @@ describe('cliFailureError', () => {
     expect(cliFailureError('Claude Code (local)', 'Authentication failed')).toMatchObject({ code: 'PROVIDER_AUTH_FAILED' });
   });
 
-  it('maps anything else to PROVIDER_REQUEST_FAILED with the text tail as detail', () => {
-    const error = cliFailureError('Codex CLI (local)', 'boom');
+  it('maps anything else to PROVIDER_REQUEST_FAILED with a fixed message and the exit code', () => {
+    const error = cliFailureError('Codex CLI (local)', 'boom', 2);
 
     expect(error).toBeInstanceOf(AppError);
-    expect(error).toMatchObject({ code: 'PROVIDER_REQUEST_FAILED', detail: 'Codex CLI (local) failed: boom' });
+    expect(error).toMatchObject({ code: 'PROVIDER_REQUEST_FAILED', detail: 'Codex CLI (local) request failed (exit code 2).' });
   });
 
-  it('keeps only the last 300 characters of the CLI text', () => {
-    const error = cliFailureError('Codex CLI (local)', `${'x'.repeat(1_000)}THE-END`);
-
-    expect(error.detail?.endsWith('THE-END')).toBe(true);
-    expect(error.detail?.length).toBeLessThanOrEqual('Codex CLI (local) failed: '.length + 300);
-  });
-
-  it('removes e-mail addresses from the detail', () => {
-    const error = cliFailureError('Claude Code (local)', 'Request failed for bojan@example.com');
-
-    expect(error.detail).not.toContain('bojan@example.com');
-    expect(error.detail).toContain('[email]');
+  it('never puts CLI output in the message, which may echo the prompt', () => {
+    for (const text of [
+      'Request failed; echoed input: PRIVATE_TRANSCRIPT_SENTINEL',
+      'Rate limit hit for PRIVATE_TRANSCRIPT_SENTINEL',
+      'Not logged in as bojan@example.com PRIVATE_TRANSCRIPT_SENTINEL'
+    ]) {
+      const error = cliFailureError('Claude Code (local)', text, 1);
+      expect(error.detail).not.toContain('PRIVATE_TRANSCRIPT_SENTINEL');
+      expect(error.detail).not.toContain('bojan@example.com');
+    }
   });
 });
 

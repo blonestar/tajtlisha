@@ -157,37 +157,36 @@ export function useProviderModels(
   connected: boolean,
   onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>
 ): { models: ProviderModelDescriptor[]; state: ModelsState } {
-  const [models, setModels] = useState<ProviderModelDescriptor[]>([]);
-  const [state, setState] = useState<ModelsState>('idle');
+  // Results are tagged with the provider and capability they belong to, so a
+  // provider switch never shows (or lets the user save) the previous provider's models.
+  const key = providerId && connected && onListModels ? `${providerId}:${capability}` : '';
+  const [loaded, setLoaded] = useState<{ key: string; models: ProviderModelDescriptor[]; state: ModelsState }>({
+    key: '',
+    models: [],
+    state: 'idle'
+  });
 
   useEffect(() => {
-    if (!providerId || !connected || !onListModels) {
-      setModels([]);
-      setState('idle');
+    if (!key || !providerId || !onListModels) {
       return undefined;
     }
 
     let active = true;
-    setState('loading');
     onListModels(providerId, capability).then(
       (next) => {
-        if (active) {
-          setModels(next);
-          setState('ready');
-        }
+        if (active) setLoaded({ key, models: next, state: 'ready' });
       },
       () => {
-        if (active) {
-          setModels([]);
-          setState('error');
-        }
+        if (active) setLoaded({ key, models: [], state: 'error' });
       }
     );
 
     return () => {
       active = false;
     };
-  }, [providerId, capability, connected, onListModels]);
+  }, [key, providerId, capability, onListModels]);
 
-  return { models, state };
+  if (!key) return { models: [], state: 'idle' };
+  if (loaded.key !== key) return { models: [], state: 'loading' };
+  return { models: loaded.models, state: loaded.state };
 }

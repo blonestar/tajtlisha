@@ -303,10 +303,11 @@ describe('Transcription tab provider and model', () => {
     expect(await screen.findByText('Models could not be loaded. Check the connection and try again.')).toBeInTheDocument();
   });
 
-  it('asks for a connection before showing the model picker', () => {
+  it('asks for a connection before showing the model picker, with one notice only', () => {
     openSettingsTab('Transcription', { providers: disconnectedOpenAi, onListModels: listModels() });
 
-    expect(screen.getByText('Connect this provider to choose its models.')).toBeInTheDocument();
+    expect(screen.getByText('No connected provider can transcribe audio.')).toBeInTheDocument();
+    expect(screen.queryByText('Connect this provider to choose its models.')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Transcription model')).not.toBeInTheDocument();
   });
 

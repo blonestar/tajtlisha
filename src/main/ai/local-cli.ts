@@ -138,17 +138,31 @@ export type RunCliOptions = {
   spawn?: CliSpawn;
   /** Parent environment. Default: process.env. */
   env?: NodeJS.ProcessEnv;
+  /** Platform used for spawn and kill behavior. Default: process.platform. */
+  platform?: NodeJS.Platform;
+  /** Kills the child and everything it started. Injected for tests. Default: killProcessTree. */
+  killTree?: (child: ChildProcessWithoutNullStreams, signal: 'SIGTERM' | 'SIGKILL', platform: NodeJS.Platform) => void;
 };
 
 const defaultSpawn: CliSpawn = (command, args, options) => spawn(command, args, options);
 
 /**
+ * Extra wait after SIGKILL before the run settles anyway. A killed process
+ * normally closes at once; this only guards against a lost 'close' event.
+ */
+const CLI_CLOSE_FALLBACK_MS = 3_000;
+
+/**
  * Spawns the CLI without a shell. Stdin is written and closed. Output is
- * capped. Abort and timeout send SIGTERM, then SIGKILL after a grace period,
- * and reject. A spawn error (usually ENOENT) means the CLI is not installed.
+ * capped. Abort, timeout, and oversized output kill the whole process tree
+ * (SIGTERM, then SIGKILL after a grace period) and reject only after the
+ * process has closed, so the caller's temp directory outlives the process.
+ * A spawn error (usually ENOENT) means the CLI is not installed.
  */
 export function runCli(input: CliRunInput, options: RunCliOptions = {}): Promise<CliRunResult> {
   const spawnProcess = options.spawn ?? defaultSpawn;
+  const platform = options.platform ?? process.platform;
+  const killTree = options.killTree ?? killProcessTree;
   const displayName = input.displayName ?? basename(input.executable);
 
   return new Promise<CliRunResult>((resolve, reject) => {
@@ -163,7 +177,9 @@ export function runCli(input: CliRunInput, options: RunCliOptions = {}): Promise
         cwd: input.cwd,
         env: cliChildEnv(input.executable, options.env ?? process.env),
         shell: false,
-        windowsHide: true
+        windowsHide: true,
+        // Own process group on POSIX, so a kill reaches every process the CLI starts.
+        detached: platform !== 'win32'
       });
     } catch {
       reject(notStartedError(displayName));
@@ -174,29 +190,38 @@ export function runCli(input: CliRunInput, options: RunCliOptions = {}): Promise
     const stderrChunks: Buffer[] = [];
     const outputBytes = { stdout: 0, stderr: 0 };
     let settled = false;
-    let closed = false;
+    let failure: AppError | undefined;
     let killTimer: NodeJS.Timeout | undefined;
+    let fallbackTimer: NodeJS.Timeout | undefined;
 
-    const settle = (action: () => void): void => {
+    const finish = (action: () => void): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutTimer);
+      clearTimeout(killTimer);
+      clearTimeout(fallbackTimer);
       input.signal?.removeEventListener('abort', onAbort);
       action();
     };
 
-    const fail = (error: AppError): void => {
-      settle(() => {
-        terminate();
-        reject(error);
-      });
+    const kill = (signal: 'SIGTERM' | 'SIGKILL'): void => {
+      try {
+        killTree(child, signal, platform);
+      } catch {
+        // The process is already gone.
+      }
     };
 
-    const terminate = (): void => {
-      if (closed) return;
-      child.kill('SIGTERM');
+    /** Records the first failure and stops the process; the run settles on 'close'. */
+    const fail = (error: AppError): void => {
+      if (settled || failure) return;
+      failure = error;
+      clearTimeout(timeoutTimer);
+      input.signal?.removeEventListener('abort', onAbort);
+      kill('SIGTERM');
       killTimer = setTimeout(() => {
-        if (!closed) child.kill('SIGKILL');
+        kill('SIGKILL');
+        fallbackTimer = setTimeout(() => finish(() => reject(error)), CLI_CLOSE_FALLBACK_MS);
       }, CLI_KILL_GRACE_MS);
     };
 
@@ -209,7 +234,7 @@ export function runCli(input: CliRunInput, options: RunCliOptions = {}): Promise
     input.signal?.addEventListener('abort', onAbort, { once: true });
 
     const collect = (stream: 'stdout' | 'stderr', chunks: Buffer[]) => (chunk: Buffer) => {
-      if (settled) return;
+      if (settled || failure) return;
       outputBytes[stream] += chunk.length;
       if (outputBytes[stream] > CLI_MAX_OUTPUT_BYTES) {
         fail(new AppError('PROVIDER_REQUEST_FAILED', `${displayName} produced too much output.`));
@@ -226,21 +251,54 @@ export function runCli(input: CliRunInput, options: RunCliOptions = {}): Promise
     child.stdin.end(input.stdin ?? '');
 
     child.on('error', () => {
+      // No pid: the process never started, so there is nothing to wait for.
+      if (child.pid === undefined) {
+        finish(() => reject(notStartedError(displayName)));
+        return;
+      }
       fail(notStartedError(displayName));
     });
 
     child.on('close', (exitCode: number | null) => {
-      closed = true;
-      clearTimeout(killTimer);
-      settle(() =>
+      finish(() => {
+        if (failure) {
+          reject(failure);
+          return;
+        }
         resolve({
           exitCode,
           stdout: Buffer.concat(stdoutChunks).toString('utf8'),
           stderr: Buffer.concat(stderrChunks).toString('utf8')
-        })
-      );
+        });
+      });
     });
   });
+}
+
+/**
+ * Kills the child and its descendants. POSIX: the child leads its own process
+ * group (spawned detached), so the negative pid signals the whole group.
+ * Windows: `taskkill /T /F` ends the tree.
+ */
+export function killProcessTree(
+  child: ChildProcessWithoutNullStreams,
+  signal: 'SIGTERM' | 'SIGKILL',
+  platform: NodeJS.Platform
+): void {
+  const pid = child.pid;
+  if (pid === undefined) return;
+
+  if (platform === 'win32') {
+    const killer = spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    killer.on('error', () => child.kill(signal));
+    return;
+  }
+
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    child.kill(signal);
+  }
 }
 
 function notStartedError(displayName: string): AppError {
@@ -266,29 +324,23 @@ export function cliChildEnv(executable: string, parentEnv: NodeJS.ProcessEnv): N
 
 const RATE_LIMIT_PATTERN = /rate[ _-]?limit|usage limit|too many requests|\b429\b|quota/i;
 const AUTH_PATTERN = /not logged in|log ?in|sign ?in|unauthori[sz]ed|authenticat/i;
-const DETAIL_MAX_CHARS = 300;
 
 /**
- * Maps CLI failure text to an AppError. The detail is the last 300 characters
- * of the text, with e-mail addresses removed. The full text (which may echo
- * the prompt) never reaches the message.
+ * Maps CLI failure text to an AppError. The text is only classified: CLI
+ * output can echo the prompt (transcript, instructions), so it never becomes
+ * part of the message. Messages are fixed per category.
  */
-export function cliFailureError(displayName: string, text: string): AppError {
-  const tail = scrubEmails(text.trim()).slice(-DETAIL_MAX_CHARS).trim();
-
+export function cliFailureError(displayName: string, text: string, exitCode?: number | null): AppError {
   if (RATE_LIMIT_PATTERN.test(text)) {
-    return new AppError('PROVIDER_RATE_LIMITED', tail ? `${displayName}: ${tail}` : `${displayName} usage limit reached.`);
+    return new AppError('PROVIDER_RATE_LIMITED', `${displayName} reached its usage limit. Try again later.`);
   }
 
   if (AUTH_PATTERN.test(text)) {
-    return new AppError('PROVIDER_AUTH_FAILED', tail ? `${displayName} is not signed in: ${tail}` : `${displayName} is not signed in.`);
+    return new AppError('PROVIDER_AUTH_FAILED', `${displayName} is not signed in. Sign in to the CLI in a terminal, then try again.`);
   }
 
-  return new AppError('PROVIDER_REQUEST_FAILED', tail ? `${displayName} failed: ${tail}` : `${displayName} request failed.`);
-}
-
-function scrubEmails(text: string): string {
-  return text.replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]');
+  const code = typeof exitCode === 'number' && exitCode !== 0 ? ` (exit code ${exitCode})` : '';
+  return new AppError('PROVIDER_REQUEST_FAILED', `${displayName} request failed${code}.`);
 }
 
 /** Runs `task` in a fresh temp directory and removes the directory afterwards. */

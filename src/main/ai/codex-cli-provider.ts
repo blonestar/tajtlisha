@@ -209,7 +209,9 @@ export class CodexCliProvider extends LocalCliProvider {
     });
 
     if (result.exitCode !== 0) {
-      throw cliFailureError(this.displayName, result.stderr || result.stdout);
+      // codex echoes the prompt on stderr; drop it so caption text cannot steer the error category.
+      const output = (result.stderr || result.stdout).split(input.stdin).join('');
+      throw cliFailureError(this.displayName, output, result.exitCode);
     }
   }
 }

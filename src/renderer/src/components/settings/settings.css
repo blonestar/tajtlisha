@@ -360,7 +360,8 @@
   margin-top: var(--space-2);
 }
 .settings-sheet .settings-provider-notice {
-  margin-bottom: var(--space-3);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
 }
 
 /* Credential */

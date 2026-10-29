@@ -71,25 +71,26 @@ export function TranslationSettings({
             if (providerId) updateConnector({ textProviderId: providerId });
           }}
         />
+        {canTranslate ? null : (
+          <div className="settings-inline settings-provider-notice">
+            <span className="muted">{t('settings.ai.noTextProvider')}</span>
+            {onOpenConnectors ? (
+              <button type="button" className="btn btn-sm" onClick={onOpenConnectors}>
+                {t('settings.ai.openConnectors')}
+              </button>
+            ) : null}
+          </div>
+        )}
+        {canTranslate && textId && !chosen?.connected ? (
+          <p className="settings-row-hint">{t('settings.ai.connectToChooseModels')}</p>
+        ) : null}
       </SettingsRow>
 
-      {canTranslate ? null : (
-        <div className="settings-inline settings-provider-notice">
-          <span className="muted">{t('settings.ai.noTextProvider')}</span>
-          {onOpenConnectors ? (
-            <button type="button" className="btn btn-sm" onClick={onOpenConnectors}>
-              {t('settings.ai.openConnectors')}
-            </button>
-          ) : null}
-        </div>
-      )}
 
       {chosen?.connected ? (
         <SettingsRow label={t('settings.ai.textModel')} htmlFor="settings-text-model" hint={t('settings.ai.textHint')}>
           <ModelPicker id="settings-text-model" value={modelId} models={models} state={state} onChange={updateModel} />
         </SettingsRow>
-      ) : textId ? (
-        <p className="settings-card-note muted">{t('settings.ai.connectToChooseModels')}</p>
       ) : null}
 
       <SettingsRow label={t('settings.ai.textEffort')} htmlFor="settings-text-effort" hint={t('settings.ai.textEffortHint')}>

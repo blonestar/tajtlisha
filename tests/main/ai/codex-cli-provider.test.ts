@@ -311,6 +311,19 @@ describe('CodexCliProvider text requests', () => {
     await expect(provider.polishTexts(POLISH_REQUEST)).rejects.toMatchObject({ code: 'PROVIDER_AUTH_FAILED' });
   });
 
+  it('ignores the echoed prompt when it classifies a failure, and keeps caption text out of the message', async () => {
+    const request = { ...TRANSLATE_REQUEST, items: [{ id: 'c1', text: 'Please log in to your quota dashboard SECRET_CAPTION' }] };
+    const provider = new CodexCliProvider({
+      runner: fakeRunner((input) => failed(`user\n${input.stdin}\nERROR: stream disconnected`)).runner,
+      resolveDeps: installedResolveDeps('codex')
+    });
+
+    const error = await provider.translateTexts(request).catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ code: 'PROVIDER_REQUEST_FAILED' });
+    expect(String((error as { detail?: string }).detail)).not.toContain('SECRET_CAPTION');
+  });
+
   it('runs requests in a temp directory, never in the project', async () => {
     const { runner, calls } = codexReplying(JSON.stringify({ items: ITEMS }));
     const provider = new CodexCliProvider({ runner, resolveDeps: installedResolveDeps('codex') });

@@ -223,7 +223,7 @@ export class ClaudeCodeCliProvider extends LocalCliProvider {
 
     if (!resultPayload || resultPayload.is_error === true || resultPayload.subtype !== 'success' || result.exitCode !== 0) {
       const failureText = typeof resultPayload?.result === 'string' ? resultPayload.result : '';
-      throw cliFailureError(this.displayName, failureText || result.stderr || result.stdout);
+      throw cliFailureError(this.displayName, failureText || result.stderr || result.stdout, result.exitCode);
     }
 
     return resultPayload;

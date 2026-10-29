@@ -69,18 +69,21 @@ export function TranscriptionSettings({
             if (providerId) updateConnector({ activeProviderId: providerId });
           }}
         />
+        {canTranscribe ? null : (
+          <div className="settings-inline settings-provider-notice">
+            <span className="muted">{t('settings.ai.noTranscriptionProvider')}</span>
+            {onOpenConnectors ? (
+              <button type="button" className="btn btn-sm" onClick={onOpenConnectors}>
+                {t('settings.ai.openConnectors')}
+              </button>
+            ) : null}
+          </div>
+        )}
+        {canTranscribe && transcriptionId && !chosen?.connected ? (
+          <p className="settings-row-hint">{t('settings.ai.connectToChooseModels')}</p>
+        ) : null}
       </SettingsRow>
 
-      {canTranscribe ? null : (
-        <div className="settings-inline settings-provider-notice">
-          <span className="muted">{t('settings.ai.noTranscriptionProvider')}</span>
-          {onOpenConnectors ? (
-            <button type="button" className="btn btn-sm" onClick={onOpenConnectors}>
-              {t('settings.ai.openConnectors')}
-            </button>
-          ) : null}
-        </div>
-      )}
 
       {chosen?.connected ? (
         <SettingsRow
@@ -105,8 +108,6 @@ export function TranscriptionSettings({
             onChange={updateModel}
           />
         </SettingsRow>
-      ) : transcriptionId ? (
-        <p className="settings-card-note muted">{t('settings.ai.connectToChooseModels')}</p>
       ) : null}
 
       <SettingsRow

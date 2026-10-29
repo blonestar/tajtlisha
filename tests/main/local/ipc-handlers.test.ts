@@ -431,6 +431,16 @@ describe('ai:listModels capability validation', () => {
     expect(listModels).toHaveBeenCalledWith('openai', 'summary');
     await expect(ipc.invoke(IPC_CHANNELS.aiListModels, fakeOwner(1), 'openai', 'vision')).rejects.toThrow('capability must be one of');
   });
+
+  it('accepts the local_cli auth mode without a secret', async () => {
+    const ipc = fakeIpc();
+    const connectProvider = vi.fn(async () => ({ connected: true }));
+    registerAiIpc({ ipc, registry: { connectProvider } as never });
+
+    await ipc.invoke(IPC_CHANNELS.aiConnectProvider, fakeOwner(1), { providerId: 'codex_cli', authMode: 'local_cli' });
+
+    expect(connectProvider).toHaveBeenCalledWith({ providerId: 'codex_cli', authMode: 'local_cli' });
+  });
 });
 
 describe('project:selectVideo', () => {

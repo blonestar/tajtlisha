@@ -60,8 +60,7 @@ export function SummarySettings({ settings, providers = [], onSettingsChange, on
         />
       </SettingsRow>
 
-      <SummaryPromptRow systemPrompt={summary.systemPrompt} onCommit={(systemPrompt) => updateSummary({ systemPrompt })} />
-
+      <h3 className="settings-subheading">{t('settings.ai.providerAndModel')}</h3>
       <SettingsRow
         label={t('settings.summary.provider')}
         htmlFor="settings-summary-provider"
@@ -94,6 +93,8 @@ export function SummarySettings({ settings, providers = [], onSettingsChange, on
           onChange={(reasoningEffort) => updateSummary({ reasoningEffort })}
         />
       </SettingsRow>
+
+      <SummaryPromptRow systemPrompt={summary.systemPrompt} onCommit={(systemPrompt) => updateSummary({ systemPrompt })} />
     </>
   );
 }
