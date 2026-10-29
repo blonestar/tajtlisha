@@ -1095,6 +1095,31 @@ describe('SubtitleWorkflowService video context', () => {
     );
   });
 
+  it('sends the correction pass to its own text provider when one is set, and keeps translation on the request provider', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(
+      createRequest({
+        providerId: 'openai',
+        correction: { providerId: 'codex_cli', modelId: 'gpt-fix', instructions: 'Fix names.' }
+      })
+    );
+
+    expect(registry.transcribe).toHaveBeenCalledWith('openai', expect.anything());
+    expect(registry.polishTexts).toHaveBeenCalledWith('codex_cli', expect.objectContaining({ mode: 'transcript_correction' }));
+    expect(registry.polishTexts).not.toHaveBeenCalledWith('openai', expect.anything());
+  });
+
+  it('uses the request provider for the correction pass when no correction provider is set', async () => {
+    const registry = correctingRegistry((text) => text);
+    const { service } = createService({ registry });
+
+    await service.transcribe(createRequest({ providerId: 'openrouter', correction: { instructions: '' } }));
+
+    expect(registry.polishTexts).toHaveBeenCalledWith('openrouter', expect.objectContaining({ mode: 'transcript_correction' }));
+  });
+
   it('sends no video context to polish when the transcript is not corrected', async () => {
     const registry = correctingRegistry((text) => text);
     const { service } = createService({ registry });

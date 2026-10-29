@@ -75,6 +75,7 @@ function toTranscribeRequest(payload: unknown): TranscribeClipRequest {
 function toCorrectionRequest(value: unknown): TranscriptCorrectionRequest {
   const input = requireRecord(value, 'correction');
   return {
+    ...(input.providerId === undefined ? {} : { providerId: requireProviderId(input.providerId) }),
     modelId: summaryModelId(input.modelId),
     instructions: instructionsText(input.instructions, 'correction.instructions') ?? ''
   };
