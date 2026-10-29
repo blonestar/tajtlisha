@@ -208,7 +208,7 @@ function formatClockTime(ms: number): string {
  * (for example Polish/Czech "ale" instead of "ali").
  */
 const SERBIAN_VOCABULARY_RULE =
-  'Use natural, standard Serbian (ekavian) vocabulary and grammar, as a native Serbian speaker would write it. Do not use words that belong only to Croatian, Bosnian, Slovenian, Polish, Czech, Russian, or another Slavic language.';
+  'Use natural Serbian vocabulary and grammar, as a native Serbian speaker would write it. Never use words from other Slavic languages, such as Polish, Czech, Slovenian, or Russian.';
 
 /** Explicit script and vocabulary rules for Serbian targets; empty for other languages. */
 function scriptInstruction(language: string): string {

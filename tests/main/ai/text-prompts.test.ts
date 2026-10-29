@@ -47,11 +47,11 @@ describe('script instructions', () => {
   it('asks for standard Serbian vocabulary for both Serbian scripts', () => {
     for (const targetLanguage of ['sr-Latn', 'sr-Cyrl']) {
       expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'en', targetLanguage })).toContain(
-        'Use natural, standard Serbian (ekavian) vocabulary'
+        'Use natural Serbian vocabulary and grammar'
       );
     }
     expect(buildTranslationInstructions({ ...limits, sourceLanguage: 'sr-Latn', targetLanguage: 'en' })).not.toContain(
-      'standard Serbian'
+      'natural Serbian'
     );
   });
 
