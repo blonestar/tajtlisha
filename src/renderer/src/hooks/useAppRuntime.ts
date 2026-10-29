@@ -5,6 +5,7 @@ import type { TajtlishaApi } from '../../../shared/types/ipc';
 import type { AppSettings, UiLanguage } from '../../../shared/types/settings';
 import { normalizeUiZoom } from '../../../shared/ui-zoom';
 import { resolveUiLanguage } from '../i18n';
+import { activeProviderAfterConnect } from '../utils/providerRoles';
 
 export type AppRuntimePhase = 'loading' | 'ready' | 'error';
 
@@ -18,7 +19,12 @@ export type AppRuntime = {
   reload: () => void;
   changeLanguage: (language: UiLanguage) => void;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
-  setActiveProvider: (providerId: AiProviderId) => void;
+  /** Reloads the provider statuses, for example after the user installed a local CLI. */
+  refreshProviders: () => Promise<void>;
+  /**
+   * Saves the provider's credential. The provider takes the transcription role only
+   * when none is chosen or the chosen one is not connected (see activeProviderAfterConnect).
+   */
   connectProvider: (providerId: AiProviderId, authMode: AuthMode, secret: string) => Promise<void>;
   disconnectProvider: (providerId: AiProviderId) => Promise<void>;
   testProvider: (providerId: AiProviderId) => Promise<TestConnectionResult>;
@@ -125,15 +131,6 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
     [applyLanguage, updateSettings]
   );
 
-  const setActiveProvider = useCallback(
-    (providerId: AiProviderId) => {
-      const current = settingsRef.current;
-      const next = { ...current, aiConnector: { ...current.aiConnector, activeProviderId: providerId } };
-      void saveSettings({ aiConnector: next.aiConnector }, next);
-    },
-    [saveSettings]
-  );
-
   const refreshProviders = useCallback(async () => {
     const api = getApi();
     if (!api) return;
@@ -145,21 +142,22 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
     async (providerId: AiProviderId, authMode: AuthMode, secret: string) => {
       const api = getApi();
       const status = await api?.ai.connectProvider({ providerId, authMode, secret });
+      const nextProviders = status ? providers.map((provider) => (provider.id === providerId ? status : provider)) : providers;
       if (status) {
-        setProviders((current) => current.map((provider) => (provider.id === providerId ? status : provider)));
+        setProviders(nextProviders);
       }
       const current = settingsRef.current;
       const next = {
         ...current,
         aiConnector: {
           ...current.aiConnector,
-          activeProviderId: providerId,
+          activeProviderId: activeProviderAfterConnect(current.aiConnector.activeProviderId, providerId, nextProviders),
           authModeByProvider: { ...current.aiConnector.authModeByProvider, [providerId]: authMode }
         }
       };
       await saveSettings({ aiConnector: next.aiConnector }, next);
     },
-    [saveSettings]
+    [providers, saveSettings]
   );
 
   const disconnectProvider = useCallback(async (providerId: AiProviderId) => {
@@ -199,7 +197,7 @@ export function useAppRuntime(fallbackSettings: AppSettings): AppRuntime {
     reload,
     changeLanguage,
     updateSettings,
-    setActiveProvider,
+    refreshProviders,
     connectProvider,
     disconnectProvider,
     testProvider,

@@ -338,6 +338,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.settings-sheet .provider-card-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Local CLI values (version, executable path): monospace, wrapped instead of widening the card. */
+.settings-sheet .settings-mono-value {
+  color: var(--text-muted);
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.settings-sheet .settings-cli-actions {
+  margin-top: var(--space-2);
+}
+.settings-sheet .settings-provider-notice {
+  margin-bottom: var(--space-3);
+}
 
 /* Credential */
 .settings-sheet .settings-stored-key {

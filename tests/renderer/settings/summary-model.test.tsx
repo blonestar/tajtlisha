@@ -8,6 +8,27 @@ import { SummarySettings } from '../../../src/renderer/src/components/settings/S
 import { mockProviderStatuses, mockSettings } from './mockSettings';
 import { renderWithI18n } from '../renderWithI18n';
 
+/** Local CLI provider that can summarize, found on this computer. */
+const codexFound: ProviderStatus = {
+  id: 'codex_cli',
+  displayName: 'Codex CLI (local)',
+  authModes: ['local_cli'],
+  experimental: true,
+  connected: true,
+  cliVersion: 'codex-cli 0.165.0',
+  cliPath: '/home/user/.local/bin/codex',
+  capabilities: {
+    detectLanguage: false,
+    transcription: false,
+    segmentTimestamps: false,
+    wordTimestamps: false,
+    translation: true,
+    subtitlePolish: true,
+    textToSpeech: false,
+    summary: true
+  }
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -57,9 +78,7 @@ function renderSummaryTab(options: {
 
 describe('Summary tab model row', () => {
   it('is not part of the Connectors section any more', () => {
-    renderWithI18n(
-      <ConnectorsSection settings={settingsWith({ enabled: true })} providers={mockProviderStatuses} onListModels={listModelsSpy()} />
-    );
+    renderWithI18n(<ConnectorsSection settings={settingsWith({ enabled: true })} providers={mockProviderStatuses} />);
 
     expect(screen.queryByLabelText('Summary model')).not.toBeInTheDocument();
   });
@@ -70,7 +89,7 @@ describe('Summary tab model row', () => {
     const input = screen.getByLabelText('Summary model');
     expect(input).toBeEnabled();
     expect(input).toHaveAttribute('placeholder', 'Same as text model');
-    expect(screen.getByText(/Uses the active AI provider: OpenAI\./)).toBeInTheDocument();
+    expect(screen.getByText(/Uses the summary provider: OpenAI\./)).toBeInTheDocument();
   });
 
   it('is disabled with a hint when the active provider is not connected', () => {
@@ -80,7 +99,7 @@ describe('Summary tab model row', () => {
     });
 
     expect(screen.getByLabelText('Summary model')).toBeDisabled();
-    expect(screen.getByText('Connect the active AI provider in the Connectors section to choose a model.')).toBeInTheDocument();
+    expect(screen.getByText('Connect the summary provider in the Connectors section to choose a model.')).toBeInTheDocument();
   });
 
   it('is disabled with a hint when the provider cannot summarize', () => {
@@ -214,6 +233,79 @@ describe('Summary tab model row', () => {
     fireEvent.blur(input);
     expect(onSettingsChange).toHaveBeenCalledWith({
       summary: expect.objectContaining({ modelByProvider: { openai: 'custom-model' } })
+    });
+  });
+});
+
+describe('Summary tab provider', () => {
+  it('stores "Same as translation" as an empty provider id', () => {
+    const { onSettingsChange } = renderSummaryTab({
+      settings: settingsWith({ enabled: true, providerId: 'codex_cli' }),
+      providers: [...mockProviderStatuses, codexFound]
+    });
+
+    fireEvent.change(screen.getByLabelText('Summary provider'), { target: { value: '' } });
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      summary: expect.objectContaining({ providerId: '' })
+    });
+  });
+
+  it('offers only providers that can summarize, and shows "Same as translation" as the blank choice', () => {
+    renderSummaryTab({
+      settings: settingsWith({ enabled: true }),
+      providers: [...mockProviderStatuses, { ...codexFound, capabilities: { ...codexFound.capabilities, summary: false } }]
+    });
+
+    const select = screen.getByLabelText('Summary provider') as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.text)).toEqual(['Same as translation (OpenAI)', 'OpenAI']);
+    expect(select.value).toBe('');
+  });
+
+  it('follows the translation provider when the summary has no provider of its own', () => {
+    const onListModels = listModelsSpy();
+    renderSummaryTab({
+      settings: { ...settingsWith({ enabled: true }), aiConnector: { ...mockSettings.aiConnector, textProviderId: 'codex_cli' } },
+      providers: [...mockProviderStatuses, codexFound],
+      onListModels
+    });
+
+    expect(screen.getByLabelText('Summary provider')).toHaveValue('');
+    expect(screen.getByText(/Uses the summary provider: Codex CLI \(local\)\./)).toBeInTheDocument();
+    expect(onListModels).toHaveBeenCalledWith('codex_cli', 'summary');
+  });
+
+  it('uses its own provider, and its model list, when one is chosen', () => {
+    const onListModels = listModelsSpy();
+    renderSummaryTab({
+      settings: {
+        ...settingsWith({ enabled: true, providerId: 'codex_cli' }),
+        aiConnector: { ...mockSettings.aiConnector, textProviderId: 'openai' }
+      },
+      providers: [...mockProviderStatuses, codexFound],
+      onListModels
+    });
+
+    expect(screen.getByLabelText('Summary provider')).toHaveValue('codex_cli');
+    expect(screen.getByText(/Uses the summary provider: Codex CLI \(local\)\./)).toBeInTheDocument();
+    expect(onListModels).toHaveBeenCalledWith('codex_cli', 'summary');
+  });
+
+  it('keeps the model saved for the resolved provider', () => {
+    const { onSettingsChange } = renderSummaryTab({
+      settings: {
+        ...settingsWith({ enabled: true, modelByProvider: { codex_cli: 'gpt-5-codex' } }),
+        aiConnector: { ...mockSettings.aiConnector, textProviderId: 'codex_cli' }
+      },
+      providers: [...mockProviderStatuses, codexFound]
+    });
+
+    expect(screen.getByLabelText('Summary model')).toHaveValue('gpt-5-codex');
+    fireEvent.change(screen.getByLabelText('Summary model'), { target: { value: 'gpt-5' } });
+    fireEvent.blur(screen.getByLabelText('Summary model'));
+
+    expect(onSettingsChange).toHaveBeenCalledWith({
+      summary: expect.objectContaining({ modelByProvider: { codex_cli: 'gpt-5' } })
     });
   });
 });

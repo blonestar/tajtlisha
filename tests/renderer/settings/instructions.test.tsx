@@ -140,10 +140,10 @@ describe('AI correction after transcription', () => {
     expect(screen.getByText(`3 / ${MAX_AI_INSTRUCTIONS_CHARS} characters`)).toBeInTheDocument();
   });
 
-  it('shows the correction hint that names the Connectors text model', () => {
+  it('shows the correction hint that names the provider and model chosen in the Translation tab', () => {
     renderTab('Transcription', mockSettings);
 
-    expect(screen.getByText(/uses the text model chosen under Connectors and keeps the timing/)).toBeInTheDocument();
+    expect(screen.getByText(/uses the provider and model chosen in the Translation tab and keeps the timing/)).toBeInTheDocument();
   });
 });
 

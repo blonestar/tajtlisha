@@ -27,10 +27,10 @@ type SettingsPageProps = {
   providers?: ProviderStatus[];
   onLanguageChange: (language: UiLanguage) => void;
   onSettingsChange?: (patch: Partial<AppSettings>) => void;
-  onActiveProviderChange?: (providerId: AiProviderId) => void;
   onConnectProvider?: (providerId: AiProviderId, authMode: AuthMode, secret: string) => Promise<void>;
   onDisconnectProvider?: (providerId: AiProviderId) => Promise<void>;
   onTestProvider?: (providerId: AiProviderId) => Promise<TestConnectionResult>;
+  onRefreshProviders?: () => Promise<void>;
   onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
   /** Shows the close button in the header. The container handles Esc. */
   onClose?: () => void;
@@ -54,10 +54,10 @@ export function SettingsPage({
   providers = [],
   onLanguageChange,
   onSettingsChange,
-  onActiveProviderChange,
   onConnectProvider,
   onDisconnectProvider,
   onTestProvider,
+  onRefreshProviders,
   onListModels,
   onClose
 }: SettingsPageProps): ReactElement {
@@ -101,19 +101,29 @@ export function SettingsPage({
               <ConnectorsSection
                 settings={settings}
                 providers={providers}
-                onSettingsChange={onSettingsChange}
-                onActiveProviderChange={onActiveProviderChange}
                 onConnectProvider={onConnectProvider}
                 onDisconnectProvider={onDisconnectProvider}
                 onTestProvider={onTestProvider}
-                onListModels={onListModels}
+                onRefreshProviders={onRefreshProviders}
               />
             ) : null}
             {section === 'transcription' ? (
-              <TranscriptionSettings settings={settings} onSettingsChange={onSettingsChange} />
+              <TranscriptionSettings
+                settings={settings}
+                providers={providers}
+                onSettingsChange={onSettingsChange}
+                onListModels={onListModels}
+                onOpenConnectors={() => setSection('connectors')}
+              />
             ) : null}
             {section === 'translation' ? (
-              <TranslationSettings settings={settings} onSettingsChange={onSettingsChange} />
+              <TranslationSettings
+                settings={settings}
+                providers={providers}
+                onSettingsChange={onSettingsChange}
+                onListModels={onListModels}
+                onOpenConnectors={() => setSection('connectors')}
+              />
             ) : null}
             {section === 'summary' ? (
               <SummarySettings

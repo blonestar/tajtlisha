@@ -21,7 +21,9 @@ function props(overrides: Partial<GeneratePanelProps> = {}): GeneratePanelProps 
     hasAudio: true,
     videoContext: '',
     onVideoContextChange: vi.fn(),
-    provider: connectedProvider,
+    transcriptionProvider: connectedProvider,
+    textProvider: connectedProvider,
+    summaryProvider: connectedProvider,
     sourceLanguage: 'auto',
     targetLanguage: 'sr-Latn',
     captionCount: 0,
@@ -86,7 +88,7 @@ describe('GeneratePanel', () => {
 
   it('asks for a provider and offers Open Settings when none is selected', () => {
     const onOpenSettings = vi.fn();
-    renderWithI18n(<GeneratePanel {...props({ provider: null, onOpenSettings })} />);
+    renderWithI18n(<GeneratePanel {...props({ transcriptionProvider: null, textProvider: null, onOpenSettings })} />);
 
     expect(screen.getByText('No AI provider selected')).toBeTruthy();
     expect(screen.getByText('Choose an AI provider in Settings')).toBeTruthy();
@@ -100,7 +102,8 @@ describe('GeneratePanel', () => {
     renderWithI18n(
       <GeneratePanel
         {...props({
-          provider: { ...connectedProvider, connected: false },
+          transcriptionProvider: { ...connectedProvider, connected: false },
+          textProvider: { ...connectedProvider, connected: false },
           captionCount: 2,
           rowsNeedingTranslation: 2,
           onOpenSettings
@@ -119,7 +122,7 @@ describe('GeneratePanel', () => {
 
   it('explains when the provider cannot transcribe', () => {
     renderWithI18n(
-      <GeneratePanel {...props({ provider: { ...connectedProvider, displayName: 'OpenRouter', canTranscribe: false } })} />
+      <GeneratePanel {...props({ transcriptionProvider: { ...connectedProvider, displayName: 'OpenRouter', canTranscribe: false } })} />
     );
 
     expect(screen.getByRole('button', { name: 'Transcribe' })).toBeDisabled();
@@ -242,7 +245,7 @@ describe('GeneratePanel', () => {
     it('explains when the provider cannot summarize', () => {
       renderWithI18n(
         <GeneratePanel
-          {...summaryProps({ provider: { ...connectedProvider, displayName: 'OpenRouter', canSummarize: false } })}
+          {...summaryProps({ summaryProvider: { ...connectedProvider, displayName: 'OpenRouter', canSummarize: false } })}
         />
       );
 
@@ -251,7 +254,7 @@ describe('GeneratePanel', () => {
     });
 
     it('names a provider that is not connected', () => {
-      renderWithI18n(<GeneratePanel {...summaryProps({ provider: { ...connectedProvider, connected: false } })} />);
+      renderWithI18n(<GeneratePanel {...summaryProps({ summaryProvider: { ...connectedProvider, connected: false } })} />);
 
       expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
       expect(screen.getAllByText('Connect OpenAI in Settings first').length).toBeGreaterThan(0);
@@ -383,5 +386,62 @@ describe('GeneratePanel video context', () => {
 
     expect(onVideoContextChange).toHaveBeenCalledWith('');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+});
+
+describe('GeneratePanel per-task providers', () => {
+  const codexCli = {
+    id: 'codex_cli',
+    displayName: 'Codex CLI (local)',
+    connected: true,
+    canTranscribe: false,
+    canTranslate: true,
+    canSummarize: true
+  };
+
+  it('shows the translation provider next to the transcription provider when they differ', () => {
+    renderWithI18n(<GeneratePanel {...props({ textProvider: codexCli, captionCount: 1, rowsNeedingTranslation: 1 })} />);
+
+    expect(screen.getByText('Translation: Codex CLI (local)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Transcribe again' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Translate 1 rows' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Open Settings' })).not.toBeInTheDocument();
+  });
+
+  it('hides the translation provider when it is the transcription provider', () => {
+    renderWithI18n(<GeneratePanel {...props()} />);
+
+    expect(screen.queryByText(/^Translation:/)).not.toBeInTheDocument();
+  });
+
+  it('names the translation provider when translation is blocked, and keeps transcription usable', () => {
+    const onOpenSettings = vi.fn();
+    renderWithI18n(
+      <GeneratePanel
+        {...props({
+          textProvider: { ...codexCli, connected: false },
+          captionCount: 2,
+          rowsNeedingTranslation: 2,
+          onOpenSettings
+        })}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Transcribe again' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Translate 2 rows' })).toBeDisabled();
+    expect(screen.getByText('Connect Codex CLI (local) in Settings first')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Open Settings for a missing summary provider only while the summary is enabled', () => {
+    const { unmount } = renderWithI18n(<GeneratePanel {...props({ summaryProvider: null, summaryEnabled: false })} />);
+    expect(screen.queryByRole('button', { name: 'Open Settings' })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithI18n(<GeneratePanel {...props({ summaryProvider: null, summaryEnabled: true, summarizableRows: 1 })} />);
+    expect(screen.getByRole('button', { name: 'Open Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Summarize' })).toBeDisabled();
   });
 });

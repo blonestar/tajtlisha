@@ -34,7 +34,12 @@ export type GenerateProviderInfo = {
 export type GeneratePanelProps = {
   hasSource: boolean;
   hasAudio: boolean;
-  provider: GenerateProviderInfo | null;
+  /** Provider for transcription. */
+  transcriptionProvider: GenerateProviderInfo | null;
+  /** Provider for translation and transcript correction. Shown only when it differs from the transcription provider. */
+  textProvider: GenerateProviderInfo | null;
+  /** Provider for the summary. Checked only when the summary is enabled. */
+  summaryProvider: GenerateProviderInfo | null;
   sourceLanguage: string | 'auto';
   targetLanguage: string;
   captionCount: number;
@@ -70,45 +75,59 @@ function contextPreview(text: string): string {
 }
 
 /** First reason that blocks an action, or null when it can run. */
+/** Why one AI step cannot run with this provider, or null when it can. */
+function providerBlock(
+  provider: GenerateProviderInfo | null,
+  capable: 'canTranscribe' | 'canTranslate' | 'canSummarize',
+  cannotKey: string
+): Reason | null {
+  if (!provider) return { key: 'captions.generate.reason.noProvider' };
+  if (!provider.connected) {
+    return { key: 'captions.generate.reason.notConnected', values: { provider: provider.displayName } };
+  }
+  if (!provider[capable]) {
+    return { key: cannotKey, values: { provider: provider.displayName } };
+  }
+  return null;
+}
+
 function transcribeBlock(props: GeneratePanelProps): Reason | null {
   if (props.busy) return { key: 'captions.generate.reason.busy' };
   if (!props.hasSource) return { key: 'captions.generate.reason.noVideo' };
   if (!props.hasAudio) return { key: 'captions.generate.reason.noAudio' };
-  if (!props.provider) return { key: 'captions.generate.reason.noProvider' };
-  if (!props.provider.connected) {
-    return { key: 'captions.generate.reason.notConnected', values: { provider: props.provider.displayName } };
-  }
-  if (!props.provider.canTranscribe) {
-    return { key: 'captions.generate.reason.cannotTranscribe', values: { provider: props.provider.displayName } };
-  }
-  return null;
+  return providerBlock(props.transcriptionProvider, 'canTranscribe', 'captions.generate.reason.cannotTranscribe');
 }
 
 function translateBlock(props: GeneratePanelProps): Reason | null {
   if (props.busy) return { key: 'captions.generate.reason.busy' };
   if (props.captionCount === 0) return { key: 'captions.generate.reason.noCaptions' };
   if (props.rowsNeedingTranslation === 0) return { key: 'captions.generate.reason.allTranslated' };
-  if (!props.provider) return { key: 'captions.generate.reason.noProvider' };
-  if (!props.provider.connected) {
-    return { key: 'captions.generate.reason.notConnected', values: { provider: props.provider.displayName } };
-  }
-  if (!props.provider.canTranslate) {
-    return { key: 'captions.generate.reason.cannotTranslate', values: { provider: props.provider.displayName } };
-  }
-  return null;
+  return providerBlock(props.textProvider, 'canTranslate', 'captions.generate.reason.cannotTranslate');
 }
 
 function summarizeBlock(props: GeneratePanelProps): Reason | null {
   if (props.busy) return { key: 'captions.generate.reason.busy' };
   if ((props.summarizableRows ?? 0) === 0) return { key: 'captions.generate.reason.noTranscript' };
-  if (!props.provider) return { key: 'captions.generate.reason.noProvider' };
-  if (!props.provider.connected) {
-    return { key: 'captions.generate.reason.notConnected', values: { provider: props.provider.displayName } };
-  }
-  if (!props.provider.canSummarize) {
-    return { key: 'captions.generate.reason.cannotSummarize', values: { provider: props.provider.displayName } };
-  }
-  return null;
+  return providerBlock(props.summaryProvider, 'canSummarize', 'captions.generate.reason.cannotSummarize');
+}
+
+/** Provider name with its connection state. */
+function ProviderState({ provider, label }: { provider: GenerateProviderInfo; label?: string }): ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <span className="generate-provider-name">
+      {label ?? provider.displayName}
+      {provider.connected ? (
+        <span className="badge badge-success">
+          <CircleCheck aria-hidden="true" size={12} />
+          {t('captions.generate.providerConnected')}
+        </span>
+      ) : (
+        <span className="badge badge-muted">{t('captions.generate.providerNotConnected')}</span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -118,7 +137,9 @@ function summarizeBlock(props: GeneratePanelProps): Reason | null {
 export function GeneratePanel(props: GeneratePanelProps): ReactElement {
   const { t, i18n } = useTranslation();
   const {
-    provider,
+    transcriptionProvider,
+    textProvider,
+    summaryProvider,
     sourceLanguage,
     targetLanguage,
     captionCount,
@@ -144,6 +165,9 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
   const transcribeReason = transcribeBlock(props);
   const translateReason = translateBlock(props);
   const summarizeReason = summarizeBlock(props);
+  // Settings is offered whenever a provider that an action needs is missing or not connected.
+  const neededProviders = [transcriptionProvider, textProvider, ...(summaryEnabled ? [summaryProvider] : [])];
+  const needsSettings = neededProviders.some((provider) => !provider?.connected);
   const [contextOpen, setContextOpen] = useState(false);
   const hasContext = videoContext.trim() !== '';
   const contextTitle = hasContext
@@ -202,22 +226,18 @@ export function GeneratePanel(props: GeneratePanelProps): ReactElement {
 
       <div className="generate-provider">
         <span className="field-label">{t('captions.generate.provider')}</span>
-        {provider ? (
-          <span className="generate-provider-name">
-            {provider.displayName}
-            {provider.connected ? (
-              <span className="badge badge-success">
-                <CircleCheck aria-hidden="true" size={12} />
-                {t('captions.generate.providerConnected')}
-              </span>
-            ) : (
-              <span className="badge badge-muted">{t('captions.generate.providerNotConnected')}</span>
-            )}
-          </span>
+        {transcriptionProvider ? (
+          <ProviderState provider={transcriptionProvider} />
         ) : (
           <span className="muted">{t('captions.generate.noProvider')}</span>
         )}
-        {(!provider || !provider.connected) && (
+        {textProvider && textProvider.id !== transcriptionProvider?.id ? (
+          <ProviderState
+            provider={textProvider}
+            label={t('captions.generate.textProviderLabel', { provider: textProvider.displayName })}
+          />
+        ) : null}
+        {needsSettings && (
           <button type="button" className="btn btn-sm" onClick={onOpenSettings}>
             {t('captions.generate.openSettings')}
           </button>

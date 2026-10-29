@@ -2,15 +2,16 @@ import type { ReactElement } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DEFAULT_SUMMARY_PROMPT, MAX_SUMMARY_PROMPT_CHARS } from '../../../../shared/summary';
-import {
-  REASONING_EFFORTS,
-  type AiProviderCapabilities,
-  type AiProviderId,
-  type ProviderModelDescriptor,
-  type ProviderStatus
+import type {
+  AiProviderCapabilities,
+  AiProviderId,
+  ProviderModelDescriptor,
+  ProviderStatus
 } from '../../../../shared/types/ai';
 import type { AppSettings, SummarySettings as SummarySettingsValue } from '../../../../shared/types/settings';
+import { providerRolesOf } from '../../utils/providerRoles';
 import { useCommitOnUnmount } from './hooks';
+import { EffortSelect, ProviderSelect } from './ProviderControls';
 import { SettingsRow, SettingsSwitch } from './SettingsPrimitives';
 
 type SummarySettingsProps = {
@@ -20,7 +21,11 @@ type SummarySettingsProps = {
   onListModels?: (providerId: AiProviderId, capability: keyof AiProviderCapabilities) => Promise<ProviderModelDescriptor[]>;
 };
 
-type EffortChoice = SummarySettingsValue['reasoningEffort'];
+/**
+ * Stored as '' for "Same as translation". Settings patches cannot carry undefined,
+ * and main normalizes '' to unset, the same as an unregistered provider.
+ */
+const SAME_AS_TRANSLATION = '' as unknown as AiProviderId;
 
 /** A blank stored prompt means the default, the same way main and the request builder treat it. */
 function shownPrompt(stored: string): string {
@@ -29,13 +34,17 @@ function shownPrompt(stored: string): string {
 
 /**
  * The Summary settings tab. The switch only shows or hides the Summarize button
- * in the editor; the prompt, model and effort stay editable either way.
+ * in the editor; the prompt, provider, model and effort stay editable either way.
  */
 export function SummarySettings({ settings, providers = [], onSettingsChange, onListModels }: SummarySettingsProps): ReactElement {
   const { t } = useTranslation();
   const summary = settings.summary;
-  const activeId = settings.aiConnector.activeProviderId;
-  const activeProvider = providers.find((provider) => provider.id === activeId);
+  const roles = providerRolesOf(settings, providers);
+  const summaryProvider = providers.find((provider) => provider.id === roles.summaryId);
+  // "Same as translation" names the provider it resolves to, so the select shows what is used.
+  const textProviderName = providers.find((provider) => provider.id === roles.textId)?.displayName ?? t('settings.ai.noProviderChosen');
+  // Only a registered provider is shown as chosen; an unregistered stored id falls back to "Same as translation".
+  const chosenSummaryProvider = providers.some((provider) => provider.id === summary.providerId) ? summary.providerId : undefined;
 
   function updateSummary(patch: Partial<SummarySettingsValue>): void {
     onSettingsChange?.({ summary: { ...summary, ...patch } });
@@ -53,28 +62,37 @@ export function SummarySettings({ settings, providers = [], onSettingsChange, on
 
       <SummaryPromptRow systemPrompt={summary.systemPrompt} onCommit={(systemPrompt) => updateSummary({ systemPrompt })} />
 
+      <SettingsRow
+        label={t('settings.summary.provider')}
+        htmlFor="settings-summary-provider"
+        hint={t('settings.summary.providerHint', {
+          provider: summaryProvider?.displayName ?? t('settings.ai.noProviderChosen')
+        })}
+      >
+        <ProviderSelect
+          id="settings-summary-provider"
+          value={chosenSummaryProvider ?? ''}
+          providers={providers}
+          capability="summary"
+          blankLabel={t('settings.summary.sameAsTranslation', { provider: textProviderName })}
+          onChange={(providerId) => updateSummary({ providerId: providerId === '' ? SAME_AS_TRANSLATION : providerId })}
+        />
+      </SettingsRow>
+
       <SummaryModelRow
-        key={activeProvider?.id ?? 'none'}
-        provider={activeProvider}
+        key={summaryProvider?.id ?? 'none'}
+        provider={summaryProvider}
         settings={settings}
         onSettingsChange={onSettingsChange}
         onListModels={onListModels}
       />
 
       <SettingsRow label={t('settings.summary.effort')} htmlFor="settings-summary-effort" hint={t('settings.summary.effortHint')}>
-        <select
+        <EffortSelect
           id="settings-summary-effort"
-          className="select"
           value={summary.reasoningEffort}
-          onChange={(event) => updateSummary({ reasoningEffort: event.currentTarget.value as EffortChoice })}
-        >
-          <option value="default">{t('settings.summary.effortDefault')}</option>
-          {REASONING_EFFORTS.map((effort) => (
-            <option key={effort} value={effort}>
-              {t(`settings.summary.effortLevels.${effort}`)}
-            </option>
-          ))}
-        </select>
+          onChange={(reasoningEffort) => updateSummary({ reasoningEffort })}
+        />
       </SettingsRow>
     </>
   );
