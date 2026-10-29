@@ -95,6 +95,11 @@ export interface AiProvider extends ProviderSummary {
   translateTexts(request: ProviderTranslateRequest): Promise<ProviderTextItem[]>;
   polishTexts(request: ProviderPolishRequest): Promise<ProviderTextItem[]>;
   summarizeText(request: ProviderSummarizeRequest): Promise<string>;
+  /**
+   * Local CLI providers only: finds the installed CLI and reads its version.
+   * Null when it is not installed. The registry uses this instead of a credential.
+   */
+  detectLocalCli?(): Promise<{ path: string; version: string } | null>;
 }
 
 type FetchJsonOptions = {

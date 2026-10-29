@@ -40,7 +40,8 @@ OpenRouter takodje ima STT endpoint za transkripciju:
 - Main process ima subtitle workflow servis koji iz videa ekstraktuje privremeni audio, poziva provider za transkripciju, prevod i opcioni polish, pa renderer-u vraca originalni i prevedeni track.
 - OpenRouter ima runtime tok za transkripciju preko `/api/v1/audio/transcriptions`, kao i translation/polish preko `/api/v1/chat/completions`.
 - Settings ucitava OpenAI poznate modele i OpenRouter katalog modela za odgovarajuce capability-je.
-- OpenAI API key je jedini podrzani auth tok za ovu aplikaciju. ChatGPT/Codex login se ne koristi za OpenAI API pozive.
+- Za OpenAI i OpenRouter API key je jedini podrzani auth tok. ChatGPT/Codex login se ne koristi za OpenAI API pozive.
+- Za tekst postoje i lokalni CLI provider-i (Codex CLI, Claude Code, experimental). Oni koriste login svog CLI-ja, a ne API key. Vidi "Lokalni CLI provider-i" ispod.
 
 ## Auth strategija
 
@@ -77,17 +78,61 @@ OpenRouter je API provider preko Bearer token-a. Koristi se kao alternativni pro
 - translation/polish preko izabranog chat modela,
 - kasnije mozda TTS ako provider/model podrzi kvalitet koji treba.
 
+## Lokalni CLI provider-i (experimental)
+
+Dva provider-a pokrecu AI CLI koji je instaliran na korisnikovom racunaru i koriste njegov login (ChatGPT ili Claude pretplatu), umesto API key-a:
+
+- `codex_cli`: "Codex CLI (local)", komanda `codex`.
+- `claude_code_cli`: "Claude Code (local)", komanda `claude`.
+
+Pravila:
+
+- Samo tekst: translation, subtitle polish (ukljucujuci transcript correction) i summary. Transkripcija nije podrzana (`transcription: false`), pa ovi provider-i ne mogu biti provider za transkripciju.
+- Oba imaju `authModes: ['local_cli']` i `experimental: true`. Nema tajne: nista se ne cuva u credential store-u, a "connected" znaci da je CLI pronadjen na racunaru.
+- Tajtlisha nikad ne cita auth fajlove CLI-ja (`~/.codex/auth.json`, `~/.claude/*`). Samo pokrece binarni fajl.
+- Nalazenje izvrsne datoteke: svi direktorijumi iz `PATH`, pa fallback: `~/.local/bin`, `~/.claude/local`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`, `/usr/local/bin`, `/opt/homebrew/bin` i `~/.nvm/versions/node/*/bin` (najnovija verzija prva). GUI-pokrenuta Electron aplikacija cesto nema korisnikov shell PATH, zato fallback postoji.
+- Na Windows-u traži se samo `<ime>.exe`. npm `.cmd` shim-ovi nisu podrzani (shell se ne koristi).
+- Proces se pokrece bez shell-a, u privremenom direktorijumu koji se brise posle svakog zahteva. Stdout i stderr su ogranicen na 10 MB. Timeout: provera verzije i login statusa 5 s, lista modela 10 s, tekstualni zahtev 5 min. Iz ENV-a se uklanja `ELECTRON_RUN_AS_NODE`, a direktorijum izvrsne datoteke ide prvi u `PATH`.
+
+Komande za tekstualni zahtev (prompt ide na stdin):
+
+Codex CLI:
+
+```text
+codex exec --skip-git-repo-check --sandbox read-only --ephemeral --ignore-user-config --ignore-rules --color never -C <tmp> --output-schema <tmp>/schema.json -o <tmp>/out.txt [-m <model>] [-c model_reasoning_effort="<effort>"] -
+```
+
+Summary koristi istu komandu bez `--output-schema`. Odgovor se cita iz `-o` fajla. Lista modela je `codex debug models`, provera prijave `codex login status`.
+
+`--ignore-user-config` je namerno: preskace korisnikovu konfiguraciju i MCP servere (brze, bez nuspojava). Prijava i dalje radi.
+
+Claude Code:
+
+```text
+claude -p --output-format json --json-schema <schema> --system-prompt <instrukcije> --tools "" --no-session-persistence --safe-mode [--model <model>] [--effort <effort>]
+```
+
+Summary koristi istu komandu bez `--json-schema`. Prijava se proverava sa `claude auth status` (JSON polje `loggedIn`). `--bare` se ne koristi, jer preskace prijavu pretplatom. `none` i `minimal` se mapiraju na `low`. Modeli su CLI aliasi: `fable`, `opus`, `sonnet`, `haiku`.
+
+Claude Code nije vidljiv u paketovanim (instaliranim) build-ovima, osim ako je `TAJTLISHA_ENABLE_CLAUDE_CODE=1`. Razlog: Anthropic ne dozvoljava third-party proizvodima da nude koriscenje Claude pretplate bez odobrenja. U `pnpm dev` build-u je uvek vidljiv.
+
+Privatnost i greske:
+
+- E-mail i organizacija iz `claude auth status` se nikad ne kopiraju u poruke ni logove.
+- Greske CLI-ja se mapiraju: rate/usage limit na `PROVIDER_RATE_LIMITED`, prijava ili unauthorized na `PROVIDER_AUTH_FAILED`, ostalo na `PROVIDER_REQUEST_FAILED`. Detalj je poslednjih 300 karaktera teksta CLI-ja, bez e-mail adresa. Ceo prompt se ne prikazuje.
+
 ## Provider capability model
 
 Svaki provider mora eksplicitno da prijavi sta podrzava.
 
 ```ts
-type AiProviderId = 'openai' | 'openrouter';
+type AiProviderId = 'openai' | 'openrouter' | 'codex_cli' | 'claude_code_cli';
 
 type AuthMode =
   | 'oauth_or_chatgpt_login'
   | 'api_key'
-  | 'codex_auth_experimental';
+  | 'codex_auth_experimental'
+  | 'local_cli';
 
 type AiProviderCapabilities = {
   detectLanguage: boolean;

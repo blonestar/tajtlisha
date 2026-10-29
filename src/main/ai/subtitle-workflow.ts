@@ -188,7 +188,7 @@ export class SubtitleWorkflowService {
 
     try {
       const corrected = await this.runTextStage(items, 'correcting', context, (batch) =>
-        this.registry.polishTexts(request.providerId, {
+        this.registry.polishTexts(correction.providerId ?? request.providerId, {
           items: batch,
           language,
           mode: 'transcript_correction',

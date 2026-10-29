@@ -958,6 +958,28 @@ describe('workflow:transcribe correction validation', () => {
     expect(transcribe.mock.calls[0]?.[0]).not.toHaveProperty('correction');
   });
 
+  it('passes the correction text provider through and accepts a local CLI provider id', async () => {
+    const { ipc, transcribe } = setup();
+
+    await ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+      ...transcribeRequest('job-1'),
+      correction: { providerId: 'codex_cli', instructions: '' }
+    });
+
+    expect(transcribe.mock.calls[0]?.[0]).toMatchObject({ correction: { providerId: 'codex_cli', instructions: '' } });
+  });
+
+  it('rejects an unknown correction provider id', async () => {
+    const { ipc } = setup();
+
+    await expect(
+      ipc.invoke(IPC_CHANNELS.workflowTranscribe, fakeOwner(1), {
+        ...transcribeRequest('job-1'),
+        correction: { providerId: 'mystery', instructions: '' }
+      })
+    ).rejects.toThrow('[UNKNOWN] providerId must be one of openai, openrouter, codex_cli, claude_code_cli.');
+  });
+
   it('accepts a correction with a model and instructions', async () => {
     const { ipc, transcribe } = setup();
 
